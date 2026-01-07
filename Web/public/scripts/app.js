@@ -6100,6 +6100,9 @@ applyResponsiveMode();
     if (openModal && openModal.kind === "transport" && openModal.transportRefs){
       applyTransportRefs(transport, openModal.transportRefs);
     }
+    if (openModal && openModal.kind === "regions"){
+      renderModal();
+    }
   };
 
   let lastState = null;     // {master, tracks[]}
@@ -6895,7 +6898,13 @@ slotbar.appendChild(folderBtn);
       if (was) fxExpanded.delete(guid);
       else fxExpanded.add(guid);
       // ensure we have the FX list ready when expanding
-      const cur = Object.assign({}, trackByGuid.get(guid) || t, {_compact: !!t._compact});
+      const cur = Object.assign({}, trackByGuid.get(guid) || t, {
+        _compact: !!t._compact,
+        _gapL: !!t._gapL,
+        _gapR: !!t._gapR,
+        _folderGroupId: t._folderGroupId || null,
+        _folderGroupColor: t._folderGroupColor || "",
+      });
       const fxCount = cur.fxCount || 0;
       if (!was && fxCount>0){
         // request list even if cfg.showFxSlots is off
@@ -7084,7 +7093,15 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
 
     // VOL label
     const db = dbFromVol(t.vol||1.0);
-    r.volDb.textContent = db + " dB";
+    const clipState = meterAnim.get(t.guid);
+    const now = performance.now();
+    if (clipState && clipState.clipUntil && clipState.clipUntil > now && Number.isFinite(clipState.clipDb)){
+      r.volDb.textContent = `CLIP +${clipState.clipDb.toFixed(1)} dB`;
+      r.volDb.classList.add("clip");
+    } else {
+      r.volDb.textContent = db + " dB";
+      r.volDb.classList.remove("clip");
+    }
 
     // narrow strip detection (hide VOL label on very thin strips)
     const w = (el.getBoundingClientRect ? el.getBoundingClientRect().width : el.offsetWidth);
@@ -8495,6 +8512,7 @@ modalBody.appendChild(wrap);
     overlay.style.display = "block";
     modal.style.display = "block";
     openModal = {kind:"regions"};
+    wsSend({type:"reqState"});
     renderModal();
   }
 

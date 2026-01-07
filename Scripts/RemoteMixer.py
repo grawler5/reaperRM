@@ -657,8 +657,14 @@ def get_track_peaks(track):
             if isinstance(pkR, tuple): pkR = pkR[0]
             pkL = float(pkL)
             pkR = float(pkR)
+            raw_peak = max(pkL, pkR)
             # If it looks dead, fall back to UI peaks (useful for monitoring cases).
             clip_db = _ui_peaks_clip_db(track)
+            if clip_db is None and raw_peak > 1.0:
+                try:
+                    clip_db = 20.0 * math.log10(raw_peak)
+                except Exception:
+                    clip_db = None
             if pkL < 1e-6 and pkR < 1e-6:
                 uL, uR = _ui_peaks_lin(track)
                 if uL > pkL or uR > pkR:
