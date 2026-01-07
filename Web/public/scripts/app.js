@@ -6348,11 +6348,11 @@ function hideUserPicker(){
         }
         return;
       }
-    if (msg.type === "fxParams"){
-      // Update plugin window (if open)
-      try{
-        const k = `${msg.guid}:${msg.fxIndex}`;
-        const w = pluginWins.get(k);
+      if (msg.type === "fxParams"){
+        // Update plugin window (if open)
+        try{
+          const k = `${msg.guid}:${msg.fxIndex}`;
+          const w = pluginWins.get(k);
           if (w){
             w.params = msg.params || [];
             renderPluginWin(w);
@@ -8526,6 +8526,7 @@ modalBody.appendChild(wrap);
     modal.style.display = "block";
     openModal = {kind:"regions"};
     wsSend({type:"reqRegions"});
+    wsSend({type:"reqState"});
     renderModal();
   }
 
