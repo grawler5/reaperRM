@@ -13,7 +13,7 @@ out_pin:SC Ch2
 //out_pin:AuxL
 //out_pin:AuxR
 
-slider1:66<1,1000,1>density (ms)
+slider1:66<1,4000,1>density (ms)
 slider2:74<0,99,1>feedback
 slider3:95<0,95,1>late-bias (%)
 slider4:25<0,100,1>wet (%)
@@ -24,13 +24,13 @@ slider8:23<0,100,1>detuning (cents)
 slider9:1.5<0.1,10,0.1>chorus speed (Hz)
 slider10:chorus_alignment=0<0,1,1{independent,linked}>chorus phase
 
-slider11:67<1,1000,1>density (ms)
+slider11:67<1,4000,1>density (ms)
 slider12:6<0,99,1>ERfeedback
 slider13:0<0,95,1>late-bias (%)
 slider14:25<0,100,1>ERwet (%)
 slider15:86<0,100,1>ER vs. Tail
 slider16:-0.4<-6,6,.01>Tilt
-slider17:22<0,300,1>PreDelay
+slider17:22<0,4000,1>PreDelay
 slider18:0<0,300,1>GapDelay
 slider19:1<0,1,0.01>StereoSpread
 slider20:0.22<0,1,0.01>DryWet
@@ -59,6 +59,10 @@ slider37:0.5<0,1,0.01>-Low Boost/Cut (dB)
 slider38:0.5<0,1,0.01>-EQ GAIN
 slider39:0.5<0,1,0.01>-Mid Boost/Cut (dB)
 slider40:0.5<0,1,0.01>-High Shelf (12k) Boost/Cut (dB)
+slider41:120<0,300,0.1>-Telemetry BPM
+slider42:0<0,1,1>-Tempo Sync
+slider43:0<0,19,1>-Length Sync Note
+slider44:0<0,19,1>-Predelay Sync Note
 import delay-utils.jsfx-inc
 import smoother.jsfx-inc
 
@@ -432,11 +436,42 @@ PREEQGAIN = pow(10, 2 * PREEQFPARAM9 - 1);
 
 );
 
+function note_factor(idx) local(f) (
+	idx < 0 ? idx = 0;
+	idx > 19 ? idx = 19;
+	idx == 0 ? f = 1/96 :
+	idx == 1 ? f = 1/16 :
+	idx == 2 ? f = 3/32 :
+	idx == 3 ? f = 1/48 :
+	idx == 4 ? f = 1/8 :
+	idx == 5 ? f = 3/16 :
+	idx == 6 ? f = 1/24 :
+	idx == 7 ? f = 1/4 :
+	idx == 8 ? f = 3/8 :
+	idx == 9 ? f = 1/12 :
+	idx == 10 ? f = 1/2 :
+	idx == 11 ? f = 3/4 :
+	idx == 12 ? f = 1/6 :
+	idx == 13 ? f = 1 :
+	idx == 14 ? f = 3/2 :
+	idx == 15 ? f = 1/3 :
+	idx == 16 ? f = 2 :
+	idx == 17 ? f = 3 :
+	idx == 18 ? f = 4 :
+	idx == 19 ? f = 8 : f = 1;
+	f;
+);
+
 update();
 smoother_init(wet);
 smoother_init(dry);
 smoother_init(ERwet);
 smoother_init(ERdry);
+
+sync_last_bpm = -1;
+sync_last_len = -1;
+sync_last_pre = -1;
+sync_last_on = -1;
 
 
 
@@ -905,6 +940,38 @@ smoothing = smoother_block(wet) + smoother_block(dry)
 	
 @sample
 
+pr = play_rate;
+pr <= 0 ? pr = 1;
+bpm = tempo / pr;
+slider41 = bpm;
+
+sync_on = slider42 >= 0.5;
+sync_on != sync_last_on ? (
+  sync_last_on = sync_on;
+  sync_last_bpm = -1;
+);
+
+sync_on ? (
+  len_idx = slider43|0;
+  pre_idx = slider44|0;
+  len_ms = (60000 / max(1, bpm)) * note_factor(len_idx);
+  pre_ms = (60000 / max(1, bpm)) * note_factor(pre_idx);
+  len_ms > 4000 ? len_ms = 4000;
+  pre_ms > 4000 ? pre_ms = 4000;
+  len_ms < 1 ? len_ms = 1;
+  pre_ms < 0 ? pre_ms = 0;
+  (abs(len_ms - sync_last_len) > 0.001 || abs(pre_ms - sync_last_pre) > 0.001 || abs(bpm - sync_last_bpm) > 0.0001) ? (
+    slider1 = len_ms;
+    slider11 = len_ms;
+    slider17 = pre_ms;
+    sync_last_len = len_ms;
+    sync_last_pre = pre_ms;
+    sync_last_bpm = bpm;
+    update();
+    PREdelaylen = (slider17*srate*0.001)|0;
+  );
+);
+
 DRYspl0 = spl0;
 DRYspl1 = spl1;
 
@@ -1296,11 +1363,6 @@ fxm1 < abs(FXR) ? FXm1 = abs(FXR);//:(fxm1*=0.999);
 aaa= __memtop();
 //bpos+=2;
 //bpos>=33*max_delay_samples+1+buffsize*2 ? bpos=33*max_delay_samples+1;
-
-
-
-
-
 
 
 
