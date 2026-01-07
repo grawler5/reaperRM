@@ -2751,6 +2751,10 @@ background: linear-gradient(180deg,
 .rmDelaySkin .tkSprite, .rmLexi2Skin .tkSprite{ position:absolute; }
 .rmDelayInfo{
   position:absolute;
+  left:190px;
+  top:28px;
+  width:510px;
+  height:18px;
   font-family: ui-monospace, Menlo, Monaco, "Courier New", monospace;
   font-size:13px;
   line-height:18px;
@@ -2762,36 +2766,6 @@ background: linear-gradient(180deg,
   pointer-events:none;
   user-select:none;
 }
-.rmDelaySeg{
-  position:absolute;
-  top:0;
-  height:18px;
-  line-height:18px;
-  text-align:center;
-  overflow:hidden;
-  white-space:nowrap;
-}
-.rmDelayBtn{
-  position:absolute;
-  background:transparent;
-  border:0;
-  outline:none;
-  cursor:pointer;
-  opacity:0.01;
-  border-radius:6px;
-}
-.rmDelayBtn:active{ transform:translateY(1px); }
-.rmDelayLedDot{
-  position:absolute;
-  width:7px;
-  height:7px;
-  border-radius:50%;
-  background:#ff2a2a;
-  box-shadow:0 0 6px rgba(255,50,50,0.9), 0 0 2px rgba(255,50,50,0.9);
-  opacity:0;
-  pointer-events:none;
-}
-.rmDelayLedDot.on{ opacity:1; }
 .rmLexi2Btn{ position:absolute; background:transparent; border:0; outline:none; cursor:pointer; opacity:0.01; }
 .rmLexi2Btn.on{ opacity:1; background:rgba(0,145,255,0.18); box-shadow:0 0 10px 3px rgba(0,145,255,0.85); border-radius:9px; }
 .rmLexi2Hi{ position:absolute; pointer-events:none; opacity:0.95; }
@@ -2827,224 +2801,233 @@ background: linear-gradient(180deg,
 
 
 
-/* ---- RM Delay Machine (rebuilt HTML skin, no DAW assets) ---- */
-.rmDM2Skin{
-  position:absolute; left:0; top:0;
-  overflow:hidden;
-  border-radius:18px;
-  box-shadow:0 12px 32px rgba(0,0,0,0.55);
+/* ===== RM DelayMachine (new HTML UI) ===== */
+.tukanHost.rmDM2Host{
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 10px;
+  overflow: hidden;
 }
 .rmDM2Panel{
-  position:absolute; inset:0;
-  border-radius:18px;
-  background: linear-gradient(180deg, rgba(28,30,34,0.98), rgba(16,16,20,0.98));
-  border:1px solid rgba(255,255,255,0.10);
-  user-select:none;
+  width: 980px;
+  height: 360px;
+  box-sizing: border-box;
+  background: rgba(18,18,18,0.92);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 18px;
+  padding: 14px 14px 12px 14px;
+  transform-origin: top center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  user-select: none;
 }
-.rmDM2Title{
-  position:absolute; left:0; right:0; top:10px;
-  text-align:center;
-  font-size:12px;
-  letter-spacing:0.24em;
-  text-transform:uppercase;
-  opacity:0.82;
-  pointer-events:none;
+.rmDM2LedBar{
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(10,10,10,0.85);
+  border: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 12px;
 }
-.rmDM2Display{
-  position:absolute;
-  left:108px; right:108px;
-  top:32px;
-  height:30px;
-  border-radius:10px;
-  background: rgba(0,0,0,0.55);
-  border:1px solid rgba(255,255,255,0.08);
-  display:grid;
-  grid-template-columns: 1.25fr 0.65fr 0.75fr 0.85fr 0.55fr 1.20fr 0.70fr;
-  gap: 12px;
-  padding: 6px 12px;
-  align-items:center;
-  font-family: ui-monospace, Menlo, Monaco, "Courier New", monospace;
-  font-size:13px;
-  color:#d23;
-  text-shadow:0 0 3px rgba(255,0,0,0.22);
-  overflow:hidden;
-  pointer-events:none;
+.rmDM2LedSeg{
+  border-radius: 10px;
+  padding: 6px 8px;
+  background: rgba(40,0,0,0.25);
+  border: 1px solid rgba(255,80,80,0.18);
+  min-height: 38px;
 }
-.rmDM2Seg{ white-space:nowrap; overflow:hidden; text-overflow:clip; }
-.rmDM2Seg.mix{ text-align:right; }
-.rmDM2Seg.bpm{ text-align:right; }
+.rmDM2LedLabel{
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  opacity: 0.7;
+}
+.rmDM2LedValue{
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 2px;
+  color: rgba(255,120,120,0.95);
+  text-shadow: 0 0 12px rgba(255,70,70,0.35);
+}
+.rmDM2Flash{
+  animation: rmDM2Flash 0.28s ease-out;
+}
+@keyframes rmDM2Flash{
+  0%{ filter: brightness(1.6); box-shadow: 0 0 0 rgba(255,70,70,0); }
+  100%{ filter: brightness(1.0); box-shadow: 0 0 18px rgba(255,70,70,0.18); }
+}
 
-/* Knobs */
-.rmDM2KnobWrap{ position:absolute; text-align:center; }
-.rmDM2Lab{
-  margin-top:6px;
-  font-size:11px;
-  letter-spacing:0.16em;
-  opacity:0.82;
+.rmDM2Main{
+  display: grid;
+  grid-template-columns: 1fr 210px;
+  gap: 12px;
+}
+.rmDM2Knobs{
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+.rmDM2KnobWrap{
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 14px;
+  padding: 10px 10px 8px 10px;
+  text-align: center;
+}
+.rmDM2KnobLabel{
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  opacity: 0.75;
+  margin-bottom: 8px;
 }
 .rmDM2Knob{
-  position:relative;
-  border-radius:50%;
-  --v:0;
-  --tick: rgba(130,210,255,0.80);
-  --face1: rgba(54,60,70,1);
-  --face2: rgba(24,26,30,1);
-  --cap1: rgba(18,18,20,1);
-  --cap2: rgba(6,6,7,1);
-  --pointer: rgba(235,240,255,0.92);
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  margin: 0 auto;
+  position: relative;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.20), rgba(0,0,0,0.35));
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: inset 0 0 18px rgba(0,0,0,0.55);
+  touch-action: none;
 }
-.rmDM2Knob.blue{ --tick: rgba(120,210,255,0.82); --cap1: rgba(34,96,150,0.75); --cap2: rgba(10,26,40,1); }
-.rmDM2Knob.red{ --tick: rgba(255,125,90,0.70); --cap1: rgba(170,64,32,0.92); --cap2: rgba(58,16,8,1); --pointer: rgba(255,250,245,0.94); }
-.rmDM2Knob.gray{ --tick: rgba(200,210,220,0.30); --cap1: rgba(22,22,24,1); --cap2: rgba(8,8,9,1); --pointer: rgba(230,236,245,0.85); }
-
-.rmDM2Ticks{
-  position:absolute;
-  inset:-8px;
-  border-radius:50%;
-  background: repeating-conic-gradient(from -90deg, var(--tick) 0deg 2deg, transparent 2deg 14deg);
-  opacity:0.95;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px));
+.rmDM2DotRing{
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
-.rmDM2Face{
-  position:absolute;
-  inset:8px;
-  border-radius:50%;
-  background: radial-gradient(circle at 35% 30%, var(--face1), var(--face2));
-  border:1px solid rgba(255,255,255,0.10);
-  box-shadow: inset 0 2px 6px rgba(255,255,255,0.05), inset 0 -6px 18px rgba(0,0,0,0.60);
+.rmDM2Dot{
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.18);
 }
-.rmDM2Cap{
-  position:absolute;
-  inset:18px;
-  border-radius:50%;
-  background:
-    radial-gradient(circle at 30% 28%, rgba(255,255,255,0.10), rgba(255,255,255,0.02)),
-    radial-gradient(circle at 35% 30%, var(--cap1), var(--cap2));
-  border:1px solid rgba(255,255,255,0.06);
-  box-shadow: inset 0 2px 10px rgba(0,0,0,0.55);
+.rmDM2Needle{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 22px;
+  background: rgba(255,255,255,0.85);
+  border-radius: 2px;
+  transform-origin: 50% 90%;
+  transform: translate(-50%, -90%) rotate(-135deg);
+  box-shadow: 0 0 10px rgba(255,255,255,0.25);
 }
-.rmDM2Pointer{
-  position:absolute;
-  left:50%;
-  top:50%;
-  width:4px;
-  height:44%;
-  border-radius:4px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.0), var(--pointer));
-  transform-origin: 50% calc(100% - 2px);
-  transform: translate(-50%,-92%) rotate(calc(-140deg + (var(--v) * 280deg)));
-  box-shadow: 0 0 6px rgba(0,0,0,0.55);
-  pointer-events:none;
+.rmDM2KnobValue{
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  opacity: 0.9;
 }
-.rmDM2KnobWrap.big .rmDM2Lab{ font-size:12px; }
-.rmDM2KnobWrap.sm .rmDM2Lab{ font-size:10px; opacity:0.78; margin-top:4px; }
-.rmDM2KnobWrap.sm .rmDM2Face{ inset:7px; }
-.rmDM2KnobWrap.sm .rmDM2Cap{ inset:16px; }
-.rmDM2KnobWrap.sm .rmDM2Ticks{
-  inset:-7px;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 7px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 7px));
+.rmDM2FlashText{
+  animation: rmDM2FlashText 0.22s ease-out;
+}
+@keyframes rmDM2FlashText{
+  0%{ filter: brightness(1.6); }
+  100%{ filter: brightness(1.0); }
 }
 
-/* Switches */
-.rmDM2Switch{
-  width:60px;
-  height:118px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
-  gap:6px;
-  user-select:none;
-  cursor:pointer;
+.rmDM2Right{
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.rmDM2SwitchLab{
-  font-size:10px;
-  letter-spacing:0.18em;
-  opacity:0.76;
-  text-transform:uppercase;
+.rmDM2Row{
+  display: flex;
+  gap: 10px;
 }
-.rmDM2SwitchTrack{
-  width:22px;
-  height:64px;
-  border-radius:12px;
-  background: rgba(0,0,0,0.32);
-  border:1px solid rgba(255,255,255,0.12);
-  box-shadow: inset 0 2px 10px rgba(0,0,0,0.55);
-  position:relative;
+.rmDM2Toggle{
+  flex: 1;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.9);
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
-.rmDM2SwitchThumb{
-  position:absolute;
-  left:50%;
-  width:16px;
-  height:26px;
-  border-radius:10px;
-  transform: translateX(-50%);
-  top: 34px;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18), rgba(255,255,255,0.02)),
-    linear-gradient(180deg, rgba(220,220,230,0.22), rgba(0,0,0,0.35));
-  border:1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 6px 14px rgba(0,0,0,0.55);
+.rmDM2Toggle.on{
+  background: rgba(255,60,60,0.18);
+  border-color: rgba(255,60,60,0.25);
+  box-shadow: 0 0 18px rgba(255,60,60,0.14);
 }
-.rmDM2Switch.on .rmDM2SwitchThumb{ top: 4px; }
-.rmDM2Switch:active{ transform: translateY(1px); }
+.rmDM2Start{
+  width: 100%;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.95);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.rmDM2StartLed{
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: rgba(255,60,60,0.12);
+  box-shadow: 0 0 0 rgba(255,60,60,0);
+}
+.rmDM2Start.l .rmDM2StartLed.L,
+.rmDM2Start.r .rmDM2StartLed.R{
+  background: rgba(255,60,60,0.90);
+  box-shadow: 0 0 18px rgba(255,60,60,0.35);
+}
 
-/* Buttons + LEDs */
+.rmDM2Bottom{
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 80px 80px 1fr;
+  gap: 10px;
+  align-items: end;
+}
+.rmDM2Divs{
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
 .rmDM2Btn{
-  width:38px;
-  height:30px;
-  border-radius:8px;
-  border:1px solid rgba(255,255,255,0.14);
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(0,0,0,0.22));
-  color: rgba(255,255,255,0.82);
-  font-size:12px;
-  letter-spacing:0.06em;
-  cursor:pointer;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 18px rgba(0,0,0,0.35);
+  position: relative;
+  height: 46px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.92);
+  font-weight: 800;
+  letter-spacing: 0.10em;
 }
-.rmDM2Btn.wide{ width:72px; }
-.rmDM2Btn:active{ transform: translateY(1px); }
+.rmDM2Btn .rmDM2BtnLed{
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 6px;
+  border-radius: 99px;
+  background: rgba(255,60,60,0.10);
+}
 .rmDM2Btn.on{
-  border-color: rgba(255,120,90,0.45);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 10px 18px rgba(0,0,0,0.35), 0 0 16px rgba(255,90,60,0.20);
-  animation: rmDM2Blink 1.1s steps(2,end) infinite;
+  border-color: rgba(255,60,60,0.25);
+  box-shadow: 0 0 18px rgba(255,60,60,0.12);
+}
+.rmDM2Btn.on .rmDM2BtnLed{
+  background: rgba(255,60,60,0.95);
+  box-shadow: 0 0 18px rgba(255,60,60,0.35);
+  animation: rmDM2Blink 0.85s linear infinite;
 }
 @keyframes rmDM2Blink{
-  0%{ filter: none; }
-  50%{ filter: brightness(1.15); }
-  100%{ filter: none; }
-}
-.rmDM2Led{
-  width:8px;
-  height:8px;
-  border-radius:50%;
-  background: rgba(255,60,40,0.15);
-  box-shadow: none;
-  opacity:0.88;
-  pointer-events:none;
-}
-.rmDM2Led.on{
-  background: rgba(255,70,45,0.95);
-  box-shadow: 0 0 10px 2px rgba(255,70,45,0.55);
-}
-.rmDM2Led.side{ width:7px; height:7px; }
-
-/* Tape mode container */
-.rmDM2Tape{
-  display:none;
-  border-radius:16px;
-  margin:0 16px 12px 16px;
-  background: linear-gradient(180deg, rgba(245,245,248,0.10), rgba(0,0,0,0.22));
-  border:1px solid rgba(255,255,255,0.10);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-}
-.rmDM2Tape .rmDM2Lab{ opacity:0.90; }
-.rmDM2TapeKnobWrap .rmDM2Knob{
-  --tick: rgba(220,220,230,0.25);
-  --face1: rgba(50,52,56,1);
-  --face2: rgba(16,16,18,1);
+  0%,100%{ opacity: 1; }
+  50%{ opacity: 0.35; }
 }
 
 </style>
@@ -3922,9 +3905,6 @@ function formatParam(p){
 
   const host = document.createElement("div");
   host.className = "tukanHost";
-  host.style.width = "100%";
-  host.style.height = "100%";
-  host.style.minHeight = "1px";
   const stage = document.createElement("div");
   stage.className = "tukanStage";
   host.appendChild(stage);
@@ -5460,537 +5440,584 @@ function buildRMKickerL2PanelControl(win, ctrl){
   return {el: host, update, ctrl};
 }
 
-
-
 function buildRMDelayMachinePanelControl(win, ctrl){
-  // Custom HTML skin (DAW-inspired layout, no DAW assets)
+  // New HTML/CSS DelayMachine UI (no DAW skin). LED segments + animated updates.
   const ex = (ctrl && ctrl.extra) ? ctrl.extra : {};
-  const BASE_W = 960;
-  const BASE_H = 310; // a bit taller to fit all elements comfortably
+  const DESIGN_W = 980;
+  const DESIGN_H = 360;
 
-  const host = document.createElement("div");
-  host.className = "tukanHost";
+  const P = (i)=> (win && Array.isArray(win.params)) ? (win.params[i] || null) : null;
 
-  const stage = document.createElement("div");
-  stage.className = "tukanStage";
-  host.appendChild(stage);
-
-  const skin = document.createElement("div");
-  skin.className = "tukanSkin rmDM2Skin";
-  skin.style.width  = BASE_W + "px";
-  skin.style.height = BASE_H + "px";
-  skin.style.background = "transparent";
-  stage.appendChild(skin);
-
-  const panel = document.createElement("div");
-  panel.className = "rmDM2Panel";
-  panel.style.width = BASE_W + "px";
-  panel.style.height = BASE_H + "px";
-  skin.appendChild(panel);
-
-  // scale-to-fit
-  const fit = ()=>{
-    // Use the nearest plugin container for sizing (host may report 0x0 before layout)
-    const bodyEl = host.closest(".pluginWinBody");
-    const ctrlEl = host.closest(".plugCtrl");
-    const scope = ctrlEl || bodyEl || host.parentElement || host;
-
-    const availW = Math.max(10, scope.clientWidth  || 0);
-    const availH = Math.max(10, scope.clientHeight || 0);
-
-    let sc = Math.min(availW/BASE_W, availH/BASE_H);
-
-    const isFs = !!(win && win.el && win.el.classList && win.el.classList.contains("fullscreen"));
-    const maxScale = isFs ? 2.0 : 1.35;
-    sc = Math.max(0.25, Math.min(maxScale, sc));
-
-    stage.style.width  = (BASE_W*sc) + "px";
-    stage.style.height = (BASE_H*sc) + "px";
-    skin.style.transform = `scale(${sc})`;
+  const clamp01 = (v)=> Math.max(0, Math.min(1, v));
+  const normFromRaw = (raw, min, max)=>{
+    if (!Number.isFinite(raw) || !Number.isFinite(min) || !Number.isFinite(max) || max===min) return 0;
+    return clamp01((raw - min) / (max - min));
   };
-  try{
-    const ro = new ResizeObserver(()=>fit());
-    const obs = host.closest(".plugCtrl") || host.closest(".pluginWinBody") || host.parentElement || host;
-    ro.observe(obs);
-    host._ro = ro;
-  }catch(_){}
-  requestAnimationFrame(fit);
-
-  // ---------- helpers ----------
-  const clamp01 = (x)=>Math.max(0, Math.min(1, x||0));
-  const ps = ()=> (Array.isArray(win.params) ? win.params : []);
-
-  const byIdx = (idx)=> ps().find(p=>p && p.index===idx) || null;
-  const byName = (rx)=> ps().find(p=>rx.test(String(p.name||""))) || null;
-
-  const rawVal = (p)=>{
-    if (!p) return 0;
-    const v = clamp01(p.value||0);
-    return rawFromNorm(v, p.min, p.max);
-  };
-  const normFromRaw = (p, r)=>{
-    if (!p) return 0;
-    const den = (p.max - p.min);
-    if (!den) return 0;
-    return clamp01((r - p.min) / den);
+  const rawFromNorm = (n, min, max)=>{
+    n = clamp01(n);
+    return min + (max - min) * n;
   };
 
-  const setParamNorm = (p, next)=>{
-    if (!p) return;
-    bringPluginToFront(win);
-    suppressPoll(win, 800);
-    setParamNormalized(win, p.index, next);
-    p.value = next;
-    try{ setDraggedParamValue(win, p.index, next); }catch(_){}
+  const fmtK = (hz)=>{
+    if (!Number.isFinite(hz)) return "—";
+    if (hz >= 10000) return `${Math.round(hz/1000)}k`;
+    return String(Math.round(hz));
   };
 
-  const getBpmFallback = ()=>{
-    try{
-      const st = (typeof lastState !== "undefined") ? lastState : null;
-      const cands = [
-        st && st.bpm, st && st.tempo,
-        st && st.transport && (st.transport.bpm ?? st.transport.tempo),
-        st && st.project && (st.project.bpm ?? st.project.tempo),
-        st && st.play && (st.play.bpm ?? st.play.tempo),
-        st && st.master && (st.master.bpm ?? st.master.tempo),
-      ];
-      for (const v of cands){
-        const n = Number(v);
-        if (Number.isFinite(n) && n>0) return n;
+  const host = document.createElement('div');
+  host.className = 'tukanHost rmDM2Host';
+  host.innerHTML = '';
+
+  const panel = document.createElement('div');
+  panel.className = 'rmDM2Panel';
+  host.appendChild(panel);
+
+  // --- LED bar (segments)
+  const led = document.createElement('div');
+  led.className = 'rmDM2LedBar';
+  panel.appendChild(led);
+
+  const mkSeg = (key, label)=>{
+    const seg = document.createElement('div');
+    seg.className = 'rmDM2LedSeg';
+    const lab = document.createElement('div');
+    lab.className = 'rmDM2LedLabel';
+    lab.textContent = label;
+    const val = document.createElement('div');
+    val.className = 'rmDM2LedValue';
+    val.textContent = '—';
+    seg.appendChild(lab);
+    seg.appendChild(val);
+    led.appendChild(seg);
+    return {seg, val, key, last:''};
+  };
+
+  const segTime  = mkSeg('time',  'TIME');
+  const segDamp  = mkSeg('damp',  'DAMP');
+  const segHPF   = mkSeg('hpf',   'HPF');
+  const segLPF   = mkSeg('lpf',   'LPF');
+  const segWidth = mkSeg('width', 'WIDTH');
+  const segMix   = mkSeg('mix',   'MIX');
+  const segBpm   = mkSeg('bpm',   'BPM');
+
+  const flashSeg = (segObj, text)=>{
+    const t = String(text ?? '—');
+    if (segObj.last === t) return;
+    segObj.last = t;
+    segObj.val.textContent = t;
+    segObj.seg.classList.remove('rmDM2Flash');
+    // force reflow to restart animation
+    void segObj.seg.offsetWidth;
+    segObj.seg.classList.add('rmDM2Flash');
+    clearTimeout(segObj._t);
+    segObj._t = setTimeout(()=>segObj.seg.classList.remove('rmDM2Flash'), 280);
+  };
+
+  // --- Controls layout
+  const main = document.createElement('div');
+  main.className = 'rmDM2Main';
+  panel.appendChild(main);
+
+  const knobs = document.createElement('div');
+  knobs.className = 'rmDM2Knobs';
+  main.appendChild(knobs);
+
+  const right = document.createElement('div');
+  right.className = 'rmDM2Right';
+  main.appendChild(right);
+
+  // Helpers: params indices (0-based)
+  const IDX = {
+    delayMs: 0,      // slider1
+    fbDb:    1,      // slider2
+    mix:     3,      // slider4 (0..1 wet)
+    width:   5,      // slider6 (0..100)
+    tape:    8,      // slider9
+    timeSig: 9,      // slider10 (0..5)
+    timeSpec:10,     // slider11 (0..2)
+    hpf:     11,     // slider12 (0..1000 Hz)
+    lpfLog:  13,     // slider14 (0..1)
+    crush:   14,     // slider15 (0/1)
+    start:   15,     // slider16 (0..2)
+    bpmTel:  17      // slider18 (telemetry BPM)
+  };
+
+  const setParam = (idx, nVal)=>{
+    if (!win) return;
+    setParamNormalized(win, idx, clamp01(nVal));
+    setDraggedParamValue(win, idx, clamp01(nVal));
+  };
+
+  const setParamRaw = (idx, raw, min, max)=>{
+    setParam(idx, normFromRaw(raw, min, max));
+  };
+
+  // --- Knob widget
+  function mkKnob(label, options){
+    const {idx, minRaw, maxRaw, valueToText, onUserStart, onUserChangeEnd} = options;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'rmDM2KnobWrap';
+
+    const title = document.createElement('div');
+    title.className = 'rmDM2KnobLabel';
+    title.textContent = label;
+
+    const k = document.createElement('div');
+    k.className = 'rmDM2Knob';
+    k.tabIndex = 0;
+
+    const dotRing = document.createElement('div');
+    dotRing.className = 'rmDM2DotRing';
+    // static dots (do NOT rotate)
+    for (let i=0;i<19;i++){
+      const d = document.createElement('span');
+      d.className = 'rmDM2Dot';
+      const a = (-135 + (270*(i/18))) * Math.PI/180;
+      const r = 15;
+      d.style.left = (22 + Math.cos(a)*r) + 'px';
+      d.style.top  = (22 + Math.sin(a)*r) + 'px';
+      dotRing.appendChild(d);
+    }
+
+    const needle = document.createElement('div');
+    needle.className = 'rmDM2Needle';
+
+    const val = document.createElement('div');
+    val.className = 'rmDM2KnobValue';
+    val.textContent = '—';
+
+    k.appendChild(dotRing);
+    k.appendChild(needle);
+
+    wrap.appendChild(title);
+    wrap.appendChild(k);
+    wrap.appendChild(val);
+
+    const state = {n:0, dragging:false, lastText:''};
+
+    const setVisual = (n, text)=>{
+      state.n = clamp01(n);
+      const deg = -135 + 270*state.n;
+      needle.style.transform = `translate(-50%, -90%) rotate(${deg}deg)`;
+      if (text!=null){
+        const t = String(text);
+        if (t !== state.lastText){
+          state.lastText = t;
+          val.textContent = t;
+          // subtle flash on value changes
+          val.classList.remove('rmDM2FlashText');
+          void val.offsetWidth;
+          val.classList.add('rmDM2FlashText');
+          clearTimeout(state._vt);
+          state._vt = setTimeout(()=>val.classList.remove('rmDM2FlashText'), 220);
+        }
       }
-    }catch(_){}
+    };
+
+    const getNFromParam = ()=>{
+      const p = P(idx);
+      if (!p) return 0;
+      return clamp01(p.value ?? 0);
+    };
+
+    const getTextFromParam = ()=>{
+      const p = P(idx);
+      if (!p) return '—';
+      const n = clamp01(p.value ?? 0);
+      const raw = rawFromNorm(n, minRaw, maxRaw);
+      try{
+        return valueToText ? valueToText(n, raw, p) : String(Math.round(raw));
+      }catch(_){
+        return String(Math.round(raw));
+      }
+    };
+
+    const applyN = (n)=>{
+      setParam(idx, n);
+      setVisual(n, getTextFromParam());
+    };
+
+    let startY = 0;
+    let startN = 0;
+
+    const onMove = (ev)=>{
+      if (!state.dragging) return;
+      ev.preventDefault();
+      const dy = (startY - ev.clientY);
+      const fine = ev.shiftKey ? 0.0035 : 0.01;
+      const n = clamp01(startN + dy * fine);
+      applyN(n);
+    };
+    const onUp = (ev)=>{
+      if (!state.dragging) return;
+      state.dragging = false;
+      try{ endParamDrag(win, idx); }catch(_){}
+      try{ suppressPoll(win, 520); }catch(_){}
+      window.removeEventListener('pointermove', onMove, {passive:false});
+      window.removeEventListener('pointerup', onUp, {passive:true});
+      try{ onUserChangeEnd && onUserChangeEnd(); }catch(_){}
+    };
+
+    k.addEventListener('pointerdown', (ev)=>{
+      ev.preventDefault();
+      try{ onUserStart && onUserStart(); }catch(_){}
+      state.dragging = true;
+      startY = ev.clientY;
+      startN = getNFromParam();
+      try{ beginParamDrag(win, idx); }catch(_){}
+      k.setPointerCapture?.(ev.pointerId);
+      window.addEventListener('pointermove', onMove, {passive:false});
+      window.addEventListener('pointerup', onUp, {passive:true});
+    });
+
+    return {wrap, setVisual, getNFromParam, getTextFromParam, idx, minRaw, maxRaw};
+  }
+
+  // Sync state
+  let syncTS = 0;   // 0..5
+  let syncSP = 0;   // 0..2
+  let syncNote = 0; // 1|2|4|8|16
+  let lastBpm = null;
+  let suppressSyncClearOnce = false;
+
+  const getBpmProject = ()=>{
+    // prefer telemetry bpm if present
+    const p = P(IDX.bpmTel);
+    const raw = p && Number.isFinite(p.raw) ? p.raw : null;
+    // if raw isn't provided, derive from normalized using 0..300 range (slider18 definition)
+    if (raw!=null) return raw;
+    if (p && Number.isFinite(p.value)){
+      return rawFromNorm(p.value, 0, 300);
+    }
     return null;
   };
 
-  // ---------- UI ----------
-  const title = document.createElement("div");
-  title.className = "rmDM2Title";
-  title.textContent = "TUKAN — DELAY — MACHINE";
-  panel.appendChild(title);
-
-  const display = document.createElement("div");
-  display.className = "rmDM2Display";
-  panel.appendChild(display);
-
-  const seg = (cls)=>{
-    const el = document.createElement("div");
-    el.className = "rmDM2Seg " + cls;
-    display.appendChild(el);
-    return el;
-  };
-  const segTime = seg("time");
-  const segFb   = seg("fb");
-  const segHPF  = seg("hpf");
-  const segLPF  = seg("lpf");
-  const segW    = seg("w");
-  const segMix  = seg("mix");
-  const segBpm  = seg("bpm");
-
-  // Knobs
-  const mkKnob = (x,y,size,label,color,wrapKind)=>{
-    const wrap = document.createElement("div");
-    wrap.className = "rmDM2KnobWrap " + (wrapKind||"big");
-    wrap.style.left = Math.round(x) + "px";
-    wrap.style.top  = Math.round(y) + "px";
-    wrap.style.width  = size + "px";
-    wrap.style.height = (size + 30) + "px";
-    wrap.style.touchAction = "none";
-    wrap.style.userSelect = "none";
-    wrap.style.position = "absolute";
-    wrap.style.textAlign = "center";
-
-    const knob = document.createElement("div");
-    knob.className = "rmDM2Knob " + (color||"blue");
-    knob.style.width = size + "px";
-    knob.style.height = size + "px";
-    knob.style.cursor = "pointer";
-    knob.style.touchAction = "none";
-    knob.tabIndex = 0;
-
-    const ticks = document.createElement("div"); ticks.className = "rmDM2Ticks";
-    const face  = document.createElement("div"); face.className  = "rmDM2Face";
-    const cap   = document.createElement("div"); cap.className   = "rmDM2Cap";
-    const ptr   = document.createElement("div"); ptr.className   = "rmDM2Pointer";
-    knob.appendChild(ticks);
-    knob.appendChild(face);
-    knob.appendChild(cap);
-    knob.appendChild(ptr);
-
-    const lab = document.createElement("div");
-    lab.className = "rmDM2Lab";
-    lab.textContent = label;
-
-    wrap.appendChild(knob);
-    wrap.appendChild(lab);
-    panel.appendChild(wrap);
-
-    return {wrap, knob};
-  };
-
-  const kTime = mkKnob(170, 84, 86, "TIME", "blue", "big");
-  const kDamp = mkKnob(320, 84, 86, "DAMPING", "blue", "big");
-
-  const kLPF  = mkKnob(470, 98, 60, "LPF", "gray", "sm");
-  const kHPF  = mkKnob(470, 170, 60, "HPF", "gray", "sm");
-  const kPing = mkKnob(590, 98, 60, "PING‑PONG", "gray", "sm");
-  const kMix  = mkKnob(705, 76, 96, "MIX", "red", "big");
-
-  // Switches (Tape/Digital + Crush)
-  const mkSwitch = (x,y,label)=>{
-    const sw = document.createElement("div");
-    sw.className = "rmDM2Switch";
-    sw.style.position = "absolute";
-    sw.style.left = Math.round(x) + "px";
-    sw.style.top  = Math.round(y) + "px";
-    sw.style.touchAction = "none";
-
-    const lab = document.createElement("div");
-    lab.className = "rmDM2SwitchLab";
-    lab.textContent = label;
-
-    const track = document.createElement("div");
-    track.className = "rmDM2SwitchTrack";
-    const thumb = document.createElement("div");
-    thumb.className = "rmDM2SwitchThumb";
-    track.appendChild(thumb);
-
-    sw.appendChild(lab);
-    sw.appendChild(track);
-    panel.appendChild(sw);
-    return {sw};
-  };
-
-  const swCrush = mkSwitch(68, 120, "CRUSH");
-  const swTape  = mkSwitch(888, 120, "TAPE");
-
-  // Buttons (note sync)
-  const mkBtn = (x,y,text,withLed=true,wide=false)=>{
-    const wrap = document.createElement("div");
-    wrap.style.position = "absolute";
-    wrap.style.left = Math.round(x) + "px";
-    wrap.style.top  = Math.round(y) + "px";
-    wrap.style.display = "flex";
-    wrap.style.flexDirection = "column";
-    wrap.style.alignItems = "center";
-    wrap.style.gap = "6px";
-    wrap.style.userSelect = "none";
-    wrap.style.touchAction = "none";
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "rmDM2Btn" + (wide ? " wide" : "");
-    btn.textContent = text;
-    btn.style.touchAction = "none";
-
-    let led = null;
-    if (withLed){
-      led = document.createElement("div");
-      led.className = "rmDM2Led";
-    }
-    wrap.appendChild(btn);
-    if (led) wrap.appendChild(led);
-    panel.appendChild(wrap);
-    return {wrap, btn, led};
-  };
-
-  const yBtn = 228;
-  const bT   = mkBtn(128, yBtn, "T",  true);
-  const bD   = mkBtn(176, yBtn, "D",  true);
-
-  const b16  = mkBtn(262, yBtn, "16", true);
-  const b8   = mkBtn(320, yBtn, "8",  true);
-  const b4   = mkBtn(378, yBtn, "4",  true);
-  const b2   = mkBtn(436, yBtn, "2",  true);
-  const b1   = mkBtn(494, yBtn, "1",  true);
-
-  const bStart = mkBtn(620, yBtn, "START", false, true);
-
-  // side LEDs for START (only left/right)
-  const ledStartL = document.createElement("div");
-  ledStartL.className = "rmDM2Led side";
-  ledStartL.style.position = "absolute";
-  ledStartL.style.left = "604px";
-  ledStartL.style.top  = (yBtn + 38) + "px";
-  panel.appendChild(ledStartL);
-
-  const ledStartR = document.createElement("div");
-  ledStartR.className = "rmDM2Led side";
-  ledStartR.style.position = "absolute";
-  ledStartR.style.left = "705px";
-  ledStartR.style.top  = (yBtn + 38) + "px";
-  panel.appendChild(ledStartR);
-
-  // ---------- Param mapping ----------
-  const mapParams = ()=>{
-    // Prefer names, but keep robust index fallbacks (0-based)
-    const pDelay = byName(/\bDelay\b.*\(ms\)|\bDelay\s*\(ms\)/i) || byIdx(0);
-    const pFb    = byName(/\bFeedback\b/i) || byIdx(1);
-    const pWet   = byName(/Mix\s*dry\/Wet/i) || byIdx(3);
-    const pWidth = byName(/Ping-?Pong\s*Width/i) || byIdx(5);
-
-    const pHPF   = byName(/\bHPF\b/i) || byIdx(11);
-    const pLPF   = byName(/\bLPF\s*Log\b/i) || byIdx(13);
-
-    const pTape  = byName(/\bTape\b/i) || byIdx(8);
-    const pCrush = byName(/\bCrush\b/i) || byIdx(14);
-
-    const pStart = byName(/Start\s*Pong/i) || byIdx(15);
-
-    const pBpm   = byName(/telemetry.*bpm|\bbpm\b/i) || byIdx(17);
-
-    return {pDelay,pFb,pWet,pWidth,pHPF,pLPF,pTape,pCrush,pStart,pBpm};
-  };
-  const getP = ()=>mapParams();
-
-  // ---------- Local tempo-sync state (UI only) ----------
-  // noteSig: 0=off, 1=1/1,2=1/2,3=1/4,4=1/8,5=1/16; timeSpec: 0=none,1=triplet,2=dotted
-  let uiNoteSig = 0;
-  let uiTimeSpec = 0;
-
-  const noteLabel = (sig)=>{
-    return sig===5 ? "1/16" :
-           sig===4 ? "1/8"  :
-           sig===3 ? "1/4"  :
-           sig===2 ? "1/2"  :
-           sig===1 ? "1/1"  : "";
-  };
-  const specLabel = (sp)=> sp===1 ? "T" : sp===2 ? "D" : "";
-
-  const computeSyncMs = (bpm, sig, sp)=>{
-    const b = (Number.isFinite(bpm) && bpm>0) ? bpm : 120;
-    const q = 60000 / b; // quarter
-    let ms =
-      sig===5 ? (q/4) :
-      sig===4 ? (q/2) :
-      sig===3 ? q :
-      sig===2 ? (2*q) :
-      sig===1 ? (4*q) : null;
-    if (ms == null) return null;
-    if (sp===1) ms *= (2/3);  // triplet
-    if (sp===2) ms *= 1.5;    // dotted
+  const calcMsFromSync = (bpm, ts, sp)=>{
+    if (!Number.isFinite(bpm) || bpm<=0) return null;
+    let base = 60;
+    ts==1 ? base=240 :
+    ts==2 ? base=120 :
+    ts==3 ? base=60  :
+    ts==4 ? base=30  :
+    ts==5 ? base=15  : base=60;
+    let ms = 1000*(base/bpm);
+    sp==1 ? ms *= (2/3) :
+    sp==2 ? ms *= 1.5 : 0;
+    if (ms<0) ms=0;
+    if (ms>3000) ms=3000;
     return ms;
   };
 
-  const applySyncToDelay = ()=>{
-    const {pDelay, pBpm} = getP();
-    if (!pDelay || uiNoteSig===0) return;
-    let bpm = null;
-    if (pBpm){
-      const v = rawVal(pBpm);
-      if (Number.isFinite(v) && v>0) bpm = v;
+  const clearSync = ()=>{
+    if (suppressSyncClearOnce){ suppressSyncClearOnce = false; return; }
+    syncTS = 0; syncSP = 0; syncNote = 0;
+    setParamRaw(IDX.timeSig, 0, 0, 5);
+    setParamRaw(IDX.timeSpec, 0, 0, 2);
+    updateButtons();
+  };
+
+  // --- Create knobs
+  const kbTime = mkKnob('TIME', {
+    idx: IDX.delayMs,
+    minRaw: 0, maxRaw: 3000,
+    valueToText: (n, raw)=>{
+      return `${Math.round(raw)}ms`;
+    },
+    onUserStart: ()=>{ clearSync(); },
+  });
+
+  const kbDamp = mkKnob('DAMP', {
+    idx: IDX.fbDb,
+    minRaw: -40, maxRaw: 0,
+    valueToText: (n, raw)=>`${Math.round(raw)}dB`,
+  });
+
+  const kbHPF = mkKnob('HPF', {
+    idx: IDX.hpf,
+    minRaw: 0, maxRaw: 1000,
+    valueToText: (n, raw)=>`${Math.round(raw)}`
+  });
+
+  const kbLPF = mkKnob('LPF', {
+    idx: IDX.lpfLog,
+    // slider14 is log2(freq) in Hz (1000..22000)
+    minRaw: 9.96, maxRaw: 14.2877123,
+    valueToText: (n, raw)=>{
+      const hz = Math.pow(2, raw);
+      return fmtK(hz);
     }
-    if (bpm == null) bpm = getBpmFallback();
-    const ms = computeSyncMs(bpm, uiNoteSig, uiTimeSpec);
-    if (ms == null) return;
-    const clamped = Math.max(pDelay.min, Math.min(pDelay.max, ms));
-    setParamNorm(pDelay, normFromRaw(pDelay, clamped));
-  };
-
-  // ---------- Interaction ----------
-  const bindKnob = (knobEl, pGetter, speed=0.004, opts={})=>{
-    let drag=null;
-    knobEl.addEventListener("pointerdown", (ev)=>{
-      const p = pGetter();
-      if (!p) return;
-
-      // If user drags TIME knob manually -> cancel local sync buttons
-      if (opts && opts.clearsSync){
-        uiNoteSig = 0;
-        uiTimeSpec = 0;
-      }
-
-      bringPluginToFront(win);
-      suppressPoll(win, 900);
-      beginParamDrag(win, p.index);
-      try{ knobEl.setPointerCapture(ev.pointerId); }catch(_){}
-      drag = {id:ev.pointerId, y:ev.clientY, start: clamp01(p.value||0), pIdx:p.index, sp:speed};
-      ev.preventDefault(); ev.stopPropagation();
-    });
-    knobEl.addEventListener("pointermove", (ev)=>{
-      if (!drag || drag.id!==ev.pointerId) return;
-      const p = byIdx(drag.pIdx);
-      if (!p) return;
-      const dy = ev.clientY - drag.y;
-      let next = clamp01(drag.start - dy*drag.sp);
-      if (ev.shiftKey) next = clamp01(drag.start - dy*(drag.sp*0.25));
-      setParamNorm(p, next);
-      knobEl.style.setProperty("--v", String(next));
-      ev.preventDefault(); ev.stopPropagation();
-    });
-    const end=(ev)=>{
-      if (!drag || drag.id!==ev.pointerId) return;
-      const p = byIdx(drag.pIdx);
-      if (p) endParamDrag(win, p.index);
-      try{ knobEl.releasePointerCapture(ev.pointerId); }catch(_){}
-      drag=null;
-      ev.preventDefault(); ev.stopPropagation();
-    };
-    knobEl.addEventListener("pointerup", end);
-    knobEl.addEventListener("pointercancel", end);
-  };
-
-  const bindSwitch = (swEl, pGetter)=>{
-    swEl.addEventListener("pointerdown", (ev)=>{
-      const p = pGetter();
-      if (!p) return;
-      const curRaw = Math.round(rawVal(p));
-      const nextRaw = curRaw ? 0 : 1;
-      setParamNorm(p, normFromRaw(p, nextRaw));
-      ev.preventDefault(); ev.stopPropagation();
-    });
-  };
-
-  // knobs
-  bindKnob(kTime.knob, ()=>getP().pDelay, 0.004, {clearsSync:true});
-  bindKnob(kDamp.knob, ()=>getP().pFb,    0.004);
-
-  bindKnob(kHPF.knob,  ()=>getP().pHPF,   0.006);
-  bindKnob(kLPF.knob,  ()=>getP().pLPF,   0.006);
-  bindKnob(kPing.knob, ()=>getP().pWidth, 0.006);
-
-  bindKnob(kMix.knob,  ()=>getP().pWet,   0.004);
-
-  // switches
-  bindSwitch(swTape.sw,  ()=>getP().pTape);
-  bindSwitch(swCrush.sw, ()=>getP().pCrush);
-
-  // Buttons: UI-only sync (sets Delay(ms) based on BPM)
-  const setBtn = (b, on)=>{
-    b.btn.classList.toggle("on", !!on);
-    if (b.led) b.led.classList.toggle("on", !!on);
-  };
-
-  bT.btn.addEventListener("pointerdown", (ev)=>{
-    uiTimeSpec = (uiTimeSpec===1) ? 0 : 1;
-    if (uiTimeSpec===1) uiTimeSpec = 1;
-    // T and D mutually exclusive
-    if (uiTimeSpec===1) { /* ok */ } else { /* off */ }
-    // if turning on T -> turn off D
-    if (uiTimeSpec===1) { /* implicit */ }
-    applySyncToDelay();
-    ev.preventDefault(); ev.stopPropagation();
-  });
-  bD.btn.addEventListener("pointerdown", (ev)=>{
-    uiTimeSpec = (uiTimeSpec===2) ? 0 : 2;
-    // mutually exclusive with T
-    applySyncToDelay();
-    ev.preventDefault(); ev.stopPropagation();
   });
 
-  const noteBtns = [
-    {btn:b16, sig:5},
-    {btn:b8,  sig:4},
-    {btn:b4,  sig:3},
-    {btn:b2,  sig:2},
-    {btn:b1,  sig:1},
-  ];
-  noteBtns.forEach(({btn, sig})=>{
-    btn.btn.addEventListener("pointerdown", (ev)=>{
-      uiNoteSig = (uiNoteSig===sig) ? 0 : sig;
-      applySyncToDelay();
-      ev.preventDefault(); ev.stopPropagation();
-    });
+  const kbWidth = mkKnob('WIDTH', {
+    idx: IDX.width,
+    minRaw: 0, maxRaw: 100,
+    valueToText: (n, raw)=>`${Math.round(raw)}%`,
   });
 
-  // Ensure T/D are exclusive
-  const enforceSpecExclusive = ()=>{
-    if (uiTimeSpec===1){
-      // triplet on, dotted off
-    }else if (uiTimeSpec===2){
-      // dotted on, triplet off
+  const kbMix = mkKnob('MIX', {
+    idx: IDX.mix,
+    minRaw: 0, maxRaw: 1,
+    valueToText: (n)=>`${Math.round(n*100)}%`,
+  });
+
+  for (const k of [kbTime, kbDamp, kbHPF, kbLPF, kbWidth, kbMix]){
+    knobs.appendChild(k.wrap);
+  }
+
+  // --- Right column: toggles + start
+  const mkToggle = (label)=>{
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rmDM2Toggle';
+    b.textContent = label;
+    return b;
+  };
+
+  const row1 = document.createElement('div');
+  row1.className = 'rmDM2Row';
+  right.appendChild(row1);
+
+  const btTape = mkToggle('TAPE');
+  const btCrush = mkToggle('CRUSH');
+  row1.appendChild(btTape);
+  row1.appendChild(btCrush);
+
+  const row2 = document.createElement('div');
+  row2.className = 'rmDM2Row';
+  right.appendChild(row2);
+
+  const btStart = document.createElement('button');
+  btStart.type = 'button';
+  btStart.className = 'rmDM2Start';
+  btStart.innerHTML = `<span class="rmDM2StartLed L"></span><span class="rmDM2StartTxt">START</span><span class="rmDM2StartLed R"></span>`;
+  row2.appendChild(btStart);
+
+  // --- Bottom sync buttons
+  const bottom = document.createElement('div');
+  bottom.className = 'rmDM2Bottom';
+  panel.appendChild(bottom);
+
+  const mkBtn = (txt, wide=false)=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className = wide ? 'rmDM2Btn wide' : 'rmDM2Btn';
+    b.textContent = txt;
+    const led = document.createElement('span');
+    led.className = 'rmDM2BtnLed';
+    b.appendChild(led);
+    return b;
+  };
+
+  const bT  = mkBtn('T');
+  const bD  = mkBtn('D');
+  const b16 = mkBtn('16');
+  const b8  = mkBtn('8');
+  const b4  = mkBtn('4');
+  const b2  = mkBtn('2');
+  const b1  = mkBtn('1');
+
+  bottom.appendChild(bT);
+  bottom.appendChild(bD);
+  const divs = document.createElement('div');
+  divs.className='rmDM2Divs';
+  for (const b of [b16,b8,b4,b2,b1]) divs.appendChild(b);
+  bottom.appendChild(divs);
+
+  // --- Button state helpers
+  const setBtnOn = (btn, on)=>{
+    btn.classList.toggle('on', !!on);
+  };
+
+  const updateButtons = ()=>{
+    setBtnOn(bT,  syncSP===1);
+    setBtnOn(bD,  syncSP===2);
+    setBtnOn(b16, syncNote===16);
+    setBtnOn(b8,  syncNote===8);
+    setBtnOn(b4,  syncNote===4);
+    setBtnOn(b2,  syncNote===2);
+    setBtnOn(b1,  syncNote===1);
+
+    const pTape = P(IDX.tape);
+    const tapeOn = !!pTape && (pTape.value||0) >= 0.5;
+    btTape.classList.toggle('on', tapeOn);
+
+    const pCr = P(IDX.crush);
+    const crOn = !!pCr && (pCr.value||0) >= 0.5;
+    btCrush.classList.toggle('on', crOn);
+
+    const pSt = P(IDX.start);
+    const st = pSt ? Math.round(clamp01(pSt.value||0) * 2) : 0;
+    btStart.classList.toggle('l', st===1);
+    btStart.classList.toggle('r', st===2);
+  };
+
+  const applySync = ()=>{
+    // push TS/SP to params
+    setParamRaw(IDX.timeSig, syncTS, 0, 5);
+    setParamRaw(IDX.timeSpec, syncSP, 0, 2);
+    updateButtons();
+
+    // set Delay(ms) to computed value so TIME knob follows, and keep it updated on BPM changes
+    const bpm = getBpmProject();
+    const ms = calcMsFromSync(bpm, syncTS, syncSP);
+    if (ms!=null){
+      suppressSyncClearOnce = true; // avoid clearing when we programmatically move TIME
+      setParamRaw(IDX.delayMs, ms, 0, 3000);
     }
   };
 
-  // START cycle 0->1->2->0 (plugin param)
-  const cycleStart = ()=>{
-    const {pStart} = getP();
-    if (!pStart) return;
-    const cur = Math.round(rawVal(pStart));
-    const nxt = (cur + 1) % 3;
-    setParamNorm(pStart, normFromRaw(pStart, nxt));
+  const setNote = (note)=>{
+    // note: 16/8/4/2/1
+    if (syncNote === note){
+      // toggle off
+      syncNote = 0; syncTS = 0;
+      applySync();
+      return;
+    }
+    syncNote = note;
+    // map to TimeSig: 1=whole,2=half,3=quarter,4=eighth,5=sixteenth
+    syncTS = (note===1)?1:(note===2)?2:(note===4)?3:(note===8)?4:5;
+    applySync();
   };
-  bStart.btn.addEventListener("pointerdown", (ev)=>{
-    cycleStart();
-    ev.preventDefault(); ev.stopPropagation();
+
+  const setSpec = (sp)=>{
+    if (syncSP === sp){
+      syncSP = 0;
+    }else{
+      syncSP = sp;
+    }
+    applySync();
+  };
+
+  bT.addEventListener('click', ()=>{ setSpec(1); });
+  bD.addEventListener('click', ()=>{ setSpec(2); });
+  b16.addEventListener('click', ()=>{ setNote(16); });
+  b8.addEventListener('click', ()=>{ setNote(8); });
+  b4.addEventListener('click', ()=>{ setNote(4); });
+  b2.addEventListener('click', ()=>{ setNote(2); });
+  b1.addEventListener('click', ()=>{ setNote(1); });
+
+  btTape.addEventListener('click', ()=>{
+    const p = P(IDX.tape);
+    const on = !!p && (p.value||0)>=0.5;
+    setParamRaw(IDX.tape, on ? 0 : 1, 0, 1);
+    updateButtons();
+  });
+  btCrush.addEventListener('click', ()=>{
+    const p = P(IDX.crush);
+    const on = !!p && (p.value||0)>=0.5;
+    setParamRaw(IDX.crush, on ? 0 : 1, 0, 1);
+    updateButtons();
   });
 
-  // ---------- update ----------
-  const setKnob = (knobEl, p)=>{
-    if (!p) return;
-    knobEl.style.setProperty("--v", String(clamp01(p.value||0)));
-  };
-  const setSwitch = (swEl, p)=>{
-    if (!p) return;
-    swEl.classList.toggle("on", clamp01(p.value||0) >= 0.5);
-  };
+  btStart.addEventListener('click', ()=>{
+    const p = P(IDX.start);
+    const st = p ? Math.round(clamp01(p.value||0) * 2) : 0;
+    const next = (st + 1) % 3;
+    setParamRaw(IDX.start, next, 0, 2);
+    updateButtons();
+  });
 
+  // --- Fit scaling
+  const fit = ()=>{
+    const parent = host.parentElement || host;
+    const r = parent.getBoundingClientRect ? parent.getBoundingClientRect() : {width: DESIGN_W, height: DESIGN_H};
+    const availW = Math.max(50, r.width || parent.clientWidth || DESIGN_W);
+    const availH = Math.max(50, r.height || parent.clientHeight || DESIGN_H);
+    const pad = 16;
+    const sc = Math.min(1, (availW - pad) / DESIGN_W, (availH - pad) / DESIGN_H);
+    panel.style.transform = `scale(${Math.max(0.5, sc)})`;
+  };
+  let ro = null;
+  try{
+    ro = new ResizeObserver(()=>{ requestAnimationFrame(fit); });
+    ro.observe(host.parentElement || host);
+  }catch(_){}
+  requestAnimationFrame(fit);
+
+  // --- Update loop
   function update(){
-    enforceSpecExclusive();
+    // read params
+    const bpm = getBpmProject();
+    if (Number.isFinite(bpm)) flashSeg(segBpm, String(Math.round(bpm)));
+    else flashSeg(segBpm, '—');
 
-    const {pDelay,pFb,pWet,pWidth,pHPF,pLPF,pTape,pCrush,pStart,pBpm} = getP();
+    // sync params
+    const pTS = P(IDX.timeSig);
+    const pSP = P(IDX.timeSpec);
+    syncTS = pTS ? (pTS.raw!=null ? (pTS.raw|0) : Math.round(clamp01(pTS.value||0)*5)) : 0;
+    syncSP = pSP ? (pSP.raw!=null ? (pSP.raw|0) : Math.round(clamp01(pSP.value||0)*2)) : 0;
 
-    setKnob(kTime.knob, pDelay);
-    setKnob(kDamp.knob, pFb);
-    setKnob(kHPF.knob,  pHPF);
-    setKnob(kLPF.knob,  pLPF);
-    setKnob(kPing.knob, pWidth);
-    setKnob(kMix.knob,  pWet);
+    // derive note for UI
+    syncNote = (syncTS===1)?1:(syncTS===2)?2:(syncTS===3)?4:(syncTS===4)?8:(syncTS===5)?16:0;
 
-    setSwitch(swTape.sw,  pTape);
-    setSwitch(swCrush.sw, pCrush);
-
-    // get bpm
-    let bpm = null;
-    if (pBpm) {
-      const v = rawVal(pBpm);
-      if (Number.isFinite(v) && v > 0) bpm = v;
+    // if bpm changed and sync is active -> recompute delay(ms) to keep TIME knob in sync
+    if (Number.isFinite(bpm) && syncTS>0){
+      if (lastBpm==null) lastBpm = bpm;
+      if (Math.abs(bpm - lastBpm) > 0.0001){
+        lastBpm = bpm;
+        const ms = calcMsFromSync(bpm, syncTS, syncSP);
+        if (ms!=null){
+          suppressSyncClearOnce = true;
+          setParamRaw(IDX.delayMs, ms, 0, 3000);
+        }
+      }
+    }else{
+      lastBpm = bpm;
     }
-    if (bpm == null) bpm = getBpmFallback();
 
-    // display numbers
-    const ms  = Math.round(rawVal(pDelay));
-    const fb  = Math.round(rawVal(pFb));
-    const hpf = Math.round(rawVal(pHPF));
-    const lpf = Math.round(rawVal(pLPF));
-    const wPct = Math.round(clamp01(pWidth ? pWidth.value : 0) * 100);
+    // Knob visuals
+    for (const k of [kbTime, kbDamp, kbHPF, kbLPF, kbWidth, kbMix]){
+      const n = k.getNFromParam();
+      const text = k.getTextFromParam();
+      k.setVisual(n, text);
+    }
 
-    const wetPct = Math.round(clamp01(pWet ? pWet.value : 0) * 100);
-    const dryPct = 100 - wetPct;
+    // LED values
+    // TIME segment: show computed ms + note if synced
+    let timeText = '—';
+    if (syncTS>0 && Number.isFinite(bpm)){
+      const ms = calcMsFromSync(bpm, syncTS, syncSP);
+      const noteStr = syncNote ? `1/${syncNote}` : '';
+      const specStr = (syncSP===1)?'T':(syncSP===2)?'D':'';
+      timeText = `${Math.round(ms)}ms ${noteStr}${specStr}`;
+    }else{
+      const p = P(IDX.delayMs);
+      const raw = p && Number.isFinite(p.raw) ? p.raw : (p ? rawFromNorm(clamp01(p.value||0), 0, 3000) : null);
+      timeText = raw!=null ? `${Math.round(raw)}ms` : '—';
+    }
+    flashSeg(segTime, timeText);
 
-    const nLab = noteLabel(uiNoteSig);
-    const sLab = specLabel(uiTimeSpec);
-    segTime.textContent = (uiNoteSig ? `${ms}ms ${nLab} ${sLab}`.trim() : `${ms}ms`);
-    segFb.textContent   = `${fb}dB`;
-    segHPF.textContent  = `HPF ${hpf}`;
-    segLPF.textContent  = `LPF ${lpf}`;
-    segW.textContent    = `${wPct}%W`;
-    segMix.textContent  = `${dryPct}%Dry / ${wetPct}%Wet`;
-    segBpm.textContent  = (bpm!=null) ? `${Math.round(bpm)} BPM` : "";
+    const pFb = P(IDX.fbDb);
+    const fbRaw = pFb && Number.isFinite(pFb.raw) ? pFb.raw : (pFb ? rawFromNorm(clamp01(pFb.value||0), -40, 0) : null);
+    flashSeg(segDamp, fbRaw!=null ? `${Math.round(fbRaw)}dB` : '—');
 
-    // button visuals
-    setBtn(bT, uiTimeSpec===1);
-    setBtn(bD, uiTimeSpec===2);
+    // HPF is in Hz (0..1000)
+    const pH = P(IDX.hpf);
+    const hRaw = (pH && Number.isFinite(pH.raw)) ? pH.raw : rawFromNorm(clamp01(pH ? (pH.value||0) : 0), 0, 1000);
+    flashSeg(segHPF, `${Math.round(hRaw)}`);
 
-    setBtn(b16, uiNoteSig===5);
-    setBtn(b8,  uiNoteSig===4);
-    setBtn(b4,  uiNoteSig===3);
-    setBtn(b2,  uiNoteSig===2);
-    setBtn(b1,  uiNoteSig===1);
+    // LPF uses log2(freq) raw (slider14)
+    const pL = P(IDX.lpfLog);
+    const lRaw = (pL && Number.isFinite(pL.raw)) ? pL.raw : rawFromNorm(clamp01(pL ? (pL.value||0) : 0), 9.96, 14.2877123);
+    flashSeg(segLPF, fmtK(Math.pow(2, lRaw)));
 
-    // START leds
-    const st = pStart ? Math.round(rawVal(pStart)) : 0;
-    const stL = (st===1);
-    const stR = (st===2);
-    bStart.btn.classList.toggle("on", stL||stR);
-    ledStartL.classList.toggle("on", stL);
-    ledStartR.classList.toggle("on", stR);
+    const pW = P(IDX.width);
+    const wRaw = pW && Number.isFinite(pW.raw) ? pW.raw : (pW ? rawFromNorm(clamp01(pW.value||0), 0, 100) : null);
+    flashSeg(segWidth, wRaw!=null ? `${Math.round(wRaw)}%` : '—');
+
+    const pMix = P(IDX.mix);
+    const mixN = pMix ? clamp01(pMix.value||0) : 0;
+    flashSeg(segMix, `${Math.round(mixN*100)}%`);
+
+    updateButtons();
   }
 
   ctrl.update = ()=>update();
   update();
   return {el: host, update, ctrl};
 }
-
 
 function buildRMEqt1aPanelControl(win, ctrl){
   // Tukan EQT-1A (DAW-like) skin: background + correct knob/selector sprites.
