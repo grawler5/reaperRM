@@ -1978,9 +1978,9 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   transform-origin: 0 0;
   will-change: transform;
 }
-.tukanSkin.laSkin{ background-image: url(tukan/la/LABack.png); }
-.tukanSkin.nc76Skin{ background-image: url(tukan/76/76BackB.png); }
-.tukanSkin.preSkin{ background-image: url(tukan/pre/PREBack.png); }
+.tukanSkin.laSkin{ background-image: url("/tukan/la/LABack.png"); }
+.tukanSkin.nc76Skin{ background-image: url("/tukan/76/76BackB.png"); }
+.tukanSkin.preSkin{ background-image: url("/tukan/pre/PREBack.png"); }
 
 .tukanSkin .tkSprite{
   position: absolute;

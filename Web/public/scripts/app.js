@@ -1732,7 +1732,7 @@ update();
     const availW = Math.max(10, scope.clientWidth - pad*2);
     const availH = Math.max(10, scope.clientHeight - pad*2);
     let sc = Math.min(availW/BASE_W, availH/BASE_H);
-    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 2.2 : 1.4;
+    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 2.2 : 1.8;
     sc = Math.max(0.25, Math.min(maxScale, sc));
     stage.style.width = (BASE_W*sc) + "px";
     stage.style.height = (BASE_H*sc) + "px";
