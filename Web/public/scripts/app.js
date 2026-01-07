@@ -6348,11 +6348,11 @@ function hideUserPicker(){
         }
         return;
       }
-      if (msg.type === "fxParams"){
-        // Update plugin window (if open)
-        try{
-          const k = `${msg.guid}:${msg.fxIndex}`;
-          const w = pluginWins.get(k);
+    if (msg.type === "fxParams"){
+      // Update plugin window (if open)
+      try{
+        const k = `${msg.guid}:${msg.fxIndex}`;
+        const w = pluginWins.get(k);
           if (w){
             w.params = msg.params || [];
             renderPluginWin(w);
@@ -6362,6 +6362,19 @@ function hideUserPicker(){
           openModal.fxParams = msg.params || [];
           renderModal();
         }
+        return;
+      }
+      if (msg.type === "regions"){
+        const baseTransport = transportLive.data || (lastState && lastState.transport) || {};
+        const nextTransport = Object.assign({}, baseTransport, {
+          regions: Array.isArray(msg.regions) ? msg.regions : [],
+          markers: Array.isArray(msg.markers) ? msg.markers : [],
+          regionName: msg.regionName || baseTransport.regionName || "",
+          regionIndex: Number.isFinite(msg.regionIndex) ? msg.regionIndex : baseTransport.regionIndex,
+        });
+        if (!lastState) lastState = {master: null, tracks: [], transport: nextTransport};
+        else lastState.transport = nextTransport;
+        updateTransportUI(nextTransport);
         return;
       }
     };
@@ -8512,7 +8525,7 @@ modalBody.appendChild(wrap);
     overlay.style.display = "block";
     modal.style.display = "block";
     openModal = {kind:"regions"};
-    wsSend({type:"reqState"});
+    wsSend({type:"reqRegions"});
     renderModal();
   }
 

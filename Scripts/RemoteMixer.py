@@ -1002,6 +1002,19 @@ def handle_cmd(cmd, sock):
             except Exception:
                 pass
             return
+        if typ == "reqRegions":
+            try:
+                transport = get_transport_state()
+                _send(sock, {
+                    "type": "regions",
+                    "regions": transport.get("regions", []),
+                    "markers": transport.get("markers", []),
+                    "regionName": transport.get("regionName", ""),
+                    "regionIndex": transport.get("regionIndex", None),
+                })
+            except Exception:
+                pass
+            return
         if typ == "gotoRegion":
             idx = int(cmd.get("index", -1))
             if idx >= 0:
