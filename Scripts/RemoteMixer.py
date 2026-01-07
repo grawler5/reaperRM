@@ -677,7 +677,9 @@ def get_regions():
     try:
         res = RPR_CountProjectMarkers(0, 0, 0)
         if isinstance(res, tuple):
-            total = int(res[0])
+            markers = int(res[0])
+            regions = int(res[1]) if len(res) > 1 else 0
+            total = markers + regions
         else:
             total = int(res)
     except Exception:

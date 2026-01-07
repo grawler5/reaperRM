@@ -1732,7 +1732,7 @@ update();
     const availW = Math.max(10, scope.clientWidth - pad*2);
     const availH = Math.max(10, scope.clientHeight - pad*2);
     let sc = Math.min(availW/BASE_W, availH/BASE_H);
-    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 3.5 : 3.0;
+    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 4.2 : 3.6;
     sc = Math.max(0.25, Math.min(maxScale, sc));
     stage.style.width = (BASE_W*sc) + "px";
     stage.style.height = (BASE_H*sc) + "px";
@@ -6340,13 +6340,39 @@ function hideUserPicker(){
     const min=-60, max=12;
     return min + n*(max-min);
   }
+  const faderDbFromVol = (vol)=> (vol<=0) ? -150 : (20*Math.log10(vol));
+  const faderYForDb = (db)=>{
+    const yZero = 1 - normFromDb(0);
+    if (db >= 0){
+      const n = normFromDb(db);
+      return 1 - n;
+    }
+    if (db >= -20){
+      const t = Math.abs(db) / 20;
+      return yZero + (0.75 - yZero) * t;
+    }
+    const clamped = Math.max(-60, db);
+    const t = (Math.abs(clamped) - 20) / 40;
+    return 0.75 + (0.25 * t);
+  };
   function yFromVol(vol){
-    const db = (vol<=0) ? -150 : (20*Math.log10(vol));
-    return 1 - normFromDb(db);
+    const db = faderDbFromVol(vol);
+    return Math.max(0, Math.min(1, faderYForDb(db)));
   }
   function volFromY(y){
-    const n = 1 - Math.max(0, Math.min(1, y));
-    const db = dbFromNorm(n);
+    const clamped = Math.max(0, Math.min(1, y));
+    const yZero = 1 - normFromDb(0);
+    let db = -150;
+    if (clamped <= yZero){
+      const n = 1 - clamped;
+      db = dbFromNorm(n);
+    }else if (clamped <= 0.75){
+      const t = (clamped - yZero) / (0.75 - yZero);
+      db = -20 * t;
+    }else{
+      const t = (clamped - 0.75) / 0.25;
+      db = -20 - (40 * t);
+    }
     if (db <= -60) return 0;
     return volFromDb(db);
   }
@@ -7881,9 +7907,9 @@ modalBody.appendChild(wrap);
   });
 
   const SETTINGS_TABS = [
-    {id:"main", label:"Основные"},
-    {id:"ui", label:"Интерфейс"},
-    {id:"tracks", label:"Менеджер треков"}
+    {id:"main", label:"General"},
+    {id:"ui", label:"Interface"},
+    {id:"tracks", label:"Track Manager"}
   ];
 
   function renderTrackManagerSection(){
