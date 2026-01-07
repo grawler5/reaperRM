@@ -714,14 +714,28 @@ def get_regions_and_markers():
 
     for i in range(total):
         try:
-            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512, 0)
-            if isinstance(r, tuple):
-                isrgn = int(r[1]) if len(r) > 1 else 0
-                start = float(r[2]) if len(r) > 2 else 0.0
-                end = float(r[3]) if len(r) > 3 else 0.0
-                name = _as_str(r[4]) if len(r) > 4 else ""
-                idx = int(r[5]) if len(r) > 5 else i
-            else:
+            r = None
+            if "RPR_EnumProjectMarkers2" in globals():
+                r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512, 0)
+                if isinstance(r, tuple):
+                    isrgn = int(r[1]) if len(r) > 1 else 0
+                    start = float(r[2]) if len(r) > 2 else 0.0
+                    end = float(r[3]) if len(r) > 3 else 0.0
+                    name = _as_str(r[4]) if len(r) > 4 else ""
+                    idx = int(r[5]) if len(r) > 5 else i
+                else:
+                    r = None
+            if r is None and "RPR_EnumProjectMarkers" in globals():
+                r = RPR_EnumProjectMarkers(i, 0, 0, 0, "", 0)
+                if isinstance(r, tuple):
+                    isrgn = int(r[1]) if len(r) > 1 else 0
+                    start = float(r[2]) if len(r) > 2 else 0.0
+                    end = float(r[3]) if len(r) > 3 else 0.0
+                    name = _as_str(r[4]) if len(r) > 4 else ""
+                    idx = int(r[5]) if len(r) > 5 else i
+                else:
+                    continue
+            if r is None:
                 continue
             if isrgn:
                 regions.append({"index": idx, "name": name, "start": start, "end": end})
