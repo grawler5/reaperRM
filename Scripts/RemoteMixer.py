@@ -502,6 +502,115 @@ def get_recv_names(track):
         pass
     return names
 
+def get_transport_info():
+    play_state = 0
+    try:
+        ps = RPR_GetPlayState()
+        if isinstance(ps, tuple): ps = ps[0]
+        play_state = int(ps)
+    except Exception:
+        play_state = 0
+
+    pos = 0.0
+    try:
+        if "RPR_GetPlayPosition2" in globals():
+            pos = RPR_GetPlayPosition2()
+        else:
+            pos = RPR_GetPlayPosition()
+        if isinstance(pos, tuple): pos = pos[0]
+        pos = float(pos)
+    except Exception:
+        pos = 0.0
+
+    bpm = None
+    ts_num = None
+    ts_den = None
+    try:
+        if "RPR_GetProjectTimeSignature2" in globals():
+            ret = RPR_GetProjectTimeSignature2(0, 0, 0)
+            if isinstance(ret, tuple) and len(ret) >= 4:
+                bpm = _pick_num(ret[1], None)
+                ts_num = int(_pick_num(ret[2], 4))
+                ts_den = int(_pick_num(ret[3], 4))
+            elif isinstance(ret, tuple) and len(ret) >= 3:
+                bpm = _pick_num(ret[0], None)
+                ts_num = int(_pick_num(ret[1], 4))
+                ts_den = int(_pick_num(ret[2], 4))
+    except Exception:
+        pass
+
+    if bpm is None:
+        try:
+            if "RPR_TimeMap2_GetDividedBpmAtTime" in globals():
+                ret = RPR_TimeMap2_GetDividedBpmAtTime(0, pos)
+                bpm = _pick_num(ret, None)
+        except Exception:
+            pass
+
+    measure = None
+    beat = None
+    try:
+        if "RPR_TimeMap2_timeToBeats" in globals():
+            ret = RPR_TimeMap2_timeToBeats(0, pos, 0, 0, 0, 0)
+            if isinstance(ret, tuple) and len(ret) >= 3:
+                measure = int(_pick_num(ret[1], 0))
+                beat = float(_pick_num(ret[2], 0.0))
+    except Exception:
+        pass
+
+    if (measure is None or beat is None) and bpm and ts_num:
+        try:
+            beats_total = (pos * float(bpm)) / 60.0
+            measure = int(beats_total // ts_num)
+            beat = beats_total % ts_num
+        except Exception:
+            measure = measure if measure is not None else 0
+            beat = beat if beat is not None else 0.0
+
+    return {
+        "playState": play_state,
+        "isPlaying": bool(play_state & 1),
+        "isPaused": bool(play_state & 2),
+        "isRecording": bool(play_state & 4),
+        "positionSec": pos,
+        "bpm": bpm,
+        "timeSigNum": ts_num,
+        "timeSigDen": ts_den,
+        "measure": measure,
+        "beat": beat,
+    }
+
+def get_regions():
+    regions = []
+    try:
+        if "RPR_CountProjectMarkers2" in globals():
+            ret = RPR_CountProjectMarkers2(0, 0, 0)
+        else:
+            ret = RPR_CountProjectMarkers(0, 0, 0)
+        total = 0
+        if isinstance(ret, tuple) and len(ret) >= 3:
+            total = int(_pick_num(ret[1], 0)) + int(_pick_num(ret[2], 0))
+        else:
+            total = int(_pick_num(ret, 0))
+        for i in range(total):
+            if "RPR_EnumProjectMarkers3" in globals():
+                r = RPR_EnumProjectMarkers3(0, i, 0, 0, 0, "", 0)
+            else:
+                r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 0)
+            if not isinstance(r, tuple) or len(r) < 6:
+                continue
+            is_rgn = bool(r[1])
+            if not is_rgn:
+                continue
+            pos = float(_pick_num(r[2], 0.0))
+            rgn_end = float(_pick_num(r[3], 0.0))
+            name = _as_str(r[4])
+            idx = int(_pick_num(r[5], i+1))
+            regions.append({"index": idx, "name": name, "start": pos, "end": rgn_end})
+    except Exception:
+        pass
+    return regions
+
 def build_state():
     # master + tracks
     tracks = []
@@ -580,6 +689,8 @@ def build_state():
             "tracks": tracks,
             "projectName": projName,
             "projectPath": projPath,
+            "transport": get_transport_info(),
+            "regions": get_regions(),
             "ts": _now(),
             "version": VERSION}
 
@@ -816,6 +927,46 @@ def handle_cmd(cmd, sock):
     try:
         if typ == "reqState":
             _send(sock, build_state()); return
+        if typ == "transport":
+            action = str(cmd.get("action","")).lower()
+            if action == "play":
+                if "RPR_OnPlayButton" in globals(): RPR_OnPlayButton()
+            elif action == "stop":
+                if "RPR_OnStopButton" in globals(): RPR_OnStopButton()
+            elif action == "pause":
+                if "RPR_OnPauseButton" in globals(): RPR_OnPauseButton()
+            elif action == "record":
+                if "RPR_OnRecordButton" in globals(): RPR_OnRecordButton()
+            return
+        if typ == "setTempo":
+            bpm = float(cmd.get("bpm", 0.0))
+            if bpm > 0:
+                try:
+                    if "RPR_SetCurrentBPM" in globals():
+                        RPR_SetCurrentBPM(0, bpm, True)
+                    elif "RPR_GetSetProjectInfo" in globals():
+                        RPR_GetSetProjectInfo(0, "PROJECT_BPM", bpm, True)
+                except Exception:
+                    pass
+            return
+        if typ == "goToRegion":
+            idx = cmd.get("index", None)
+            start = cmd.get("start", None)
+            end = cmd.get("end", None)
+            set_loop = bool(cmd.get("setLoop", False))
+            try:
+                if idx is not None and "RPR_GoToRegion" in globals():
+                    RPR_GoToRegion(0, int(idx), True)
+            except Exception:
+                pass
+            try:
+                if start is not None:
+                    RPR_SetEditCurPos(float(start), True, False)
+                if set_loop and start is not None and end is not None and "RPR_GetSet_LoopTimeRange2" in globals():
+                    RPR_GetSet_LoopTimeRange2(0, True, True, float(start), float(end), False)
+            except Exception:
+                pass
+            return
         if typ == "setVol":
             guid = cmd.get("guid","")
             vol = float(cmd.get("vol", 1.0))

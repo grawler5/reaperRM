@@ -5814,6 +5814,7 @@ function hideUserPicker(){
 
         rebuildIndices();
         renderOrUpdate();
+        if (openModal && openModal.guid === "__transport__") renderModal();
         return;
       }
       if (msg.type === "meter"){
@@ -5882,6 +5883,25 @@ function hideUserPicker(){
     if (Math.abs(p) < 0.001) return "C";
     const v = Math.round(Math.abs(p)*100);
     return (p<0) ? (v+"L") : (v+"R");
+  }
+  function formatTransportTime(sec){
+    if (!Number.isFinite(sec)) return "—";
+    const totalMs = Math.max(0, sec) * 1000;
+    const ms = Math.floor(totalMs % 1000);
+    const totalSec = Math.floor(totalMs / 1000);
+    const s = totalSec % 60;
+    const m = Math.floor(totalSec / 60) % 60;
+    const h = Math.floor(totalSec / 3600);
+    const frac = String(Math.floor(ms / 10)).padStart(2, "0");
+    if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${frac}`;
+    return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}.${frac}`;
+  }
+  function formatTransportBeat(measure, beat){
+    if (!Number.isFinite(measure) || !Number.isFinite(beat)) return "—";
+    const bar = Math.max(0, Math.floor(measure)) + 1;
+    const beatVal = Math.max(0, beat) + 1;
+    const beatTxt = beatVal.toFixed(2).padStart(5, "0");
+    return `${bar}.${beatTxt}`;
   }
   function normFromDb(db){
     // map [-60..+12] to [0..1] with log feel. keep simple.
@@ -6847,6 +6867,14 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     {id:"returns", label:"Returns"},
     {id:"fx", label:"FX"},
   ];
+  const tapTempoTimes = [];
+
+  function openTransport(){
+    openModal = {guid:"__transport__", tab:"transport"};
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    renderModal();
+  }
 
   function openTrackMenu(guid, tab){
     window._trackMenuState = window._trackMenuState || {};
@@ -6898,6 +6926,13 @@ const FX_ADD_CATALOG = [
 
   function renderModal(){
     if (!openModal) return;
+    if (openModal.guid === "__transport__"){
+      modalTitle.textContent = "Transport";
+      tabsEl.innerHTML = "";
+      modalBody.innerHTML = "";
+      renderTransport();
+      return;
+    }
     const t = trackByGuid.get(openModal.guid);
     modalTitle.textContent = (t ? (t.kind==="master" ? "MASTER" : t.name) : "Track");
     tabsEl.innerHTML = "";
@@ -7177,6 +7212,174 @@ modalBody.appendChild(wrap);
     modalBody.appendChild(list);
   }
 
+  function renderTransport(){
+    const wrap = document.createElement("div");
+    wrap.className = "rmTransportWrap";
+
+    const isPhone = (() => {
+      try{
+        if (document.body.classList.contains("phoneLandscape")) return true;
+        return !!window.matchMedia("(max-width: 900px)").matches;
+      }catch{ return false; }
+    })();
+
+    const transport = (lastState && lastState.transport) ? lastState.transport : {};
+    const regions = (lastState && Array.isArray(lastState.regions)) ? lastState.regions : [];
+    const projName = (lastState && (lastState.projectName || lastState.project || lastState.projName || lastState.proj)) ||
+      (projectInfo && projectInfo.projectName) || "REAPER Remote Mixer";
+
+    if (isPhone){
+      const proj = document.createElement("div");
+      proj.className = "rmTransportProject";
+      proj.textContent = projName;
+      wrap.appendChild(proj);
+    }
+
+    const timeVal = formatTransportTime(transport.positionSec ?? transport.position ?? transport.pos);
+    const beatVal = formatTransportBeat(transport.measure, transport.beat);
+    const bpmVal = Number.isFinite(transport.bpm) ? transport.bpm : null;
+    const tsNum = Number.isFinite(transport.timeSigNum) ? transport.timeSigNum : (Number.isFinite(transport.tsNum) ? transport.tsNum : null);
+    const tsDen = Number.isFinite(transport.timeSigDen) ? transport.timeSigDen : (Number.isFinite(transport.tsDen) ? transport.tsDen : null);
+    const bpmText = bpmVal != null ? String(Math.round(bpmVal * 10) / 10) : "—";
+    const tsText = (tsNum != null && tsDen != null) ? `${tsNum}/${tsDen}` : "—";
+
+    const grid = document.createElement("div");
+    grid.className = "rmTransportGrid";
+    const mkCard = (label, value, meta=null)=>{
+      const card = document.createElement("div");
+      card.className = "rmTransportCard";
+      card.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+      if (meta){
+        const metaEl = document.createElement("div");
+        metaEl.className = "small";
+        metaEl.textContent = meta;
+        card.appendChild(metaEl);
+      }
+      return card;
+    };
+    grid.appendChild(mkCard("TIME", timeVal));
+    grid.appendChild(mkCard("BEAT", beatVal));
+    grid.appendChild(mkCard("BPM", bpmText, `TS ${tsText}`));
+    wrap.appendChild(grid);
+
+    const btnRow = document.createElement("div");
+    btnRow.className = "rmTransportButtons";
+
+    const btnPlay = document.createElement("button");
+    btnPlay.className = "rmTransportBtn play";
+    btnPlay.innerHTML = `<span class="rmTransportIcon">▶</span>Play`;
+
+    const btnPause = document.createElement("button");
+    btnPause.className = "rmTransportBtn pause";
+    btnPause.innerHTML = `<span class="rmTransportPauseIcon"><span></span><span></span></span>Pause`;
+
+    const btnStop = document.createElement("button");
+    btnStop.className = "rmTransportBtn stop";
+    btnStop.innerHTML = `<span class="rmTransportIcon big">■</span>Stop`;
+
+    const btnRec = document.createElement("button");
+    btnRec.className = "rmTransportBtn rec";
+    btnRec.innerHTML = `<span class="rmTransportIcon big">●</span>Rec`;
+
+    const isPlaying = !!transport.isPlaying;
+    const isPaused = !!transport.isPaused;
+    const isRecording = !!transport.isRecording;
+    const isStopped = !isPlaying && !isPaused && !isRecording;
+
+    btnPlay.classList.toggle("on", isPlaying && !isPaused);
+    btnPause.classList.toggle("on", isPaused);
+    btnRec.classList.toggle("on", isRecording);
+    btnStop.classList.toggle("idle", isStopped);
+
+    btnPlay.addEventListener("click", ()=>wsSend({type:"transport", action:"play"}));
+    btnPause.addEventListener("click", ()=>wsSend({type:"transport", action:"pause"}));
+    btnStop.addEventListener("click", ()=>wsSend({type:"transport", action:"stop"}));
+    btnRec.addEventListener("click", ()=>wsSend({type:"transport", action:"record"}));
+
+    btnRow.appendChild(btnPlay);
+    btnRow.appendChild(btnPause);
+    btnRow.appendChild(btnStop);
+    btnRow.appendChild(btnRec);
+    wrap.appendChild(btnRow);
+
+    const bpmRow = document.createElement("div");
+    bpmRow.className = "rmTransportBpmRow";
+    const bpmInput = document.createElement("input");
+    bpmInput.className = "rmTransportInput";
+    bpmInput.type = "number";
+    bpmInput.min = "20";
+    bpmInput.max = "300";
+    bpmInput.step = "0.1";
+    bpmInput.placeholder = "BPM";
+    if (bpmVal != null) bpmInput.value = String(Math.round(bpmVal * 10) / 10);
+
+    const tapBtn = document.createElement("button");
+    tapBtn.className = "rmTransportMiniBtn";
+    tapBtn.textContent = "Tap Tempo";
+
+    const applyBtn = document.createElement("button");
+    applyBtn.className = "rmTransportMiniBtn";
+    applyBtn.textContent = "Apply";
+
+    const applyBpm = ()=>{
+      const bpm = parseFloat(bpmInput.value);
+      if (!Number.isFinite(bpm) || bpm <= 0) return;
+      wsSend({type:"setTempo", bpm});
+    };
+
+    tapBtn.addEventListener("click", ()=>{
+      const now = performance.now();
+      while (tapTempoTimes.length && (now - tapTempoTimes[0]) > 2000){
+        tapTempoTimes.shift();
+      }
+      tapTempoTimes.push(now);
+      if (tapTempoTimes.length >= 2){
+        let sum = 0;
+        for (let i=1;i<tapTempoTimes.length;i++) sum += (tapTempoTimes[i] - tapTempoTimes[i-1]);
+        const avg = sum / (tapTempoTimes.length - 1);
+        const bpm = 60000 / avg;
+        if (Number.isFinite(bpm)) bpmInput.value = String(Math.round(bpm * 10) / 10);
+      }
+    });
+    applyBtn.addEventListener("click", applyBpm);
+    bpmInput.addEventListener("keydown", (ev)=>{ if (ev.key === "Enter") applyBpm(); });
+
+    bpmRow.appendChild(bpmInput);
+    bpmRow.appendChild(tapBtn);
+    bpmRow.appendChild(applyBtn);
+    wrap.appendChild(bpmRow);
+
+    const regionsWrap = document.createElement("div");
+    regionsWrap.className = "rmTransportRegions";
+    const regionsLabel = document.createElement("div");
+    regionsLabel.className = "small";
+    regionsLabel.textContent = "Regions";
+    regionsWrap.appendChild(regionsLabel);
+
+    if (!regions.length){
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No regions.";
+      regionsWrap.appendChild(empty);
+    } else {
+      regions.forEach((r)=>{
+        const btn = document.createElement("button");
+        btn.className = "rmTransportRegionBtn";
+        const name = r.name || `Region ${r.index != null ? r.index : ""}`.trim();
+        const startTxt = formatTransportTime(r.start);
+        const endTxt = formatTransportTime(r.end);
+        btn.innerHTML = `<div class="name">${escapeHtml(name)}</div><div class="meta">${startTxt} → ${endTxt}</div>`;
+        btn.addEventListener("click", ()=>{
+          wsSend({type:"goToRegion", index: r.index, start: r.start, end: r.end, setLoop: true});
+        });
+        regionsWrap.appendChild(btn);
+      });
+    }
+    wrap.appendChild(regionsWrap);
+
+    modalBody.appendChild(wrap);
+  }
+
 
   function renderFxTab(t){
     // FX list + add catalog + enable all off/on
@@ -7302,6 +7505,7 @@ modalBody.appendChild(wrap);
   // ---------- Settings ----------
   const fsBtn = document.getElementById("fsBtn");
   const settingsBtn = document.getElementById("settingsBtn");
+  const transportBtn = document.getElementById("transportBtn");
 
   // ---------- PWA (install as app) ----------
   const installBtn = document.getElementById("installBtn");
@@ -7614,6 +7818,7 @@ modalBody.appendChild(wrap);
   }
 
   settingsBtn.addEventListener("click", openSettings);
+  transportBtn?.addEventListener("click", openTransport);
   overlay.addEventListener("click", ()=>{ if(openModal && openModal.guid==="__settings__") closeModal(); });
 
   // ---------- Init ----------
