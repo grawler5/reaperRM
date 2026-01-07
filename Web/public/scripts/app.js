@@ -6027,26 +6027,42 @@ applyResponsiveMode();
     return `${pad(hrs)}:${pad(mins)}:${pad(secs)}.${pad(frac)}`;
   };
 
-  const updateTransportUI = (transport)=>{
-    if (!transport) return;
-    if (transportTime) transportTime.textContent = formatTimecode(transport.position);
-    if (transportBars){
+  const applyTransportRefs = (transport, refs)=>{
+    if (!transport || !refs) return;
+    if (refs.time) refs.time.textContent = formatTimecode(transport.position);
+    if (refs.bars){
       const bar = Number.isFinite(transport.bar) ? transport.bar : 1;
       const beat = Number.isFinite(transport.beat) ? transport.beat : 1;
       const sub = Number.isFinite(transport.beatFrac) ? Math.round(transport.beatFrac * 100) : 0;
-      transportBars.textContent = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
+      refs.bars.textContent = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
     }
-    if (transportRegion){
+    if (refs.region){
       const name = transport.regionName || "—";
-      transportRegion.textContent = `Region: ${name}`;
+      refs.region.textContent = `Region: ${name}`;
     }
-    if (transportBpm){
-      const bpm = Number.isFinite(transport.bpm) ? (Math.round(transport.bpm*10)/10).toFixed(1) : "—";
-      transportBpm.textContent = `${bpm} BPM`;
+    if (refs.bpm){
+      const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
+      refs.bpm.textContent = bpm === null ? "—" : `${bpm} BPM`;
     }
-    if (transportPlay) transportPlay.classList.toggle("on", !!transport.playing && !transport.paused);
-    if (transportPause) transportPause.classList.toggle("on", !!transport.paused);
-    if (transportRec) transportRec.classList.toggle("on", !!transport.recording);
+    if (refs.play) refs.play.classList.toggle("on", !!transport.playing && !transport.paused);
+    if (refs.pause) refs.pause.classList.toggle("on", !!transport.paused);
+    if (refs.rec) refs.rec.classList.toggle("on", !!transport.recording);
+  };
+
+  const updateTransportUI = (transport)=>{
+    if (!transport) return;
+    applyTransportRefs(transport, {
+      time: transportTime,
+      bars: transportBars,
+      region: transportRegion,
+      bpm: transportBpm,
+      play: transportPlay,
+      pause: transportPause,
+      rec: transportRec,
+    });
+    if (openModal && openModal.kind === "transport" && openModal.transportRefs){
+      applyTransportRefs(transport, openModal.transportRefs);
+    }
   };
 
   let lastState = null;     // {master, tracks[]}
@@ -6361,6 +6377,7 @@ function hideUserPicker(){
   }
   function volFromY(y){
     const clamped = Math.max(0, Math.min(1, y));
+    if (clamped >= 0.995) return 0;
     const yZero = 1 - normFromDb(0);
     let db = -150;
     if (clamped <= yZero){
@@ -6712,6 +6729,18 @@ slotbar.appendChild(folderBtn);
       panBox, panVal: panBox.querySelector(".panVal"), panSlider: panBox.querySelector(".panSlider"),
       folderTag, indentGuide, footerBar, footerNum, footerFolderBtn, fxSlots};
 
+    const applyFaderUi = (vol, yOverride)=>{
+      const refs = el._refs;
+      if (refs && refs.volDb) refs.volDb.textContent = `${dbFromVol(vol)} dB`;
+      const y = (typeof yOverride === "number") ? yOverride : yFromVol(vol);
+      sliderTargets.set(t.guid, y);
+      sliderCurrent.set(t.guid, y);
+      if (refs && refs.thumb && refs.faderBox){
+        const h = refs.faderBox.clientHeight || 420;
+        refs.thumb.style.transform = `translate(-50%, ${Math.max(8, Math.min(h-28, y*h))}px)`;
+      }
+    };
+
     // Events
     title.addEventListener("click", (ev)=>{ ev.stopPropagation(); openTrackMenu(t.guid, "general"); });
     fxBtn.addEventListener("click",(ev)=>{
@@ -6743,11 +6772,18 @@ slotbar.appendChild(folderBtn);
 
     if (el._refs.footerFolderBtn) el._refs.footerFolderBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); if (t.kind!=="master" && t.folderDepth>0) cycleFolderMode(t.guid); });
 
+    const resetFader = (ev)=>{
+      if (ev) ev.preventDefault();
+      const vol = 1.0;
+      wsSend({type:"setVol", guid:t.guid, vol}); // 0dB = 1.0
+      applyFaderUi(vol);
+      const localTrack = trackByGuid.get(t.guid) || t;
+      localTrack.vol = vol;
+    };
     // Double click reset (0dB) on fader area
-    hit.addEventListener("dblclick",(ev)=>{
-      ev.preventDefault();
-      wsSend({type:"setVol", guid:t.guid, vol: 1.0}); // 0dB = 1.0
-    });
+    hit.addEventListener("dblclick", resetFader);
+    thumb.addEventListener("dblclick", resetFader);
+    faderBox.addEventListener("dblclick", resetFader);
 
     // Drag fader ONLY when grabbing the handle (prevents false touches while swiping)
     thumb.addEventListener("pointerdown",(ev)=>{
@@ -6758,18 +6794,12 @@ slotbar.appendChild(folderBtn);
       const rect = faderBox.getBoundingClientRect();
       function setFromClientY(clientY){
         const y = (clientY - rect.top) / rect.height;
-        const vv = volFromY(y);
-        wsSend({type:"setVol", guid:t.guid, vol: vv});
-        // immediate UI (move thumb while dragging)
         const yy = Math.max(0, Math.min(1, y));
-        sliderTargets.set(t.guid, yy);
-        sliderCurrent.set(t.guid, yy);
-        const th = el._refs.thumb;
-        const fb = el._refs.faderBox;
-        if (th && fb){
-          const h = fb.clientHeight || 420;
-          th.style.transform = `translate(-50%, ${Math.max(8, Math.min(h-28, yy*h))}px)`;
-        }
+        const vv = volFromY(yy);
+        wsSend({type:"setVol", guid:t.guid, vol: vv});
+        applyFaderUi(vv, yy);
+        const localTrack = trackByGuid.get(t.guid) || t;
+        localTrack.vol = vv;
       }
       setFromClientY(ev.clientY);
       const move = (e)=> setFromClientY(e.clientY);
@@ -7369,6 +7399,64 @@ const FX_ADD_CATALOG = [
   {name:"RM_Lexikan2", add:"JS: RM_Lexikan2||JS:RM_Lexikan2||RM_Lexikan2"}
 ];
 
+  function renderTransportModal(){
+    modalTitle.textContent = "Transport";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.className = "transportModal";
+
+    const controls = document.createElement("div");
+    controls.className = "transportControls";
+    const mkCtrl = (label, title, action, extraClass)=>{
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.title = title;
+      if (extraClass) btn.classList.add(extraClass);
+      btn.addEventListener("click", ()=>wsSend({type:"transport", action}));
+      return btn;
+    };
+    const stopBtn = mkCtrl("■", "Stop", "stop");
+    const playBtn = mkCtrl("▶", "Play", "play");
+    const pauseBtn = mkCtrl("⏸", "Pause", "pause");
+    const recBtn = mkCtrl("●", "Record", "record", "rec");
+    controls.append(stopBtn, playBtn, pauseBtn, recBtn);
+
+    const info = document.createElement("div");
+    info.className = "transportInfo";
+    const timeBtn = document.createElement("button");
+    timeBtn.className = "transportValue";
+    timeBtn.title = "Project time";
+    const barsBtn = document.createElement("button");
+    barsBtn.className = "transportValue";
+    barsBtn.title = "Bars/Beats";
+    const regionBtn = document.createElement("button");
+    regionBtn.className = "transportValue";
+    regionBtn.title = "Region";
+    regionBtn.addEventListener("click", openRegionsModal);
+    const bpmBtn = document.createElement("button");
+    bpmBtn.className = "transportValue";
+    bpmBtn.title = "BPM";
+    bpmBtn.addEventListener("click", openBpmModal);
+    info.append(timeBtn, barsBtn, regionBtn, bpmBtn);
+
+    wrap.appendChild(controls);
+    wrap.appendChild(info);
+    modalBody.appendChild(wrap);
+
+    openModal.transportRefs = {
+      time: timeBtn,
+      bars: barsBtn,
+      region: regionBtn,
+      bpm: bpmBtn,
+      play: playBtn,
+      pause: pauseBtn,
+      rec: recBtn,
+    };
+    if (lastState && lastState.transport) updateTransportUI(lastState.transport);
+  }
+
   function renderRegionsModal(){
     modalTitle.textContent = "Regions";
     tabsEl.innerHTML = "";
@@ -7405,14 +7493,17 @@ const FX_ADD_CATALOG = [
     const wrap = document.createElement("div");
     const current = Number.isFinite(openModal.draftBpm) ? openModal.draftBpm : 120;
     openModal.draftBpm = current;
-    const clampBpm = (v)=> Math.max(20, Math.min(300, v));
+    const clampBpm = (v)=>{
+      const n = Number.isFinite(v) ? v : 120;
+      return Math.max(20, Math.min(300, Math.round(n)));
+    };
 
     const row = document.createElement("div");
     row.className = "row";
     row.innerHTML = `<label>Tempo</label>
       <div style="display:flex; align-items:center; gap:10px; flex:1;">
-        <input class="rng" type="range" min="20" max="300" step="0.1" value="${current}">
-        <input class="inp" type="number" min="20" max="300" step="0.1" value="${current}" style="width:90px;">
+        <input class="rng" type="range" min="20" max="300" step="1" value="${current}">
+        <input class="inp" type="number" min="20" max="300" step="1" value="${current}" style="width:90px;">
       </div>`;
     wrap.appendChild(row);
 
@@ -7433,7 +7524,7 @@ const FX_ADD_CATALOG = [
     const [cancelBtn, applyBtn] = btnRow.querySelectorAll("button");
 
     const setDraft = (v)=>{
-      const n = Math.round(clampBpm(v) * 10) / 10;
+      const n = clampBpm(v);
       openModal.draftBpm = n;
       slider.value = String(n);
       input.value = String(n);
@@ -7471,6 +7562,10 @@ const FX_ADD_CATALOG = [
     if (!openModal) return;
     if (openModal.kind === "settings"){
       renderSettingsModal();
+      return;
+    }
+    if (openModal.kind === "transport"){
+      renderTransportModal();
       return;
     }
     if (openModal.kind === "regions"){
@@ -7883,6 +7978,7 @@ modalBody.appendChild(wrap);
   // ---------- Settings ----------
   const fsBtn = document.getElementById("fsBtn");
   const settingsBtn = document.getElementById("settingsBtn");
+  const playerBtn = document.getElementById("playerBtn");
   const transportStop = document.getElementById("transportStop");
   const transportPlay = document.getElementById("transportPlay");
   const transportPause = document.getElementById("transportPause");
@@ -8123,6 +8219,13 @@ modalBody.appendChild(wrap);
     renderModal();
   }
 
+  function openTransportModal(){
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    openModal = {kind:"transport", transportRefs: null};
+    renderModal();
+  }
+
   function openRegionsModal(){
     overlay.style.display = "block";
     modal.style.display = "block";
@@ -8133,12 +8236,13 @@ modalBody.appendChild(wrap);
   function openBpmModal(){
     overlay.style.display = "block";
     modal.style.display = "block";
-    const bpm = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? lastState.transport.bpm : 120;
+    const bpm = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
     openModal = {kind:"bpm", draftBpm: bpm};
     renderModal();
   }
 
   settingsBtn.addEventListener("click", openSettings);
+  playerBtn?.addEventListener("click", openTransportModal);
   transportStop?.addEventListener("click", ()=>wsSend({type:"transport", action:"stop"}));
   transportPlay?.addEventListener("click", ()=>wsSend({type:"transport", action:"play"}));
   transportPause?.addEventListener("click", ()=>wsSend({type:"transport", action:"pause"}));

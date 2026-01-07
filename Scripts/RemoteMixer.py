@@ -677,9 +677,11 @@ def get_regions():
     try:
         res = RPR_CountProjectMarkers(0, 0, 0)
         if isinstance(res, tuple):
-            markers = int(res[0])
-            regions = int(res[1]) if len(res) > 1 else 0
-            total = markers + regions
+            total = int(res[0]) if len(res) > 0 else 0
+            markers = int(res[1]) if len(res) > 1 else 0
+            regions = int(res[2]) if len(res) > 2 else 0
+            if total <= 0:
+                total = markers + regions
         else:
             total = int(res)
     except Exception:
@@ -955,8 +957,8 @@ def handle_cmd(cmd, sock):
                 except Exception: pass
             return
         if typ == "setBpm":
-            bpm = float(cmd.get("bpm", 120.0))
-            bpm = max(20.0, min(300.0, bpm))
+            bpm = int(round(float(cmd.get("bpm", 120.0))))
+            bpm = max(20, min(300, bpm))
             try:
                 if "RPR_SetCurrentBPM" in globals():
                     RPR_SetCurrentBPM(0, bpm, True)
