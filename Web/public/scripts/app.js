@@ -1833,7 +1833,7 @@ if (!st.raf){
 
   remap();
   update();
-  return {el: stage, update, ctrl};
+  return {el: host, update, ctrl};
 }
 
   // ---- RM_Limiter2: Waves L2-style panel (web) ----
@@ -6046,7 +6046,8 @@ applyResponsiveMode();
     if (!transport || !refs) return;
     if (refs.time){
       const position = Number.isFinite(transport.position) ? transport.position : parseFloat(transport.position);
-      refs.time.textContent = formatTimecode(Number.isFinite(position) ? position : 0);
+      const next = formatTimecode(Number.isFinite(position) ? position : 0);
+      if (refs.time.textContent !== next) refs.time.textContent = next;
     }
     if (refs.bars){
       const rawBar = Number.isFinite(transport.bar) ? transport.bar : parseFloat(transport.bar);
@@ -6055,7 +6056,8 @@ applyResponsiveMode();
       const bar = Number.isFinite(rawBar) && rawBar > 0 ? rawBar : 1;
       const beat = Number.isFinite(rawBeat) && rawBeat > 0 ? rawBeat : 1;
       const sub = Number.isFinite(rawFrac) ? Math.round(rawFrac * 100) : 0;
-      refs.bars.textContent = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
+      const next = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
+      if (refs.bars.textContent !== next) refs.bars.textContent = next;
     }
     if (refs.region){
       const name = transport.regionName || "—";
@@ -6083,6 +6085,8 @@ applyResponsiveMode();
 
   const updateTransportUI = (transport)=>{
     if (!transport) return;
+    transportLive.data = Object.assign({}, transport);
+    transportLive.ts = performance.now();
     applyTransportRefs(transport, {
       time: transportTime,
       bars: transportBars,
@@ -6107,6 +6111,7 @@ applyResponsiveMode();
   let meterAnim = new Map(); // guid -> {tL,tR,curL,curR,pL,pR}
   let meterAnimRaf = 0;
   let meterAnimLastT = 0;
+  const transportLive = {data: null, ts: 0};
 
   function ensureMeterAnim(){
     if (meterAnimRaf) return;
@@ -6115,11 +6120,11 @@ applyResponsiveMode();
       const dt = Math.min(80, Math.max(0, t - meterAnimLastT));
       meterAnimLastT = t;
 
-      // Exponential smoothing constant (~60ms time constant)
-      const a = 1 - Math.exp(-dt / 60);
+      // Exponential smoothing constant (~110ms time constant)
+      const a = 1 - Math.exp(-dt / 110);
 
       // Peak decay tuned for ~60fps; adapt to dt
-      const decay = Math.pow(0.985, dt / 16.7);
+      const decay = Math.pow(0.99, dt / 16.7);
 
       for (const [guid, st] of meterAnim){
         const el = stripEls.get(guid);
@@ -6133,8 +6138,13 @@ applyResponsiveMode();
         st.curL += (st.tL - st.curL) * a;
         st.curR += (st.tR - st.curR) * a;
 
-        const cL = Math.max(0, Math.min(1, st.curL));
-        const cR = Math.max(0, Math.min(1, st.curR));
+        const norm = (v)=>{
+          if (!Number.isFinite(v)) return 0;
+          const clamped = Math.max(0, Math.min(1, v));
+          return clamped >= 0.995 ? 1 : clamped;
+        };
+        const cL = norm(st.curL);
+        const cR = norm(st.curR);
 
         r.vuFillL.style.height = (cL*100) + "%";
         r.vuFillR.style.height = (cR*100) + "%";
@@ -6886,6 +6896,7 @@ el.classList.toggle("gapR", !!t._gapR);
       const isChild = (t.indent>0);
       el.classList.toggle("compactChild", !!t._compact);
       el.classList.toggle("folderStart", (t.folderDepth>0));
+      el.classList.toggle("folderChild", isChild);
       r.indentGuide.style.display = isChild ? "block" : "none";
       const fm = (t.folderDepth>0) ? getFolderMode(t.guid) : "expanded";
 
@@ -7033,6 +7044,41 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
           const rectH = fb.clientHeight || 420;
           const y = next * rectH;
           thumb.style.transform = `translate(-50%, ${Math.max(10, Math.min(rectH-30, y))}px)`;
+        }
+      }
+      if (transportLive.data){
+        const now = performance.now();
+        const t = transportLive.data;
+        const elapsed = Math.max(0, (now - transportLive.ts) / 1000);
+        let position = Number.isFinite(t.position) ? t.position : parseFloat(t.position);
+        if (!Number.isFinite(position)) position = 0;
+        if (t.playing || t.recording) position += elapsed;
+
+        let bar = t.bar;
+        let beat = t.beat;
+        let beatFrac = t.beatFrac;
+        if ((t.playing || t.recording) && Number.isFinite(t.bpm) && Number.isFinite(bar) && Number.isFinite(beat) && Number.isFinite(beatFrac)){
+          const beatsPerBar = 4;
+          const base = (Math.max(1, bar) - 1) * beatsPerBar + (Math.max(1, beat) - 1) + Math.max(0, beatFrac);
+          const total = base + (elapsed * t.bpm / 60);
+          bar = Math.floor(total / beatsPerBar) + 1;
+          const beatInBar = total % beatsPerBar;
+          beat = Math.floor(beatInBar) + 1;
+          beatFrac = beatInBar - Math.floor(beatInBar);
+        }
+        const derived = Object.assign({}, t, {position, bar, beat, beatFrac});
+        applyTransportRefs(derived, {
+          time: transportTime,
+          bars: transportBars,
+          region: transportRegion,
+          bpm: transportBpm,
+          play: transportPlay,
+          pause: transportPause,
+          rec: transportRec,
+          stop: transportStop,
+        });
+        if (openModal && openModal.kind === "transport" && openModal.transportRefs){
+          applyTransportRefs(derived, openModal.transportRefs);
         }
       }
     } catch {}
