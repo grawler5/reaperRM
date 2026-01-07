@@ -861,20 +861,23 @@ body.phoneLandscape .strip.fxExpanded .fxSlots{ display:flex !important; }
 }
 .strip.compactChild .trackWell .vu{ border-radius:6px; }
 
-/* Folder framing */
-.strip.folderStart,
-.strip.folderChild{
-  box-shadow:
-    0 0 0 2px var(--trackColor, rgba(90,120,170,.7)),
-    0 0 0 4px var(--trackColor, rgba(90,120,170,.7)),
-    0 10px 20px rgba(0,0,0,.35);
+/* Folder framing (drawn as a single overlay around the group) */
+#mixerWrap{ position:relative; }
+#folderFrames{
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  z-index:20;
 }
-body.light .strip.folderStart,
-body.light .strip.folderChild{
-  box-shadow:
-    0 0 0 2px var(--trackColor, rgba(90,120,170,.5)),
-    0 0 0 4px var(--trackColor, rgba(90,120,170,.5)),
-    0 8px 16px rgba(0,0,0,.18);
+.folderFrame{
+  position:absolute;
+  border:2px solid rgba(90,120,170,.7);
+  border-radius:12px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.35);
+}
+body.light .folderFrame{
+  border-color: rgba(90,120,170,.5);
+  box-shadow:0 0 0 1px rgba(0,0,0,.2);
 }
 
 

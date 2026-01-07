@@ -5963,6 +5963,10 @@ window.addEventListener("orientationchange", scheduleResponsiveMode, {passive:tr
 if (mqPhoneLandscape.addEventListener) mqPhoneLandscape.addEventListener("change", scheduleResponsiveMode);
 else if (mqPhoneLandscape.addListener) mqPhoneLandscape.addListener(scheduleResponsiveMode);
 applyResponsiveMode();
+if (mixerWrap){
+  mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
+}
+window.addEventListener("resize", scheduleFolderFrames, {passive:true});
 
   // ---------- Config ----------
   const DEFAULT_CFG = {
@@ -6401,6 +6405,12 @@ function hideUserPicker(){
     const cl = Math.max(min, Math.min(max, db));
     return (cl - min) / (max - min);
   }
+  function meterFromPeak(pk){
+    if (!Number.isFinite(pk) || pk <= 0) return 0;
+    const db = 20 * Math.log10(pk);
+    const clamped = Math.max(-60, Math.min(0, db));
+    return normFromDb(clamped);
+  }
   function dbFromNorm(n){
     const min=-60, max=12;
     return min + n*(max-min);
@@ -6468,6 +6478,7 @@ function hideUserPicker(){
   const stack = []; // {guid, indent, lastVisibleGuid}
   const gapL = new Set();
   const gapR = new Set();
+  const groupColors = new Map();
 
   const closeFoldersToIndent = (indent)=>{
     while (stack.length && indent <= stack[stack.length-1].indent){
@@ -6498,7 +6509,17 @@ function hideUserPicker(){
 
     const isVisible = !hiddenByParent;
     if (isVisible){
-      const item = Object.assign({}, t, { _compact: compactByParent });
+      let groupId = null;
+      if (stack.length > 0){
+        groupId = stack[0].guid;
+      } else if (t.folderDepth > 0){
+        groupId = t.guid;
+      }
+      if (t.folderDepth > 0 && stack.length === 0){
+        groupColors.set(t.guid, t.color || "");
+      }
+      const groupColor = groupId ? (groupColors.get(groupId) || "") : "";
+      const item = Object.assign({}, t, { _compact: compactByParent, _folderGroupId: groupId, _folderGroupColor: groupColor });
       out.push(item);
 
       // group start gap
@@ -6536,11 +6557,73 @@ function hideUserPicker(){
 
   // ---------- Rendering ----------
   const mixer = document.getElementById("mixer");
+  const mixerWrap = document.getElementById("mixerWrap");
+  let folderFrames = null;
+  let folderFrameRaf = 0;
+
+  function ensureFolderFrames(){
+    if (!mixerWrap) return null;
+    if (!folderFrames){
+      folderFrames = document.getElementById("folderFrames");
+      if (!folderFrames){
+        folderFrames = document.createElement("div");
+        folderFrames.id = "folderFrames";
+        mixerWrap.appendChild(folderFrames);
+      }
+    }
+    return folderFrames;
+  }
+
+  function updateFolderFrames(){
+    const layer = ensureFolderFrames();
+    if (!layer || !mixerWrap) return;
+    layer.innerHTML = "";
+    const wrapRect = mixerWrap.getBoundingClientRect();
+    const groups = new Map();
+    for (const el of stripEls.values()){
+      const groupId = el.dataset.folderGroup;
+      if (!groupId) continue;
+      const rect = el.getBoundingClientRect();
+      const left = rect.left - wrapRect.left + mixerWrap.scrollLeft;
+      const right = rect.right - wrapRect.left + mixerWrap.scrollLeft;
+      const top = rect.top - wrapRect.top + mixerWrap.scrollTop;
+      const bottom = rect.bottom - wrapRect.top + mixerWrap.scrollTop;
+      const color = el.style.getPropertyValue("--folderGroupColor") || "";
+      const existing = groups.get(groupId);
+      if (!existing){
+        groups.set(groupId, {left, right, top, bottom, color});
+      } else {
+        existing.left = Math.min(existing.left, left);
+        existing.right = Math.max(existing.right, right);
+        existing.top = Math.min(existing.top, top);
+        existing.bottom = Math.max(existing.bottom, bottom);
+      }
+    }
+    for (const info of groups.values()){
+      const frame = document.createElement("div");
+      frame.className = "folderFrame";
+      frame.style.left = info.left + "px";
+      frame.style.top = info.top + "px";
+      frame.style.width = Math.max(0, info.right - info.left) + "px";
+      frame.style.height = Math.max(0, info.bottom - info.top) + "px";
+      if (info.color) frame.style.borderColor = info.color;
+      layer.appendChild(frame);
+    }
+  }
+
+  function scheduleFolderFrames(){
+    if (folderFrameRaf) cancelAnimationFrame(folderFrameRaf);
+    folderFrameRaf = requestAnimationFrame(()=>{
+      folderFrameRaf = 0;
+      updateFolderFrames();
+    });
+  }
 
   function clearMixer(){
     mixer.innerHTML = "";
     stripEls.clear();
     meterEls.clear();
+    if (folderFrames) folderFrames.innerHTML = "";
   }
 
   function shouldIncludeMaster(){
@@ -6587,6 +6670,7 @@ function hideUserPicker(){
 
       // Apply meters to ensure elements exist
       if (lastMeters) applyMeters(lastMeters);
+      scheduleFolderFrames();
 
     } catch (e){
       showError(e && e.message ? e.message : String(e));
@@ -6894,7 +6978,16 @@ el.classList.toggle("gapR", !!t._gapR);
 
     // track color (used for outline/frame)
     const col = hexOrEmpty(t.color);
-    if (el.style) el.style.setProperty("--trackColor", col || "transparent");
+    if (el.style){
+      el.style.setProperty("--trackColor", col || "transparent");
+      if (t._folderGroupId){
+        el.style.setProperty("--folderGroupColor", t._folderGroupColor || col || "transparent");
+        el.dataset.folderGroup = t._folderGroupId;
+      } else {
+        el.style.removeProperty("--folderGroupColor");
+        delete el.dataset.folderGroup;
+      }
+    }
 
     // header text
     const nameEl = r.title.querySelector(".name");
@@ -7401,8 +7494,8 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         const el = stripEls.get(guid);
         if (!el || !el._refs) continue;
 
-        const pkL = Math.max(0, Math.min(1, (fr.pkL||0) / 1.0));
-        const pkR = Math.max(0, Math.min(1, (fr.pkR||0) / 1.0));
+        const pkL = Math.max(0, Math.min(1, meterFromPeak(fr.pkL||0)));
+        const pkR = Math.max(0, Math.min(1, meterFromPeak(fr.pkR||0)));
 
         const clipDb = (typeof fr.clipDb === "number") ? fr.clipDb : null;
         let st = meterAnim.get(guid);

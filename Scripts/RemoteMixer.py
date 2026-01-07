@@ -1000,26 +1000,19 @@ def handle_cmd(cmd, sock):
             idx = int(cmd.get("index", -1))
             if idx >= 0:
                 try:
-                    res = RPR_CountProjectMarkers(0, 0, 0)
-                    total = int(res[0]) if isinstance(res, tuple) else int(res)
-                except Exception:
-                    total = 0
-                for i in range(total):
-                    try:
-                        r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, 0, 0)
-                        if not isinstance(r, tuple) or len(r) < 6:
-                            continue
-                        isrgn = int(r[1])
-                        start = float(r[2])
-                        mark_idx = int(r[5])
-                        if isrgn and mark_idx == idx:
-                            try:
-                                RPR_SetEditCurPos2(0, start, True, True)
-                            except Exception:
-                                RPR_SetEditCurPos(start, True, True)
+                    regions, _markers = get_regions_and_markers()
+                    start = None
+                    for r in regions:
+                        if int(r.get("index", -1)) == idx:
+                            start = r.get("start", None)
                             break
-                    except Exception:
-                        continue
+                    if start is not None:
+                        try:
+                            RPR_SetEditCurPos2(0, start, True, True)
+                        except Exception:
+                            RPR_SetEditCurPos(start, True, True)
+                except Exception:
+                    pass
             return
         if typ == "gotoMarker":
             idx = int(cmd.get("index", -1))
