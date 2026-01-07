@@ -6155,6 +6155,18 @@ applyResponsiveMode();
         r.vuPeakL.style.transform = `translateY(${-(st.pL*100)}%)`;
         r.vuPeakR.style.transform = `translateY(${-(st.pR*100)}%)`;
 
+        if (r.volDb){
+          const now = performance.now();
+          if (st.clipUntil && st.clipUntil > now && Number.isFinite(st.clipDb)){
+            r.volDb.textContent = `CLIP +${st.clipDb.toFixed(1)} dB`;
+            r.volDb.classList.add("clip");
+          } else if (r.volDb.classList.contains("clip")){
+            const t = trackByGuid.get(guid);
+            r.volDb.textContent = `${dbFromVol(t ? (t.vol || 1.0) : 1.0)} dB`;
+            r.volDb.classList.remove("clip");
+          }
+        }
+
         // also update any open plugin windows track meters for this track (smoothed)
         try{
           for (const win of pluginWins.values()){
@@ -6880,9 +6892,9 @@ el.classList.toggle("gapL", !!t._gapL);
 el.classList.toggle("gapR", !!t._gapR);
 
 
-    // accent color
+    // track color (used for outline/frame)
     const col = hexOrEmpty(t.color);
-    r.accent.style.background = col || "transparent";
+    if (el.style) el.style.setProperty("--trackColor", col || "transparent");
 
     // header text
     const nameEl = r.title.querySelector(".name");
@@ -7392,13 +7404,18 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         const pkL = Math.max(0, Math.min(1, (fr.pkL||0) / 1.0));
         const pkR = Math.max(0, Math.min(1, (fr.pkR||0) / 1.0));
 
+        const clipDb = (typeof fr.clipDb === "number") ? fr.clipDb : null;
         let st = meterAnim.get(guid);
         if (!st){
-          st = {tL: pkL, tR: pkR, curL: pkL, curR: pkR, pL: pkL, pR: pkR};
+          st = {tL: pkL, tR: pkR, curL: pkL, curR: pkR, pL: pkL, pR: pkR, clipDb: null, clipUntil: 0};
           meterAnim.set(guid, st);
         } else {
           st.tL = pkL;
           st.tR = pkR;
+        }
+        if (clipDb && clipDb > 0){
+          st.clipDb = Math.max(st.clipDb || 0, clipDb);
+          st.clipUntil = performance.now() + 1500;
         }
       }
       ensureMeterAnim();
@@ -7602,9 +7619,11 @@ const FX_ADD_CATALOG = [
     tabsEl.innerHTML = "";
     modalBody.innerHTML = "";
     const wrap = document.createElement("div");
-    const regions = (lastState && lastState.transport && Array.isArray(lastState.transport.regions)) ? lastState.transport.regions : [];
-    if (!regions.length){
-      wrap.innerHTML = `<div class="small">No regions in project.</div>`;
+    const transport = (lastState && lastState.transport) ? lastState.transport : {};
+    const regions = Array.isArray(transport.regions) ? transport.regions : [];
+    const markers = Array.isArray(transport.markers) ? transport.markers : [];
+    if (!regions.length && !markers.length){
+      wrap.innerHTML = `<div class="small">No regions or markers in project.</div>`;
       modalBody.appendChild(wrap);
       return;
     }
@@ -7613,10 +7632,21 @@ const FX_ADD_CATALOG = [
     regions.forEach((r)=>{
       const row = document.createElement("div");
       row.className = "fxItem";
-      row.innerHTML = `<div class="nm">${escapeHtml(r.name || "Region")}</div>
+      row.innerHTML = `<div class="nm">Region: ${escapeHtml(r.name || "Region")}</div>
         <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
       row.querySelector("button").addEventListener("click", ()=>{
         wsSend({type:"gotoRegion", index: r.index});
+        closeModal();
+      });
+      list.appendChild(row);
+    });
+    markers.forEach((m)=>{
+      const row = document.createElement("div");
+      row.className = "fxItem";
+      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(m.name || "Marker")}</div>
+        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
+      row.querySelector("button").addEventListener("click", ()=>{
+        wsSend({type:"gotoMarker", index: m.index});
         closeModal();
       });
       list.appendChild(row);

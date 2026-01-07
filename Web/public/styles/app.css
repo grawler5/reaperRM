@@ -182,6 +182,10 @@
     background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 30%, rgba(0,0,0,.15));
     pointer-events:none;
   }
+  .strip{
+    outline: 2px solid var(--trackColor, transparent);
+    outline-offset: -2px;
+  }
   .strip.master{width:140px; background:linear-gradient(#3b3f45,#2a2d31 35%, #1f2126 100%);}
   .strip.child{background:linear-gradient(#353a40,#2a2d31 40%, #1f2126 100%);}
   .strip.child .header{background:linear-gradient(#2e3137,#25282d);}
@@ -193,9 +197,7 @@
   body.light .strip.master{background:linear-gradient(#f7f9fd,#e1e7ef 35%, #d5dde8 100%);}
   body.light .strip.child{background:linear-gradient(#f3f6fb,#e3e8f0 40%, #d6dde8 100%);}
   body.light .strip.child .header{background:linear-gradient(#eef2f7,#dde4ee);}
-  .strip .accent{
-    position:absolute; left:0; right:0; top:0; height:3px; background:transparent;
-  }
+  .strip .accent{ display:none; }
   .header{
     padding:7px 8px 6px 8px;
     border-bottom:1px solid rgba(0,0,0,.55);
@@ -862,18 +864,16 @@ body.phoneLandscape .strip.fxExpanded .fxSlots{ display:flex !important; }
 /* Folder framing */
 .strip.folderStart,
 .strip.folderChild{
-  outline: 2px solid rgba(90,120,170,.7);
-  outline-offset: -2px;
   box-shadow:
-    inset 0 0 0 1px rgba(90,120,170,.55),
+    0 0 0 2px var(--trackColor, rgba(90,120,170,.7)),
+    0 0 0 4px var(--trackColor, rgba(90,120,170,.7)),
     0 10px 20px rgba(0,0,0,.35);
 }
 body.light .strip.folderStart,
 body.light .strip.folderChild{
-  outline: 2px solid rgba(90,120,170,.5);
-  outline-offset: -2px;
   box-shadow:
-    inset 0 0 0 1px rgba(90,120,170,.45),
+    0 0 0 2px var(--trackColor, rgba(90,120,170,.5)),
+    0 0 0 4px var(--trackColor, rgba(90,120,170,.5)),
     0 8px 16px rgba(0,0,0,.18);
 }
 
@@ -888,6 +888,12 @@ body.light .strip.folderChild{
   opacity:.22;
 }
 .btn.onFx{background:linear-gradient(#1f3e74,#162b52); border-color:rgba(80,150,255,.75); color:#fff;}
+.vline .value.clip{
+  color:#ffb3b3;
+  background:rgba(140,20,20,.45);
+  padding:2px 6px;
+  border-radius:6px;
+}
 
 
 /* ===== Patch v5.21.8: center header id + name ===== */

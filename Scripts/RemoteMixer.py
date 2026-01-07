@@ -590,7 +590,7 @@ def _db_to_lin(db):
     return math.pow(10.0, db/20.0)
 
 def get_track_peaks(track):
-    """Return (L,R) peaks as linear 0..1 floats.
+    """Return (L,R) peaks as linear 0..1 floats plus optional clip dB.
 
     - Prefer Track_GetPeakInfo when available (fast, linear).
     - When track is record-armed, prefer UI peaks (they follow input/monitoring).
@@ -623,12 +623,28 @@ def get_track_peaks(track):
         except Exception:
             return 0.0, 0.0
 
+    def _ui_peaks_clip_db(tr):
+        try:
+            vL = RPR_GetTrackUIPeakHoldDB(tr, 0, False)
+            vR = RPR_GetTrackUIPeakHoldDB(tr, 1, False)
+            if isinstance(vL, tuple): vL = vL[0]
+            if isinstance(vR, tuple): vR = vR[0]
+            vL = float(vL)
+            vR = float(vR)
+            # treat positive dB as clipping
+            if vL > 0.0 or vR > 0.0:
+                return max(vL, vR)
+        except Exception:
+            pass
+        return None
+
     # If track is record-armed, UI peaks are usually the most useful (input/monitor).
     try:
         recarm = RPR_GetMediaTrackInfo_Value(track, "I_RECARM")
         if isinstance(recarm, tuple): recarm = recarm[0]
         if float(recarm) >= 0.5:
-            return _ui_peaks_lin(track)
+            pkL, pkR = _ui_peaks_lin(track)
+            return pkL, pkR, _ui_peaks_clip_db(track)
     except Exception:
         pass
 
@@ -642,16 +658,18 @@ def get_track_peaks(track):
             pkL = float(pkL)
             pkR = float(pkR)
             # If it looks dead, fall back to UI peaks (useful for monitoring cases).
+            clip_db = _ui_peaks_clip_db(track)
             if pkL < 1e-6 and pkR < 1e-6:
                 uL, uR = _ui_peaks_lin(track)
                 if uL > pkL or uR > pkR:
-                    return uL, uR
-            return max(0.0, min(1.0, pkL)), max(0.0, min(1.0, pkR))
+                    return uL, uR, clip_db
+            return max(0.0, min(1.0, pkL)), max(0.0, min(1.0, pkR)), clip_db
     except Exception:
         pass
 
     # fallback: UI peaks (hold)
-    return _ui_peaks_lin(track)
+    pkL, pkR = _ui_peaks_lin(track)
+    return pkL, pkR, _ui_peaks_clip_db(track)
 
 
 def get_project_bpm():
@@ -672,16 +690,17 @@ def get_project_bpm():
     return None
 
 
-def get_regions():
+def get_regions_and_markers():
     regions = []
+    markers = []
     try:
         res = RPR_CountProjectMarkers(0, 0, 0)
         if isinstance(res, tuple):
             total = int(res[0]) if len(res) > 0 else 0
-            markers = int(res[1]) if len(res) > 1 else 0
-            regions = int(res[2]) if len(res) > 2 else 0
+            mk = int(res[1]) if len(res) > 1 else 0
+            rg = int(res[2]) if len(res) > 2 else 0
             if total <= 0:
-                total = markers + regions
+                total = mk + rg
         else:
             total = int(res)
     except Exception:
@@ -700,9 +719,15 @@ def get_regions():
                 continue
             if isrgn:
                 regions.append({"index": idx, "name": name, "start": start, "end": end})
+            else:
+                markers.append({"index": idx, "name": name, "position": start})
         except Exception:
             continue
-    return regions
+    return regions, markers
+
+
+def get_regions():
+    return get_regions_and_markers()[0]
 
 
 def get_transport_state():
@@ -748,7 +773,7 @@ def get_transport_state():
         beat = 1
         beat_frac = 0.0
 
-    regions = get_regions()
+    regions, markers = get_regions_and_markers()
     region_name = ""
     region_index = None
     try:
@@ -777,7 +802,8 @@ def get_transport_state():
         "beatFrac": beat_frac,
         "regionName": region_name,
         "regionIndex": region_index,
-        "regions": regions
+        "regions": regions,
+        "markers": markers
     }
 
 
@@ -786,8 +812,8 @@ def build_meter():
     try:
         # master
         m = RPR_GetMasterTrack(0)
-        pkL, pkR = get_track_peaks(m)
-        frames.append({"guid": track_guid(m), "pkL": pkL, "pkR": pkR})
+        pkL, pkR, clip_db = get_track_peaks(m)
+        frames.append({"guid": track_guid(m), "pkL": pkL, "pkR": pkR, "clipDb": clip_db})
     except Exception:
         pass
     try:
@@ -800,8 +826,8 @@ def build_meter():
         tr = RPR_GetTrack(0,i)
         if isinstance(tr, tuple): tr=tr[0]
         if not tr: continue
-        pkL, pkR = get_track_peaks(tr)
-        frames.append({"guid": track_guid(tr), "pkL": pkL, "pkR": pkR})
+        pkL, pkR, clip_db = get_track_peaks(tr)
+        frames.append({"guid": track_guid(tr), "pkL": pkL, "pkR": pkR, "clipDb": clip_db})
     return {"type":"meter", "frames": frames, "ts": _now(), "version": VERSION}
 
 # --- FX helpers ---
@@ -994,6 +1020,17 @@ def handle_cmd(cmd, sock):
                             break
                     except Exception:
                         continue
+            return
+        if typ == "gotoMarker":
+            idx = int(cmd.get("index", -1))
+            if idx >= 0:
+                try:
+                    try:
+                        RPR_GotoMarker(0, idx, False)
+                    except Exception:
+                        RPR_GotoMarker(0, idx, 0)
+                except Exception:
+                    pass
             return
         if typ == "setVol":
             guid = cmd.get("guid","")
