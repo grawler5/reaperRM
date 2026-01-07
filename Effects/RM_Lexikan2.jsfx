@@ -13,7 +13,7 @@ out_pin:SC Ch2
 //out_pin:AuxL
 //out_pin:AuxR
 
-slider1:66<1,1000,1>density (ms)
+slider1:66<1,8000,1>density (ms)
 slider2:74<0,99,1>feedback
 slider3:95<0,95,1>late-bias (%)
 slider4:25<0,100,1>wet (%)
@@ -24,7 +24,7 @@ slider8:23<0,100,1>detuning (cents)
 slider9:1.5<0.1,10,0.1>chorus speed (Hz)
 slider10:chorus_alignment=0<0,1,1{independent,linked}>chorus phase
 
-slider11:67<1,1000,1>density (ms)
+slider11:67<1,8000,1>density (ms)
 slider12:6<0,99,1>ERfeedback
 slider13:0<0,95,1>late-bias (%)
 slider14:25<0,100,1>ERwet (%)
@@ -1296,7 +1296,6 @@ fxm1 < abs(FXR) ? FXm1 = abs(FXR);//:(fxm1*=0.999);
 aaa= __memtop();
 //bpos+=2;
 //bpos>=33*max_delay_samples+1+buffsize*2 ? bpos=33*max_delay_samples+1;
-
 
 
 
