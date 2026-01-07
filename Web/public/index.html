@@ -3030,6 +3030,163 @@ background: linear-gradient(180deg,
   50%{ opacity: 0.35; }
 }
 
+/* ===== RM EQT-1A (Pultec style) ===== */
+.rmPultecHost{
+  width: 100%;
+  height: 100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 14px;
+  box-sizing:border-box;
+}
+.rmPultecPanel{
+  width: 860px;
+  max-width: 100%;
+  background: linear-gradient(180deg, rgba(26,24,20,0.96), rgba(14,13,11,0.96));
+  border: 1px solid rgba(255,214,120,0.18);
+  border-radius: 18px;
+  padding: 18px 20px 22px;
+  color: rgba(255,244,220,0.92);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  display:flex;
+  flex-direction:column;
+  gap: 16px;
+}
+.rmPultecHeader{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  text-transform:uppercase;
+  letter-spacing:0.2em;
+}
+.rmPultecTitle{
+  font-size:18px;
+  font-weight:800;
+}
+.rmPultecSub{
+  font-size:11px;
+  opacity:0.7;
+}
+.rmPultecGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 18px;
+}
+.rmPultecSection{
+  background: rgba(0,0,0,0.25);
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 14px 12px;
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+}
+.rmPultecSectionTitle{
+  font-size:12px;
+  letter-spacing:0.25em;
+  opacity:0.7;
+}
+.rmPultecKnobs{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 14px;
+  justify-content:center;
+}
+
+/* shared dial control */
+.rmDial{
+  width: 110px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap: 6px;
+}
+.rmDialLabel{
+  font-size:11px;
+  letter-spacing:0.16em;
+  text-transform:uppercase;
+  opacity:0.8;
+}
+.rmDialFace{
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.25), rgba(20,18,16,0.95));
+  border: 1px solid rgba(255,214,120,0.35);
+  position:relative;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.65);
+  touch-action: none;
+}
+.rmDialNeedle{
+  position:absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 32px;
+  background: rgba(255,214,120,0.95);
+  transform-origin: 50% 100%;
+  transform: translate(-50%,-100%) rotate(-135deg);
+  box-shadow: 0 0 8px rgba(255,214,120,0.6);
+}
+.rmDialValue{
+  font-size:12px;
+  opacity:0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== RM Lexikan2 (modern) ===== */
+.rmLexiHost{
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 14px;
+  box-sizing:border-box;
+}
+.rmLexiPanel{
+  width: 900px;
+  max-width: 100%;
+  background: linear-gradient(160deg, rgba(14,18,28,0.96), rgba(8,10,16,0.98));
+  border: 1px solid rgba(120,180,255,0.25);
+  border-radius: 18px;
+  padding: 18px 20px 22px;
+  color: rgba(220,235,255,0.9);
+  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  display:flex;
+  flex-direction:column;
+  gap: 14px;
+}
+.rmLexiHeader{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  text-transform:uppercase;
+  letter-spacing:0.2em;
+}
+.rmLexiTitle{
+  font-size:16px;
+  font-weight:800;
+}
+.rmLexiSub{
+  font-size:11px;
+  opacity:0.65;
+}
+.rmLexiGrid{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+.rmLexiPanel .rmDialFace{
+  border-color: rgba(120,180,255,0.45);
+  background: radial-gradient(circle at 35% 35%, rgba(190,220,255,0.25), rgba(10,12,20,0.95));
+}
+.rmLexiPanel .rmDialNeedle{
+  background: rgba(120,180,255,0.95);
+  box-shadow: 0 0 8px rgba(120,180,255,0.6);
+}
+
 </style>
 </head>
 <body>
@@ -4895,7 +5052,7 @@ if (!st.raf){
 
   remap();
   update();
-  return {el: host, update, ctrl};
+  return {el: stage, update, ctrl};
 }
 
   // ---- RM_Limiter2: Waves L2-style panel (web) ----
@@ -5216,7 +5373,7 @@ const rawFromParamLocal = (p, fbMin=0, fbMax=1)=>{
   }
 
   update();
-  return {el: host, update, ctrl};
+  return {el: stage, update, ctrl};
 }
 
 
@@ -5436,8 +5593,9 @@ function buildRMKickerL2PanelControl(win, ctrl){
     }
   }
 
+  ctrl.update = ()=>update();
   update();
-  return {el: host, update, ctrl};
+  return {el: stage, update, ctrl};
 }
 
 function buildRMDelayMachinePanelControl(win, ctrl){
@@ -6019,522 +6177,216 @@ function buildRMDelayMachinePanelControl(win, ctrl){
   return {el: host, update, ctrl};
 }
 
-function buildRMEqt1aPanelControl(win, ctrl){
-  // Tukan EQT-1A (DAW-like) skin: background + correct knob/selector sprites.
-  const BASE_W = 600, BASE_H = 250;
-  const ex = (ctrl && ctrl.extra) ? ctrl.extra : {};
+function buildRmDialControl(win, label, getParamFn, options = {}){
+  const {steps = null, valueFormatter = null} = options;
+  const wrap = document.createElement("div");
+  wrap.className = "rmDial";
 
-  const host = document.createElement("div");
-  host.className = "tukanHost";
-  const stage = document.createElement("div");
-  stage.className = "tukanStage";
-  host.appendChild(stage);
+  const lab = document.createElement("div");
+  lab.className = "rmDialLabel";
+  lab.textContent = label;
+  const face = document.createElement("div");
+  face.className = "rmDialFace";
+  const needle = document.createElement("div");
+  needle.className = "rmDialNeedle";
+  face.appendChild(needle);
+  const val = document.createElement("div");
+  val.className = "rmDialValue";
+  val.textContent = "—";
 
-  const skin = document.createElement("div");
-  skin.className = "tukanSkin rmEqtSkin";
-  skin.style.width = BASE_W + "px";
-  skin.style.height = BASE_H + "px";
-  skin.style.backgroundImage = 'url("tukan/eqt/EQTback.png")';
-  stage.appendChild(skin);
-  stage.style.width = BASE_W + "px";
-  stage.style.height = BASE_H + "px";
-  skin.style.transform = "scale(1)";
-
-  // scale-to-fit
-  const fit = ()=>{
-    const bodyEl = host.closest(".pluginWinBody");
-    const ctrlEl = host.closest(".plugCtrl");
-    const scope = ctrlEl || bodyEl || host.closest(".pluginParamList") || host;
-    const availW = Math.max(10, scope.clientWidth);
-    const availH = Math.max(10, scope.clientHeight);
-    let sc = Math.min(availW/BASE_W, availH/BASE_H);
-    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 2.0 : 1.0;
-    sc = Math.max(0.25, Math.min(maxScale, sc));
-    stage.style.width = (BASE_W*sc) + "px";
-    stage.style.height = (BASE_H*sc) + "px";
-    skin.style.transform = `scale(${sc})`;
-  };
-  try{
-    const ro = new ResizeObserver(()=>fit());
-    const obs = host.closest(".pluginParamList") || host;
-    ro.observe(obs);
-    host._ro = ro;
-  }catch(_){ }
-  requestAnimationFrame(fit);
+  wrap.appendChild(lab);
+  wrap.appendChild(face);
+  wrap.appendChild(val);
 
   const clamp01 = (x)=>Math.max(0, Math.min(1, x||0));
-  const setSpriteFrame = (el, frame, frames)=>{
-    const f = Math.max(0, Math.min(frames-1, frame|0));
-    const pct = (frames<=1) ? 0 : (f/(frames-1))*100;
-    el.style.backgroundPositionY = pct + "%";
+
+  let drag = null;
+  face.addEventListener("pointerdown", (ev)=>{
+    const p = getParamFn();
+    if (!p) return;
+    bringPluginToFront(win);
+    beginParamDrag(win, p.index);
+    suppressPoll(win, 800);
+    drag = {id: ev.pointerId, y: ev.clientY, start: clamp01(p.value||0), idx: p.index};
+    face.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+    ev.stopPropagation();
+  });
+  face.addEventListener("pointermove", (ev)=>{
+    if (!drag || drag.id !== ev.pointerId) return;
+    const p = getParamFn();
+    if (!p) return;
+    const dy = ev.clientY - drag.y;
+    let next = clamp01(drag.start - dy*0.004);
+    if (steps && steps > 1){
+      const step = 1/(steps-1);
+      next = Math.round(next/step) * step;
+    }
+    setParamNormalized(win, p.index, next);
+    p.value = next;
+    try{ setDraggedParamValue(win, p.index, next); }catch(_){}
+    update();
+  });
+  const end = (ev)=>{
+    if (!drag || drag.id !== ev.pointerId) return;
+    drag = null;
+    const p = getParamFn();
+    if (p) endParamDrag(win, p.index);
+    try{ face.releasePointerCapture(ev.pointerId); }catch(_){}
   };
-  const frameFromNorm = (n, frames)=> Math.round(clamp01(n)*(frames-1));
+  face.addEventListener("pointerup", end);
+  face.addEventListener("pointercancel", end);
 
-  const mk = (cls, x, y, w, h)=>{
-    const el = document.createElement("div");
-    el.className = "tkSprite " + cls;
-    el.style.left = Math.round(x) + "px";
-    el.style.top  = Math.round(y) + "px";
-    el.style.width  = Math.round(w) + "px";
-    el.style.height = Math.round(h) + "px";
-    skin.appendChild(el);
-    return el;
+  const update = ()=>{
+    const p = getParamFn();
+    const n = p ? clamp01(p.value) : 0;
+    const angle = -135 + (270 * n);
+    needle.style.transform = `translate(-50%,-100%) rotate(${angle}deg)`;
+    if (!p) val.textContent = "—";
+    else if (valueFormatter) val.textContent = valueFormatter(p);
+    else val.textContent = formatParam(p);
   };
 
-  const setSprite = (el, url, frames)=>{
-    el.style.backgroundImage = `url(${url})`;
-    el.style.backgroundRepeat = "no-repeat";
-    el.style.backgroundSize = `100% ${frames*100}%`;
-    el.dataset.frames = String(frames);
-  };
+  update();
+  return {el: wrap, update};
+}
 
-  // --- Sprites (positions matched to 600x250 EQTback.png) ---
-  const kLowBoost  = mk("tkKnob",  76,  25, 75, 75);
-  const kLowAtten  = mk("tkKnob", 186,  25, 75, 75);
-  const kHighBoost = mk("tkKnob", 336,  25, 75, 75);
-  const kHighAtten = mk("tkKnob", 441,  25, 75, 75);
-  const kBW        = mk("tkKnob", 273, 103, 75, 75);
-  const kOut       = mk("tkKnob", 468, 103, 75, 75);
+function buildRMEqt1aPanelControl(win, ctrl){
+  const ex = (ctrl && ctrl.extra) ? ctrl.extra : {};
+  const host = document.createElement("div");
+  host.className = "rmPultecHost";
+  const panel = document.createElement("div");
+  panel.className = "rmPultecPanel";
+  host.appendChild(panel);
 
-  [kLowBoost,kLowAtten,kHighBoost,kHighAtten,kBW,kOut].forEach(k=> setSprite(k, "tukan/eqt/Pultec.png", 61));
+  const header = document.createElement("div");
+  header.className = "rmPultecHeader";
+  header.innerHTML = `<div class="rmPultecTitle">RM EQT-1A</div><div class="rmPultecSub">PULTEC STYLE EQ</div>`;
+  panel.appendChild(header);
 
-  // Selector sprites (stepped)
-  const kLF = mk("tkKnob", 153,  93, 70, 70);
-  const kHF = mk("tkKnob", 365,  93, 70, 70);
-  setSprite(kLF, "tukan/eqt/PFL.png", 4);
-  setSprite(kHF, "tukan/eqt/PFH.png", 7);
+  const grid = document.createElement("div");
+  grid.className = "rmPultecGrid";
+  panel.appendChild(grid);
 
-  // --- Param mapping (prefer ctrl.extra patterns) ---
   const ps = ()=> (Array.isArray(win.params) ? win.params : []);
   const find = (arr)=> findParamByPatterns(ps(), arr||[]);
 
   const pLF     = ()=> find(ex.lsfFind)     || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
   const pLBoost = ()=> find(ex.pushFind)    || ps().find(p=>/\bpush\b|\blow\b.*\bboost\b/i.test(String(p.name||""))) || null;
   const pLAtt   = ()=> find(ex.pullFind)    || ps().find(p=>/\bpull\b|\blow\b.*\batten\b/i.test(String(p.name||""))) || null;
-
   const pBW     = ()=> find(ex.midQFind)    || ps().find(p=>/\bbandwidth\b|\bmid\s*q\b|\bq\b/i.test(String(p.name||""))) || null;
-
   const pHF     = ()=> find(ex.hsfFind)     || find(ex.peakFind) || ps().find(p=>/\bhigh\s*frequency\b|\bhsf\b|\bpeak\b/i.test(String(p.name||""))) || null;
   const pHBoost = ()=> find(ex.highGainFind)|| ps().find(p=>/\bhigh\b.*\bgain\b|\bhigh\b.*\bboost\b/i.test(String(p.name||""))) || null;
-
-  // High atten isn't explicitly provided in extra for older builds; try "atten", then midGain, then any remaining gain-like param.
   const pHAtt   = ()=>{
     const arr = ps();
     const hit = arr.find(p=>/\batten\b/i.test(String(p.name||"")) && !/\bpull\b/i.test(String(p.name||"")));
     if (hit) return hit;
     return find(ex.midGainFind) || arr.find(p=>/\bgain\b/i.test(String(p.name||"")) && p !== pHBoost()) || null;
   };
-
   const pOut    = ()=> find(ex.outFind)     || ps().find(p=>/\boutput\b/i.test(String(p.name||""))) || null;
 
-  const setParamNorm = (p, next)=>{
-    if (!p) return;
-    bringPluginToFront(win);
-    suppressPoll(win, 800);
-    setParamNormalized(win, p.index, next);
-    p.value = next;
-    try{ setDraggedParamValue(win, p.index, next); }catch(_){ }
+  const low = document.createElement("div");
+  low.className = "rmPultecSection";
+  low.innerHTML = `<div class="rmPultecSectionTitle">LOW</div>`;
+  const lowKnobs = document.createElement("div");
+  lowKnobs.className = "rmPultecKnobs";
+  const lfDial = buildRmDialControl(win, "FREQ", pLF, {steps: 4});
+  const lBoost = buildRmDialControl(win, "BOOST", pLBoost);
+  const lAtt = buildRmDialControl(win, "ATTEN", pLAtt);
+  [lfDial, lBoost, lAtt].forEach(d=>lowKnobs.appendChild(d.el));
+  low.appendChild(lowKnobs);
+
+  const mid = document.createElement("div");
+  mid.className = "rmPultecSection";
+  mid.innerHTML = `<div class="rmPultecSectionTitle">MID / OUT</div>`;
+  const midKnobs = document.createElement("div");
+  midKnobs.className = "rmPultecKnobs";
+  const bwDial = buildRmDialControl(win, "BANDWIDTH", pBW);
+  const outDial = buildRmDialControl(win, "OUTPUT", pOut);
+  [bwDial, outDial].forEach(d=>midKnobs.appendChild(d.el));
+  mid.appendChild(midKnobs);
+
+  const high = document.createElement("div");
+  high.className = "rmPultecSection";
+  high.innerHTML = `<div class="rmPultecSectionTitle">HIGH</div>`;
+  const highKnobs = document.createElement("div");
+  highKnobs.className = "rmPultecKnobs";
+  const hfDial = buildRmDialControl(win, "FREQ", pHF, {steps: 7});
+  const hBoost = buildRmDialControl(win, "BOOST", pHBoost);
+  const hAtt = buildRmDialControl(win, "ATTEN", pHAtt);
+  [hfDial, hBoost, hAtt].forEach(d=>highKnobs.appendChild(d.el));
+  high.appendChild(highKnobs);
+
+  grid.appendChild(low);
+  grid.appendChild(mid);
+  grid.appendChild(high);
+
+  const update = ()=>{
+    lfDial.update();
+    lBoost.update();
+    lAtt.update();
+    bwDial.update();
+    outDial.update();
+    hfDial.update();
+    hBoost.update();
+    hAtt.update();
   };
 
-  function bindKnob(el, pFn, snapSteps=null){
-    let drag=null;
-    el.addEventListener("pointerdown", (ev)=>{
-      const p = (typeof pFn === "function") ? pFn() : null;
-      if (!p) return;
-      bringPluginToFront(win);
-      beginParamDrag(win, p.index);
-      suppressPoll(win, 900);
-      try{ el.setPointerCapture(ev.pointerId); }catch(_){ }
-      drag = {id:ev.pointerId, y:ev.clientY, start: clamp01(p.value||0), pIdx: p.index,
-              frames: parseInt(el.dataset.frames||"61",10) || 61, snapSteps};
-      ev.preventDefault();
-      ev.stopPropagation();
-    });
-    el.addEventListener("pointermove", (ev)=>{
-      if (!drag || drag.id!==ev.pointerId) return;
-      const p = ps().find(pp=>pp.index===drag.pIdx);
-      if (!p) return;
-      const dy = ev.clientY - drag.y;
-      let next = clamp01(drag.start - dy*0.004);
-      if (drag.snapSteps && drag.snapSteps > 1){
-        const step = 1/(drag.snapSteps-1);
-        next = Math.round(next/step)*step;
-      }
-      setParamNorm(p, next);
-      setSpriteFrame(el, frameFromNorm(next, drag.frames), drag.frames);
-    });
-    const end=(ev)=>{
-      if (!drag || drag.id!==ev.pointerId) return;
-      try{ endParamDrag(win, drag.pIdx); }catch(_){ }
-      drag=null;
-      try{ el.releasePointerCapture(ev.pointerId); }catch(_){ }
-    };
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
-  }
-
-  bindKnob(kLF,      pLF,     4);
-  bindKnob(kLowBoost,pLBoost);
-  bindKnob(kLowAtten,pLAtt);
-  bindKnob(kBW,      pBW);
-  bindKnob(kHF,      pHF,     7);
-  bindKnob(kHighBoost,pHBoost);
-  bindKnob(kHighAtten,pHAtt);
-  bindKnob(kOut,     pOut);
-
-  function update(){
-    const upd = (el, p)=>{
-      const n = p ? clamp01(p.value||0) : 0;
-      const frames = parseInt(el.dataset.frames||"61",10) || 61;
-      setSpriteFrame(el, frameFromNorm(n, frames), frames);
-    };
-
-    upd(kLF, pLF());
-    upd(kLowBoost, pLBoost());
-    upd(kLowAtten, pLAtt());
-    upd(kBW, pBW());
-    upd(kHF, pHF());
-    upd(kHighBoost, pHBoost());
-    upd(kHighAtten, pHAtt());
-    upd(kOut, pOut());
-
-    if (RM_DEBUG){
-      let dbg = host._dbg;
-      if (!dbg){ dbg = rmDbgMake(skin); host._dbg = dbg; }
-      const show = (p)=> p ? `${p.name}: ${formatParam(p)}` : "—";
-      dbg.textContent =
-        `LF ${show(pLF())}\n`+
-        `PUSH ${show(pLBoost())}\n`+
-        `PULL ${show(pLAtt())}\n`+
-        `BW ${show(pBW())}\n`+
-        `HF ${show(pHF())}\n`+
-        `H BOOST ${show(pHBoost())}\n`+
-        `H ATT ${show(pHAtt())}\n`+
-        `OUT ${show(pOut())}`;
-    }
-  }
-
+  ctrl.update = ()=>update();
   update();
   return {el: host, update, ctrl};
 }
 
 function buildRMLexi2PanelControl(win, ctrl){
   const ex = (ctrl && ctrl.extra) ? ctrl.extra : {};
-  const BASE_W = 945, BASE_H = 186;
-
-  
-
   const host = document.createElement("div");
-  host.className = "tukanHost";
-  host.innerHTML = "";
-const stage = document.createElement("div");
-  stage.className = "tukanStage";
-  host.appendChild(stage);
+  host.className = "rmLexiHost";
+  const panel = document.createElement("div");
+  panel.className = "rmLexiPanel";
+  host.appendChild(panel);
 
-  const skin = document.createElement("div");
-  skin.className = "tukanSkin rmLexi2Skin";
-  skin.style.width  = BASE_W + "px";
-  skin.style.height = BASE_H + "px";
-  skin.style.backgroundImage = 'url("tukan/lexi2/Lexi2_DAW.png")';
-  skin.style.backgroundSize = "100% 100%";
-  skin.style.backgroundRepeat = "no-repeat";
-  stage.appendChild(skin);
+  const header = document.createElement("div");
+  header.className = "rmLexiHeader";
+  header.innerHTML = `<div class="rmLexiTitle">RM Lexikan2</div><div class="rmLexiSub">MODERN PLATE</div>`;
+  panel.appendChild(header);
 
-  // scale-to-fit using the actual host box (fixes left-shift / clipping)
-  const fit = ()=>{
-    const r = host.getBoundingClientRect();
-    const availW = Math.max(10, r.width  || host.clientWidth  || BASE_W);
-    const availH = Math.max(10, r.height || host.clientHeight || BASE_H);
-    let sc = Math.min(availW/BASE_W, availH/BASE_H);
-    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 2.0 : 1.0;
-    sc = Math.max(0.25, Math.min(maxScale, sc));
-    stage.style.width  = (BASE_W*sc) + "px";
-    stage.style.height = (BASE_H*sc) + "px";
-    skin.style.transform = `scale(${sc})`;
+  const grid = document.createElement("div");
+  grid.className = "rmLexiGrid";
+  panel.appendChild(grid);
+
+  const ps = ()=> (Array.isArray(win.params) ? win.params : []);
+  const find = (arr)=> findParamByPatterns(ps(), arr||[]);
+
+  const pDensity  = ()=> find(ex.densityFind)  || ps().find(p=>/\bdensity\b/i.test(String(p.name||""))) || null;
+  const pPre      = ()=> find(ex.preDelayFind) || ps().find(p=>/pre\s*delay|predelay/i.test(String(p.name||""))) || null;
+  const pERTail   = ()=> find(ex.erTailFind)   || ps().find(p=>/er\s*\/\s*tail|er\/tail|er\s*tail/i.test(String(p.name||""))) || null;
+  const pGap      = ()=> find(ex.gapFind)      || ps().find(p=>/gap\s*delay|tail\s*gap/i.test(String(p.name||""))) || null;
+  const pLPF      = ()=> find(ex.lpfFind)      || ps().find(p=>/lowpass|filter\s*\(lowpass/i.test(String(p.name||""))) || null;
+  const pTilt     = ()=> find(ex.tiltFind)     || ps().find(p=>/\btilt\b/i.test(String(p.name||""))) || null;
+  const pDryWet   = ()=> find(ex.dryWetFind)   || ps().find(p=>/dry\s*wet|drywet/i.test(String(p.name||""))) || null;
+  const pStereo   = ()=> find(ex.stereoFind)   || ps().find(p=>/stereo\s*spread|stereospread|width/i.test(String(p.name||""))) || null;
+
+  const dDensity = buildRmDialControl(win, "DENSITY", pDensity);
+  const dPre = buildRmDialControl(win, "PRE-DELAY", pPre);
+  const dER = buildRmDialControl(win, "ER/Tail", pERTail);
+  const dGap = buildRmDialControl(win, "GAP", pGap);
+  const dLPF = buildRmDialControl(win, "LPF", pLPF);
+  const dTilt = buildRmDialControl(win, "TILT", pTilt);
+  const dMix = buildRmDialControl(win, "DRY/WET", pDryWet);
+  const dStereo = buildRmDialControl(win, "STEREO", pStereo);
+
+  [dDensity, dPre, dER, dGap, dLPF, dTilt, dMix, dStereo].forEach(d=>grid.appendChild(d.el));
+
+  const update = ()=>{
+    dDensity.update();
+    dPre.update();
+    dER.update();
+    dGap.update();
+    dLPF.update();
+    dTilt.update();
+    dMix.update();
+    dStereo.update();
   };
-  try{
-    const ro = new ResizeObserver(()=>fit());
-    ro.observe(host);
-    host._ro = ro;
-  }catch(_){}
-  requestAnimationFrame(fit);
-
-  const clamp01 = (x)=>Math.max(0, Math.min(1, x||0));
-  const setRot = (el, n)=>{
-    const deg = -135 + clamp01(n)*270;
-    el.style.transform = `rotate(${deg}deg)`;
-  };
-
-  const mk = (cls, x, y, w, h)=>{
-    const el = document.createElement("div");
-    el.className = cls;
-    el.style.position = "absolute";
-    el.style.left = Math.round(x) + "px";
-    el.style.top  = Math.round(y) + "px";
-    el.style.width  = Math.round(w) + "px";
-    el.style.height = Math.round(h) + "px";
-    el.style.touchAction = "none";
-    skin.appendChild(el);
-    return el;
-  };
-
-  // knobs (positions aligned to DAW capture / grid)
-  const mkKnob = (x,y)=>{
-    const k = mk("rmLexi2Knob", x,y,80,80);
-    k.style.backgroundImage = 'url("tukan/lexi2/PCM_static.png")';
-    k.style.backgroundRepeat = "no-repeat";
-    k.style.backgroundSize = "100% 100%";
-    k.style.transformOrigin = "50% 50%";
-    return k;
-  };
-
-  const kbLength   = mkKnob(200, 92);
-  const kbPredelay = mkKnob(290, 92);
-  const kbERTail   = mkKnob(380, 92);
-  const kbTailGap  = mkKnob(470, 92);
-  const kbTilt     = mkKnob(560, 92);
-  const kbDryWet   = mkKnob(650, 92);
-  const kbStereo   = mkKnob(740, 92);
-
-  // buttons (glow only; Algo buttons also set the algo parameter)
-  const mkBtn = (x,y,w,h, key)=>{
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "rmLexi2Btn";
-    b.style.left = x+"px";
-    b.style.top  = y+"px";
-    b.style.width = w+"px";
-    b.style.height= h+"px";
-    b.dataset.key = key;
-    skin.appendChild(b);
-    return b;
-  };
-
-  // Top row: algo
-  const btnAMB   = mkBtn(560, 28, 52, 18, "algo0");
-  const btnRoom  = mkBtn(622, 28, 52, 18, "algo1");
-  const btnSmall = mkBtn(684, 28, 52, 18, "algo2");
-  const btnBig   = mkBtn(746, 28, 52, 18, "algo3");
-  const btnPlate = mkBtn(808, 28, 52, 18, "algo4");
-
-  // Second row: toggles (local UI state + glow)
-  const btnWet   = mkBtn(560, 56, 52, 18, "wet");
-  const btnByp   = mkBtn(622, 56, 52, 18, "byp");
-  const btnDisp  = mkBtn(684, 56, 52, 18, "disp");
-  const btnBright= mkBtn(746, 56, 52, 18, "bright");
-  const btnTilt  = mkBtn(808, 56, 52, 18, "tiltbtn");
-
-  const btns = [btnAMB,btnRoom,btnSmall,btnBig,btnPlate,btnWet,btnByp,btnDisp,btnBright,btnTilt];
-
-  // Display (headroom + curve) - UI only, driven from telemetry Out Peak if present
-  const cvs = document.createElement("canvas");
-  cvs.width = 270; cvs.height = 95;
-  cvs.style.position = "absolute";
-  cvs.style.left = "16px";
-  cvs.style.top  = "36px";
-  cvs.style.pointerEvents = "none";
-  skin.appendChild(cvs);
-  const ctx = cvs.getContext("2d");
-
-  // param mapping
-  let idxLen=null, idxPre=null, idxER=null, idxGap=null, idxTilt=null, idxDW=null, idxStereo=null, idxAlgo=null, idxOutPk=null;
-  const getP = (idx)=> (Number.isFinite(idx)) ? (win.params||[]).find(p=>p.index===idx) : null;
-
-  function remap(){
-    const ps = Array.isArray(win.params) ? win.params : [];
-    const pLen = ps.find(p=>/\blength\b/i.test(String(p.name||""))) || ps.find(p=>p.index===0) || null;
-    const pPre = ps.find(p=>/pre\s*delay|predelay/i.test(String(p.name||""))) || ps.find(p=>p.index===1) || null;
-    const pER  = ps.find(p=>/er\s*\/\s*tail|er\/tail|er\s*tail/i.test(String(p.name||""))) || ps.find(p=>p.index===2) || null;
-    const pGap = ps.find(p=>/tail\s*gap/i.test(String(p.name||""))) || ps.find(p=>p.index===3) || null;
-    const pTlt = ps.find(p=>/\btilt\b/i.test(String(p.name||""))) || ps.find(p=>p.index===4) || null;
-    const pDW  = ps.find(p=>/dry\s*wet|dry\/wet/i.test(String(p.name||""))) || ps.find(p=>p.index===5) || null;
-    const pSt  = ps.find(p=>/\bstereo\b/i.test(String(p.name||""))) || ps.find(p=>p.index===6) || null;
-    const pAlg = ps.find(p=>/\balgo\b|\balgorithm\b/i.test(String(p.name||""))) || ps.find(p=>p.index===7) || null;
-
-    const pOutPk = findParamByPatterns(ps, ex.outPeakFind||[]) ||
-      ps.find(p=>/telemetry.*out\s*peak/i.test(String(p.name||""))) ||
-      ps.find(p=>/\bout\s*peak\b/i.test(String(p.name||""))) || null;
-
-    idxLen = pLen ? pLen.index : idxLen;
-    idxPre = pPre ? pPre.index : idxPre;
-    idxER  = pER  ? pER.index  : idxER;
-    idxGap = pGap ? pGap.index : idxGap;
-    idxTilt= pTlt ? pTlt.index : idxTilt;
-    idxDW  = pDW  ? pDW.index  : idxDW;
-    idxStereo = pSt ? pSt.index : idxStereo;
-    idxAlgo = pAlg ? pAlg.index : idxAlgo;
-    idxOutPk = pOutPk ? pOutPk.index : idxOutPk;
-
-    kbLength.dataset.idx = String(idxLen ?? "");
-    kbPredelay.dataset.idx = String(idxPre ?? "");
-    kbERTail.dataset.idx = String(idxER ?? "");
-    kbTailGap.dataset.idx = String(idxGap ?? "");
-    kbTilt.dataset.idx = String(idxTilt ?? "");
-    kbDryWet.dataset.idx = String(idxDW ?? "");
-    kbStereo.dataset.idx = String(idxStereo ?? "");
-  }
-
-  const setParamNorm = (idx, next)=>{
-    if (!Number.isFinite(idx)) return;
-    const p = getP(idx);
-    if (!p) return;
-    bringPluginToFront(win);
-    suppressPoll(win, 700);
-    setParamNormalized(win, idx, next);
-    p.value = next;
-    try{ setDraggedParamValue(win, idx, next); }catch(_){}
-  };
-
-  function bindKnob(el){
-    let drag=null;
-    el.addEventListener("pointerdown", (ev)=>{
-      remap();
-      const idx = parseInt(el.dataset.idx,10);
-      const p = getP(idx);
-      if (!p) return;
-      bringPluginToFront(win);
-      beginParamDrag(win, idx);
-      el.setPointerCapture(ev.pointerId);
-      drag = {id:ev.pointerId, y:ev.clientY, start: clamp01(p.value||0)};
-      ev.preventDefault();
-      ev.stopPropagation();
-    });
-    el.addEventListener("pointermove", (ev)=>{
-      if (!drag || drag.id!==ev.pointerId) return;
-      const idx = parseInt(el.dataset.idx,10);
-      const p = getP(idx);
-      if (!p) return;
-      const dy = ev.clientY - drag.y;
-      const next = clamp01(drag.start - dy*0.004);
-      setParamNormalized(win, idx, next);
-      p.value = next;
-      try{ setDraggedParamValue(win, idx, next); }catch(_){}
-      update();
-    });
-    const end=(ev)=>{
-      if (!drag || drag.id!==ev.pointerId) return;
-      const idx = parseInt(el.dataset.idx,10);
-      drag=null;
-      try{ endParamDrag(win, idx); }catch(_){}
-      try{ el.releasePointerCapture(ev.pointerId); }catch(_){}
-    };
-    el.addEventListener("pointerup", end);
-    el.addEventListener("pointercancel", end);
-  }
-
-  [kbLength,kbPredelay,kbERTail,kbTailGap,kbTilt,kbDryWet,kbStereo].forEach(bindKnob);
-
-  // Local toggle state (UI only)
-  const uiState = { wet:false, byp:false, disp:true, bright:false, tiltbtn:false };
-
-  btns.forEach((b)=>{
-    b.addEventListener("click", ()=>{
-      remap();
-      const key = String(b.dataset.key||"");
-      if (key.startsWith("algo")){
-        const i = parseInt(key.slice(4),10);
-        if (Number.isFinite(i) && Number.isFinite(idxAlgo)){
-          setParamNorm(idxAlgo, clamp01(i/4));
-        }
-      }else{
-        uiState[key] = !uiState[key];
-      }
-      update();
-    });
-  });
-
-  function drawDisplay(outPk){
-    // background of display is already on image; just draw subtle overlays
-    const w=cvs.width, h=cvs.height;
-    ctx.clearRect(0,0,w,h);
-
-    // Headroom meter (left strip)
-    const meterX=0, meterW=26;
-    const meterY=8, meterH=h-16;
-    ctx.globalAlpha = 0.9;
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.fillRect(meterX, meterY, meterW, meterH);
-
-    // Convert peak (0..1) to dBFS approx and then to fill with a soft log response
-    const db = 20*Math.log10(Math.max(1e-4, outPk));
-    // map -60..0 dB to 0..1
-    const norm = clamp01((db + 60)/60);
-    // headroom fill (more sensitive near top)
-    const fill = Math.pow(norm, 0.35);
-    const fh = meterH*fill;
-    ctx.fillStyle = "rgba(0,145,255,0.75)";
-    ctx.fillRect(meterX+4, meterY + (meterH - fh), meterW-8, fh);
-
-    // Curve area (rest)
-    const cx = meterW + 8, cy = 8, cw = w - cx - 6, ch = meterH;
-    ctx.globalAlpha = 0.55;
-    ctx.fillStyle = "rgba(0,0,0,0.25)";
-    ctx.fillRect(cx, cy, cw, ch);
-
-    // Build a simple response curve influenced by parameters
-    const nLen = getP(idxLen)?.value || 0;
-    const nPre = getP(idxPre)?.value || 0;
-    const nER  = getP(idxER)?.value || 0;
-    const nGap = getP(idxGap)?.value || 0;
-    const nTilt= getP(idxTilt)?.value|| 0;
-
-    const slope = 0.6 + nLen*1.8;
-    const tilt  = (nTilt-0.5)*1.2;
-    const bump  = 0.15 + nER*0.55;
-    const gap   = nGap*0.6;
-
-    ctx.globalAlpha = 0.95;
-    ctx.strokeStyle = "rgba(0,145,255,0.95)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for(let i=0;i<=cw;i++){
-      const x = i/cw;
-      // decay + small "bump"
-      let y = Math.exp(-x*slope);
-      y += bump*Math.exp(-Math.pow((x-(0.18+0.25*nPre))/(0.12+gap),2));
-      y = y*(1+tilt*(x-0.5));
-      y = Math.max(0, Math.min(1, y));
-      const px = cx + i;
-      const py = cy + ch - y*ch;
-      if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
-    }
-    ctx.stroke();
-  }
-
-  function update(){
-    remap();
-
-    // knobs
-    setRot(kbLength,   getP(idxLen)?.value   || 0);
-    setRot(kbPredelay, getP(idxPre)?.value   || 0);
-    setRot(kbERTail,   getP(idxER)?.value    || 0);
-    setRot(kbTailGap,  getP(idxGap)?.value   || 0);
-    setRot(kbTilt,     getP(idxTilt)?.value  || 0);
-    setRot(kbDryWet,   getP(idxDW)?.value    || 0);
-    setRot(kbStereo,   getP(idxStereo)?.value|| 0);
-
-    // Algo glow from parameter if exists
-    let algoIdx = 0;
-    const pAlg = getP(idxAlgo);
-    if (pAlg) algoIdx = Math.round(clamp01(pAlg.value||0)*4);
-
-    btnAMB.classList.toggle("on", algoIdx===0);
-    btnRoom.classList.toggle("on", algoIdx===1);
-    btnSmall.classList.toggle("on", algoIdx===2);
-    btnBig.classList.toggle("on", algoIdx===3);
-    btnPlate.classList.toggle("on", algoIdx===4);
-
-    // local toggles glow
-    btnWet.classList.toggle("on", !!uiState.wet);
-    btnByp.classList.toggle("on", !!uiState.byp);
-    btnDisp.classList.toggle("on", !!uiState.disp);
-    btnBright.classList.toggle("on", !!uiState.bright);
-    btnTilt.classList.toggle("on", !!uiState.tiltbtn);
-
-    // meter + curve
-    const outPk = clamp01(getP(idxOutPk)?.value || 0);
-    drawDisplay(outPk);
-  }
 
   ctrl.update = ()=>update();
   update();
@@ -8589,6 +8441,10 @@ for (const c of (sec.controls||[])){
     const layout = pickLayout(fxName);
     if (!layout) win.viewMode = "raw";
     if (!win.viewMode) win.viewMode = layout ? "layout" : "raw";
+    if (layout && win.viewMode === "raw" && !win._viewModeLocked){
+      win.viewMode = "layout";
+      win._layoutUI = null;
+    }
 
     // view-mode classes (used for mobile/landscape tweaks)
     try{
@@ -8732,7 +8588,7 @@ for (const c of (sec.controls||[])){
       // default view: layout if known, otherwise raw inspector
       const fxName = getFxNameFromCache(guid, fxIndex);
       const hasLayout = !!pickLayout(fxName);
-      win = {key, guid, fxIndex, el, params: [], search: "", pollT: null, _suppressPoll:false, _dragParams:new Set(), _dragValues:new Map(), viewMode: hasLayout ? "layout" : "raw", _layoutUI:null};
+      win = {key, guid, fxIndex, el, params: [], search: "", pollT: null, _suppressPoll:false, _dragParams:new Set(), _dragValues:new Map(), viewMode: hasLayout ? "layout" : "raw", _layoutUI:null, _viewModeLocked:false};
       pluginWins.set(key, win);
 
       // interactions
@@ -8754,6 +8610,7 @@ for (const c of (sec.controls||[])){
       btnClose.addEventListener("click", ()=>closePluginWin(key));
       if (btnInspector){
         btnInspector.addEventListener("click", ()=>{
+          win._viewModeLocked = true;
           // toggle between mapped UI and raw param inspector
           const fxName2 = getFxNameFromCache(win.guid, win.fxIndex);
           const L = pickLayout(fxName2);
@@ -10166,7 +10023,7 @@ const FX_ADD_CATALOG = [
   {name:"Waves NS1", add:"VST3: NS1 Stereo (Waves)||VST: NS1 Stereo (Waves)||NS1"},
   {name:"RM Gate", add:"JS: RM_Gate [Telemetry]||JS:RM_Gate [Telemetry]||RM_Gate [Telemetry]"},
   {name:"RM PreAmp", add:"JS: RM_PreAmp [Telemetry]||JS:RM_PreAmp [Telemetry]||RM_PreAmp [Telemetry]"},
-  {name:"RM_EQ", add:"JS: RM_EQ4 (ProQ) + Spectrum [Telemetry]||JS:RM_EQ4 (ProQ) + Spectrum [Telemetry]||RM_EQ4 (ProQ) + Spectrum [Telemetry]"},
+  {name:"RM_EQ", add:"JS: RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||JS:RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]"},
   {name:"RM_1175", add:"JS: RM_1175 (1175 core) Hybrid v3||JS:RM_1175 (1175 core) Hybrid v3||RM_1175"},
   {name:"RM_LA1A", add:"JS: RM_LA1A [Telemetry]||JS:RM_LA1A [Telemetry]||RM_LA1A [Telemetry]"},
   {name:"RM_Deesser", add:"JS: RM_Deesser [Telemetry]||JS:RM_Deesser [Telemetry]||RM_Deesser [Telemetry]"},
