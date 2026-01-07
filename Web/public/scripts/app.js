@@ -1732,7 +1732,7 @@ update();
     const availW = Math.max(10, scope.clientWidth - pad*2);
     const availH = Math.max(10, scope.clientHeight - pad*2);
     let sc = Math.min(availW/BASE_W, availH/BASE_H);
-    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 2.2 : 1.8;
+    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 3.5 : 3.0;
     sc = Math.max(0.25, Math.min(maxScale, sc));
     stage.style.width = (BASE_W*sc) + "px";
     stage.style.height = (BASE_H*sc) + "px";
@@ -6167,6 +6167,13 @@ function hideUserPicker(){
       if (msg.type === "reaper_state") msg.type = "state";
       if (msg.type === "reaper_meter") msg.type = "meter";
 
+      const normalizeProjectName = (name)=>{
+        const raw = String(name || "").trim();
+        if (!raw) return "new project";
+        if (/^\(ReaProject\*?\)/i.test(raw)) return "new project";
+        return raw;
+      };
+
       if (msg.type === "projectInfo"){
         projectInfo = msg;
         // merge server ui prefs
@@ -6192,7 +6199,7 @@ function hideUserPicker(){
           showUserPicker();
         }
         // Update brand
-        if (projectInfo.projectName) brandEl.textContent = projectInfo.projectName;
+        if (brandEl) brandEl.textContent = normalizeProjectName(projectInfo.projectName);
         return;
       }
       if (msg.type === "user"){
@@ -6209,8 +6216,9 @@ function hideUserPicker(){
         lastState = msg;
         // Project name -> header + document title
         const proj = msg.projectName || msg.project || msg.projName || msg.proj || (msg.project && msg.project.name) || "";
-        if (brandEl) brandEl.textContent = proj || "REAPER Remote Mixer";
-        if (proj) document.title = proj;
+        const normProj = normalizeProjectName(proj);
+        if (brandEl) brandEl.textContent = normProj;
+        if (normProj) document.title = normProj;
 
         rebuildIndices();
         renderOrUpdate();
