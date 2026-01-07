@@ -182,7 +182,7 @@
           mixInFind:[/mix\s*in/i],
           dryWetFind:[/dry\/?wet|dry\s*wet|mix\s*dry|mix\s*dry\/wet/i],
           widthFind:[/ping\s*\-?pong\s*width|width/i],
-          syncFind:[/tempo\s*sync|sync/i],
+          syncFind:[/tempo\s*sync/i],
           distFind:[/distortion|dist/i],
           tapeFind:[/tape/i],
           crushFind:[/crush/i],
@@ -229,6 +229,10 @@
           tiltFind:[/\btilt\b/i],
           dryWetFind:[/drywet|dry\s*wet/i],
           stereoFind:[/stereospread|stereo\s*spread|width/i],
+          syncFind:[/tempo\s*sync/i],
+          lenNoteFind:[/length\s*sync\s*note|length\s*note/i],
+          preNoteFind:[/predelay\s*sync\s*note|predelay\s*note/i],
+          bpmFind:[/telemetry\s*bpm|bpm/i]
         }}
       ] }
     ]
@@ -3224,8 +3228,18 @@ function buildRMLexi2PanelControl(win, ctrl){
   buttons.appendChild(modeRow);
 
   const ledBar = document.createElement("div");
+  const infoRow = document.createElement("div");
+  infoRow.className = "rmLexiInfoRow";
+  panel.appendChild(infoRow);
+
   ledBar.className = "rmLexiLedBar";
-  panel.appendChild(ledBar);
+  infoRow.appendChild(ledBar);
+
+  const syncBtn = document.createElement("button");
+  syncBtn.type = "button";
+  syncBtn.className = "rmLexiSyncBtn";
+  syncBtn.textContent = "SYNC";
+  infoRow.appendChild(syncBtn);
 
   const knobs = document.createElement("div");
   knobs.className = "rmLexiKnobs";
@@ -3243,6 +3257,10 @@ function buildRMLexi2PanelControl(win, ctrl){
   const pTilt    = ()=> find(ex.tiltFind)      || ps().find(p=>/\btilt\b/i.test(String(p.name||""))) || null;
   const pDryWet  = ()=> find(ex.dryWetFind)    || ps().find(p=>/dry\s*wet|drywet/i.test(String(p.name||""))) || null;
   const pStereo  = ()=> find(ex.stereoFind)    || ps().find(p=>/stereo\s*spread|stereospread|width/i.test(String(p.name||""))) || null;
+  const pSync    = ()=> find(ex.syncFind)      || ps().find(p=>/tempo\s*sync/i.test(String(p.name||""))) || null;
+  const pLenNote = ()=> find(ex.lenNoteFind)   || ps().find(p=>/length\s*sync\s*note|length\s*note/i.test(String(p.name||""))) || null;
+  const pPreNote = ()=> find(ex.preNoteFind)   || ps().find(p=>/predelay\s*sync\s*note|predelay\s*note/i.test(String(p.name||""))) || null;
+  const pBpm     = ()=> find(ex.bpmFind)       || ps().find(p=>/telemetry\s*bpm|\bbpm\b/i.test(String(p.name||""))) || null;
 
   const clamp01 = (x)=> Math.max(0, Math.min(1, x||0));
   const getRaw = (p, fallbackMin = 0, fallbackMax = 1)=>{
@@ -3262,6 +3280,69 @@ function buildRMLexi2PanelControl(win, ctrl){
     setParamNormalized(win, p.index, n);
     p.value = n;
     try{ setDraggedParamValue(win, p.index, n); }catch(_){}
+  };
+
+  const notes = [
+    {label:"1/64t", factor: 1/96},
+    {label:"1/64", factor: 1/16},
+    {label:"1/64d", factor: 3/32},
+    {label:"1/32t", factor: 1/48},
+    {label:"1/32", factor: 1/8},
+    {label:"1/32d", factor: 3/16},
+    {label:"1/16t", factor: 1/24},
+    {label:"1/16", factor: 1/4},
+    {label:"1/16d", factor: 3/8},
+    {label:"1/8t", factor: 1/12},
+    {label:"1/8", factor: 1/2},
+    {label:"1/8d", factor: 3/4},
+    {label:"1/4t", factor: 1/6},
+    {label:"1/4", factor: 1},
+    {label:"1/4d", factor: 3/2},
+    {label:"1/2t", factor: 1/3},
+    {label:"1/2", factor: 2},
+    {label:"1/2d", factor: 3},
+    {label:"1 bar", factor: 4},
+    {label:"2 bar", factor: 8}
+  ];
+
+  const getBpm = ()=>{
+    const p = pBpm();
+    if (!p) return null;
+    if (Number.isFinite(p.raw)) return p.raw;
+    if (Number.isFinite(p.min) && Number.isFinite(p.max)){
+      return p.min + (p.max - p.min) * clamp01(p.value||0);
+    }
+    return 300 * clamp01(p.value||0);
+  };
+
+  const isSyncOn = ()=>{
+    const p = pSync();
+    return !!p && clamp01(p.value||0) >= 0.5;
+  };
+
+  const noteIndexFromParam = (p)=>{
+    if (!p) return 0;
+    return Math.round(clamp01(p.value||0) * (notes.length - 1));
+  };
+
+  const noteLabelFromParam = (p)=>{
+    const idx = noteIndexFromParam(p);
+    return notes[idx] ? notes[idx].label : "—";
+  };
+
+  const findClosestNote = (ms, bpm)=>{
+    if (!Number.isFinite(ms) || !Number.isFinite(bpm) || bpm <= 0) return 0;
+    const quarter = 60000 / bpm;
+    let best = 0;
+    let min = Infinity;
+    notes.forEach((note, idx)=>{
+      const diff = Math.abs(quarter * note.factor - ms);
+      if (diff < min){
+        min = diff;
+        best = idx;
+      }
+    });
+    return best;
   };
 
   const mkBtn = (label)=>{
@@ -3341,6 +3422,26 @@ function buildRMLexi2PanelControl(win, ctrl){
   });
   modeRow.appendChild(tiltBtn);
 
+  syncBtn.addEventListener("click", ()=>{
+    const p = pSync();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    const on = clamp01(p.value||0) >= 0.5;
+    const next = on ? 0 : 1;
+    setParamRaw(p, next, 0, 1);
+    if (!on){
+      const bpm = getBpm();
+      const lenIdx = findClosestNote(getRaw(pLength(), 0, 4000), bpm);
+      const preIdx = findClosestNote(getRaw(pPre(), 0, 4000), bpm);
+      const lenNote = pLenNote();
+      const preNote = pPreNote();
+      if (lenNote) setParamRaw(lenNote, lenIdx, 0, notes.length - 1);
+      if (preNote) setParamRaw(preNote, preIdx, 0, notes.length - 1);
+    }
+    update();
+  });
+
   const mkLedSeg = (label)=>{
     const seg = document.createElement("div");
     seg.className = "rmLexiLedSeg";
@@ -3373,11 +3474,17 @@ function buildRMLexi2PanelControl(win, ctrl){
     segObj._t = setTimeout(()=>segObj.seg.classList.remove("rmLexiFlash"), 280);
   };
 
+  const formatTimeMs = (raw)=>{
+    if (!Number.isFinite(raw)) return "—";
+    if (raw > 1000){
+      return `${(raw/1000).toFixed(2)} s`;
+    }
+    return `${Math.round(raw)} ms`;
+  };
   const formatMs = (p, fallbackMax)=>{
     if (!p) return "—";
     const raw = getRaw(p, 0, fallbackMax);
-    if (!Number.isFinite(raw)) return "—";
-    return `${Math.round(raw)} ms`;
+    return formatTimeMs(raw);
   };
   const formatPercent = (p)=>{
     if (!p) return "—";
@@ -3393,11 +3500,100 @@ function buildRMLexi2PanelControl(win, ctrl){
     return `${rounded > 0 ? "+" : ""}${rounded} dB`;
   };
 
-  const dLength = buildRmDialControl(win, "LENGTH", pLength, {
-    valueFormatter: (p)=>formatMs(p, 1000)
+  const buildLexiDial = (label, getParamFn, options = {})=>{
+    const {valueFormatter, getSyncOn, getNoteParamFn} = options;
+    const wrap = document.createElement("div");
+    wrap.className = "rmDial";
+
+    const lab = document.createElement("div");
+    lab.className = "rmDialLabel";
+    lab.textContent = label;
+    const face = document.createElement("div");
+    face.className = "rmDialFace";
+    const needle = document.createElement("div");
+    needle.className = "rmDialNeedle";
+    face.appendChild(needle);
+    const val = document.createElement("div");
+    val.className = "rmDialValue";
+    val.textContent = "—";
+
+    wrap.appendChild(lab);
+    wrap.appendChild(face);
+    wrap.appendChild(val);
+
+    let drag = null;
+    const clamp = (x)=>Math.max(0, Math.min(1, x||0));
+    const getParams = ()=>{
+      const noteParam = getNoteParamFn ? getNoteParamFn() : null;
+      const syncOn = !!noteParam && getSyncOn && getSyncOn();
+      return {syncOn, valueParam: getParamFn(), noteParam};
+    };
+
+    face.addEventListener("pointerdown", (ev)=>{
+      const {syncOn, valueParam, noteParam} = getParams();
+      const p = syncOn ? noteParam : valueParam;
+      if (!p) return;
+      bringPluginToFront(win);
+      beginParamDrag(win, p.index);
+      suppressPoll(win, 800);
+      drag = {id: ev.pointerId, y: ev.clientY, start: clamp(p.value||0), idx: p.index, syncOn};
+      face.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    face.addEventListener("pointermove", (ev)=>{
+      if (!drag || drag.id !== ev.pointerId) return;
+      const dy = ev.clientY - drag.y;
+      let next = clamp(drag.start - dy*0.004);
+      if (drag.syncOn){
+        const step = 1/(notes.length-1);
+        next = Math.round(next/step) * step;
+      }
+      setParamNormalized(win, drag.idx, next);
+      try{ setDraggedParamValue(win, drag.idx, next); }catch(_){}
+      update();
+    });
+    const end = (ev)=>{
+      if (!drag || drag.id !== ev.pointerId) return;
+      const {syncOn, valueParam, noteParam} = getParams();
+      const p = syncOn ? noteParam : valueParam;
+      drag = null;
+      if (p) endParamDrag(win, p.index);
+      try{ face.releasePointerCapture(ev.pointerId); }catch(_){}
+    };
+    face.addEventListener("pointerup", end);
+    face.addEventListener("pointercancel", end);
+
+    const updateDial = ()=>{
+      const {syncOn, valueParam, noteParam} = getParams();
+      const needleParam = syncOn ? noteParam : valueParam;
+      const n = needleParam ? clamp(needleParam.value) : 0;
+      const angle = -135 + (270 * n);
+      needle.style.transform = `translate(-50%,-100%) rotate(${angle}deg)`;
+      if (!valueParam && !noteParam){
+        val.textContent = "—";
+      }else if (valueFormatter){
+        val.textContent = valueFormatter(valueParam, syncOn, noteParam);
+      }else if (syncOn && noteParam){
+        val.textContent = noteLabelFromParam(noteParam);
+      }else{
+        val.textContent = valueParam ? formatParam(valueParam) : "—";
+      }
+    };
+
+    updateDial();
+    return {el: wrap, update: updateDial};
+  };
+
+  const dLength = buildLexiDial("LENGTH", pLength, {
+    getSyncOn: isSyncOn,
+    getNoteParamFn: pLenNote,
+    valueFormatter: (p, syncOn, noteParam)=> syncOn ? noteLabelFromParam(noteParam) : formatMs(p, 4000)
   });
-  const dPre = buildRmDialControl(win, "PREDELAY", pPre, {
-    valueFormatter: (p)=>formatMs(p, 300)
+  const dPre = buildLexiDial("PREDELAY", pPre, {
+    getSyncOn: isSyncOn,
+    getNoteParamFn: pPreNote,
+    valueFormatter: (p, syncOn, noteParam)=> syncOn ? noteLabelFromParam(noteParam) : formatMs(p, 4000)
   });
   const dTilt = buildRmDialControl(win, "TILT", pTilt, {
     valueFormatter: formatTilt
@@ -3440,8 +3636,15 @@ function buildRMLexi2PanelControl(win, ctrl){
     brightBtn.classList.toggle("on", Number.isFinite(eqRaw) && Math.round(eqRaw) === 0);
     tiltBtn.classList.toggle("on", Number.isFinite(eqRaw) && Math.round(eqRaw) === 1);
 
-    flashSeg(ledLength, formatMs(pLength(), 1000));
-    flashSeg(ledPre, formatMs(pPre(), 300));
+    const syncParam = pSync();
+    const syncOn = isSyncOn();
+    syncBtn.disabled = !syncParam;
+    syncBtn.classList.toggle("on", syncOn);
+
+    const lengthLabel = syncOn && pLenNote() ? noteLabelFromParam(pLenNote()) : formatMs(pLength(), 4000);
+    const preLabel = syncOn && pPreNote() ? noteLabelFromParam(pPreNote()) : formatMs(pPre(), 4000);
+    flashSeg(ledLength, lengthLabel);
+    flashSeg(ledPre, preLabel);
     flashSeg(ledMix, formatPercent(pDryWet()));
     flashSeg(ledStereo, formatPercent(pStereo()));
   };

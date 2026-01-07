@@ -3237,6 +3237,29 @@ background: linear-gradient(180deg,
   background: rgba(8,8,8,0.75);
   border: 1px solid rgba(255,255,255,0.08);
 }
+.rmLexiInfoRow{
+  display:grid;
+  grid-template-columns: 1fr 110px;
+  gap: 12px;
+  align-items:center;
+}
+.rmLexiSyncBtn{
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: rgba(240,245,252,0.92);
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+.rmLexiSyncBtn.on{
+  border-color: rgba(60,255,160,0.45);
+  box-shadow: 0 0 16px rgba(60,255,160,0.2);
+}
+.rmLexiSyncBtn:disabled{
+  opacity: 0.45;
+  cursor: default;
+}
 .rmLexiLedSeg{
   padding: 6px 8px;
   border-radius: 10px;
