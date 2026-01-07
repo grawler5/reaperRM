@@ -3208,45 +3208,242 @@ function buildRMLexi2PanelControl(win, ctrl){
 
   const header = document.createElement("div");
   header.className = "rmLexiHeader";
-  header.innerHTML = `<div class="rmLexiTitle">RM Lexikan2</div><div class="rmLexiSub">MODERN PLATE</div>`;
+  header.innerHTML = `<div class="rmLexiTitle">Lexikan 2</div><div class="rmLexiSub">Tukan Digital Reverb</div>`;
   panel.appendChild(header);
 
-  const grid = document.createElement("div");
-  grid.className = "rmLexiGrid";
-  panel.appendChild(grid);
+  const buttons = document.createElement("div");
+  buttons.className = "rmLexiButtons";
+  panel.appendChild(buttons);
+
+  const algoRow = document.createElement("div");
+  algoRow.className = "rmLexiBtnRow rmLexiAlgoRow";
+  buttons.appendChild(algoRow);
+
+  const modeRow = document.createElement("div");
+  modeRow.className = "rmLexiBtnRow rmLexiModeRow";
+  buttons.appendChild(modeRow);
+
+  const ledBar = document.createElement("div");
+  ledBar.className = "rmLexiLedBar";
+  panel.appendChild(ledBar);
+
+  const knobs = document.createElement("div");
+  knobs.className = "rmLexiKnobs";
+  panel.appendChild(knobs);
 
   const ps = ()=> (Array.isArray(win.params) ? win.params : []);
   const find = (arr)=> findParamByPatterns(ps(), arr||[]);
 
-  const pDensity  = ()=> find(ex.densityFind)  || ps().find(p=>/\bdensity\b/i.test(String(p.name||""))) || null;
-  const pPre      = ()=> find(ex.preDelayFind) || ps().find(p=>/pre\s*delay|predelay/i.test(String(p.name||""))) || null;
-  const pERTail   = ()=> find(ex.erTailFind)   || ps().find(p=>/er\s*\/\s*tail|er\/tail|er\s*tail/i.test(String(p.name||""))) || null;
-  const pGap      = ()=> find(ex.gapFind)      || ps().find(p=>/gap\s*delay|tail\s*gap/i.test(String(p.name||""))) || null;
-  const pLPF      = ()=> find(ex.lpfFind)      || ps().find(p=>/lowpass|filter\s*\(lowpass/i.test(String(p.name||""))) || null;
-  const pTilt     = ()=> find(ex.tiltFind)     || ps().find(p=>/\btilt\b/i.test(String(p.name||""))) || null;
-  const pDryWet   = ()=> find(ex.dryWetFind)   || ps().find(p=>/dry\s*wet|drywet/i.test(String(p.name||""))) || null;
-  const pStereo   = ()=> find(ex.stereoFind)   || ps().find(p=>/stereo\s*spread|stereospread|width/i.test(String(p.name||""))) || null;
+  const pAlgo    = ()=> find(ex.algoFind)      || ps().find(p=>/\balgorithm\b/i.test(String(p.name||""))) || null;
+  const pWetSolo = ()=> find(ex.wetFind)       || ps().find(p=>/wet\s*solo|wetsolo/i.test(String(p.name||""))) || null;
+  const pBypass  = ()=> find(ex.bypassFind)    || ps().find(p=>/\bbypass\b/i.test(String(p.name||""))) || null;
+  const pEqMode  = ()=> find(ex.eqModeFind)    || ps().find(p=>/lpf\s*\/\s*tilt|lpf\s*tilt/i.test(String(p.name||""))) || null;
+  const pLength  = ()=> find(ex.lengthFind)    || ps().find(p=>/\bdensity\b/i.test(String(p.name||""))) || null;
+  const pPre     = ()=> find(ex.preDelayFind)  || ps().find(p=>/pre\s*delay|predelay/i.test(String(p.name||""))) || null;
+  const pTilt    = ()=> find(ex.tiltFind)      || ps().find(p=>/\btilt\b/i.test(String(p.name||""))) || null;
+  const pDryWet  = ()=> find(ex.dryWetFind)    || ps().find(p=>/dry\s*wet|drywet/i.test(String(p.name||""))) || null;
+  const pStereo  = ()=> find(ex.stereoFind)    || ps().find(p=>/stereo\s*spread|stereospread|width/i.test(String(p.name||""))) || null;
 
-  const dDensity = buildRmDialControl(win, "DENSITY", pDensity);
-  const dPre = buildRmDialControl(win, "PRE-DELAY", pPre);
-  const dER = buildRmDialControl(win, "ER/Tail", pERTail);
-  const dGap = buildRmDialControl(win, "GAP", pGap);
-  const dLPF = buildRmDialControl(win, "LPF", pLPF);
-  const dTilt = buildRmDialControl(win, "TILT", pTilt);
-  const dMix = buildRmDialControl(win, "DRY/WET", pDryWet);
-  const dStereo = buildRmDialControl(win, "STEREO", pStereo);
+  const clamp01 = (x)=> Math.max(0, Math.min(1, x||0));
+  const getRaw = (p, fallbackMin = 0, fallbackMax = 1)=>{
+    if (!p) return null;
+    if (Number.isFinite(p.raw)) return p.raw;
+    if (Number.isFinite(p.min) && Number.isFinite(p.max)){
+      return p.min + (p.max - p.min) * clamp01(p.value||0);
+    }
+    return fallbackMin + (fallbackMax - fallbackMin) * clamp01(p.value||0);
+  };
+  const setParamRaw = (p, raw, fallbackMin = 0, fallbackMax = 1)=>{
+    if (!p) return;
+    const min = Number.isFinite(p.min) ? p.min : fallbackMin;
+    const max = Number.isFinite(p.max) ? p.max : fallbackMax;
+    const denom = (max - min) || 1;
+    const n = clamp01((raw - min) / denom);
+    setParamNormalized(win, p.index, n);
+    p.value = n;
+    try{ setDraggedParamValue(win, p.index, n); }catch(_){}
+  };
 
-  [dDensity, dPre, dER, dGap, dLPF, dTilt, dMix, dStereo].forEach(d=>grid.appendChild(d.el));
+  const mkBtn = (label)=>{
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rmLexiBtn";
+    btn.textContent = label;
+    const led = document.createElement("span");
+    led.className = "rmLexiBtnLed";
+    btn.appendChild(led);
+    return btn;
+  };
+
+  const algoButtons = [
+    {label:"AMB", value:0},
+    {label:"ROOM", value:1},
+    {label:"SMALL", value:2},
+    {label:"BIG", value:3},
+    {label:"PLATE", value:4}
+  ].map(({label, value})=>{
+    const btn = mkBtn(label);
+    btn.addEventListener("click", ()=>{
+      const p = pAlgo();
+      if (!p) return;
+      bringPluginToFront(win);
+      suppressPoll(win, 500);
+      setParamRaw(p, value, 0, 4);
+      update();
+    });
+    algoRow.appendChild(btn);
+    return {btn, value};
+  });
+
+  const wetBtn = mkBtn("WET");
+  wetBtn.addEventListener("click", ()=>{
+    const p = pWetSolo();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    const on = clamp01(p.value||0) >= 0.5;
+    setParamRaw(p, on ? 0 : 1, 0, 1);
+    update();
+  });
+  modeRow.appendChild(wetBtn);
+
+  const bypassBtn = mkBtn("BYPASS");
+  bypassBtn.addEventListener("click", ()=>{
+    const p = pBypass();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    const on = clamp01(p.value||0) >= 0.5;
+    setParamRaw(p, on ? 0 : 1, 0, 1);
+    update();
+  });
+  modeRow.appendChild(bypassBtn);
+
+  const brightBtn = mkBtn("BRIGHT");
+  brightBtn.addEventListener("click", ()=>{
+    const p = pEqMode();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    setParamRaw(p, 0, 0, 1);
+    update();
+  });
+  modeRow.appendChild(brightBtn);
+
+  const tiltBtn = mkBtn("TILT");
+  tiltBtn.addEventListener("click", ()=>{
+    const p = pEqMode();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    setParamRaw(p, 1, 0, 1);
+    update();
+  });
+  modeRow.appendChild(tiltBtn);
+
+  const mkLedSeg = (label)=>{
+    const seg = document.createElement("div");
+    seg.className = "rmLexiLedSeg";
+    const lab = document.createElement("div");
+    lab.className = "rmLexiLedLabel";
+    lab.textContent = label;
+    const val = document.createElement("div");
+    val.className = "rmLexiLedValue";
+    val.textContent = "—";
+    seg.appendChild(lab);
+    seg.appendChild(val);
+    ledBar.appendChild(seg);
+    return {seg, val, last:""};
+  };
+
+  const ledLength = mkLedSeg("LENGTH");
+  const ledPre = mkLedSeg("PREDELAY");
+  const ledMix = mkLedSeg("DRY/WET");
+  const ledStereo = mkLedSeg("STEREO");
+
+  const flashSeg = (segObj, text)=>{
+    const t = String(text ?? "—");
+    if (segObj.last === t) return;
+    segObj.last = t;
+    segObj.val.textContent = t;
+    segObj.seg.classList.remove("rmLexiFlash");
+    void segObj.seg.offsetWidth;
+    segObj.seg.classList.add("rmLexiFlash");
+    clearTimeout(segObj._t);
+    segObj._t = setTimeout(()=>segObj.seg.classList.remove("rmLexiFlash"), 280);
+  };
+
+  const formatMs = (p, fallbackMax)=>{
+    if (!p) return "—";
+    const raw = getRaw(p, 0, fallbackMax);
+    if (!Number.isFinite(raw)) return "—";
+    return `${Math.round(raw)} ms`;
+  };
+  const formatPercent = (p)=>{
+    if (!p) return "—";
+    const raw = getRaw(p, 0, 1);
+    if (!Number.isFinite(raw)) return "—";
+    return `${Math.round(raw * 100)}%`;
+  };
+  const formatTilt = (p)=>{
+    if (!p) return "—";
+    const raw = getRaw(p, -6, 6);
+    if (!Number.isFinite(raw)) return "—";
+    const rounded = Math.round(raw * 10) / 10;
+    return `${rounded > 0 ? "+" : ""}${rounded} dB`;
+  };
+
+  const dLength = buildRmDialControl(win, "LENGTH", pLength, {
+    valueFormatter: (p)=>formatMs(p, 1000)
+  });
+  const dPre = buildRmDialControl(win, "PREDELAY", pPre, {
+    valueFormatter: (p)=>formatMs(p, 300)
+  });
+  const dTilt = buildRmDialControl(win, "TILT", pTilt, {
+    valueFormatter: formatTilt
+  });
+  const dMix = buildRmDialControl(win, "DRY/WET", pDryWet, {
+    valueFormatter: formatPercent
+  });
+  const dStereo = buildRmDialControl(win, "STEREO", pStereo, {
+    valueFormatter: formatPercent
+  });
+
+  [dLength, dPre, dTilt, dMix, dStereo].forEach(d=>knobs.appendChild(d.el));
 
   const update = ()=>{
-    dDensity.update();
+    dLength.update();
     dPre.update();
-    dER.update();
-    dGap.update();
-    dLPF.update();
     dTilt.update();
     dMix.update();
     dStereo.update();
+
+    const algoParam = pAlgo();
+    const algoRaw = getRaw(algoParam, 0, 4);
+    algoButtons.forEach(({btn, value})=>{
+      btn.disabled = !algoParam;
+      btn.classList.toggle("on", Number.isFinite(algoRaw) && Math.round(algoRaw) === value);
+    });
+
+    const wetParam = pWetSolo();
+    wetBtn.disabled = !wetParam;
+    wetBtn.classList.toggle("on", wetParam ? clamp01(wetParam.value||0) >= 0.5 : false);
+
+    const bypassParam = pBypass();
+    bypassBtn.disabled = !bypassParam;
+    bypassBtn.classList.toggle("on", bypassParam ? clamp01(bypassParam.value||0) >= 0.5 : false);
+
+    const eqParam = pEqMode();
+    const eqRaw = getRaw(eqParam, 0, 1);
+    brightBtn.disabled = !eqParam;
+    tiltBtn.disabled = !eqParam;
+    brightBtn.classList.toggle("on", Number.isFinite(eqRaw) && Math.round(eqRaw) === 0);
+    tiltBtn.classList.toggle("on", Number.isFinite(eqRaw) && Math.round(eqRaw) === 1);
+
+    flashSeg(ledLength, formatMs(pLength(), 1000));
+    flashSeg(ledPre, formatMs(pPre(), 300));
+    flashSeg(ledMix, formatPercent(pDryWet()));
+    flashSeg(ledStereo, formatPercent(pStereo()));
   };
 
   ctrl.update = ()=>update();

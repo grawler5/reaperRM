@@ -3137,7 +3137,7 @@ background: linear-gradient(180deg,
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== RM Lexikan2 (modern) ===== */
+/* ===== RM Lexikan2 (native CSS) ===== */
 .rmLexiHost{
   width:100%;
   height:100%;
@@ -3148,43 +3148,134 @@ background: linear-gradient(180deg,
   box-sizing:border-box;
 }
 .rmLexiPanel{
-  width: 900px;
+  width: 820px;
   max-width: 100%;
-  background: linear-gradient(160deg, rgba(14,18,28,0.96), rgba(8,10,16,0.98));
-  border: 1px solid rgba(120,180,255,0.25);
-  border-radius: 18px;
-  padding: 18px 20px 22px;
-  color: rgba(220,235,255,0.9);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
+  background: linear-gradient(180deg, rgba(18,22,28,0.98), rgba(10,12,16,0.98));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 18px 20px 20px;
+  color: rgba(235,240,248,0.92);
+  box-shadow: 0 16px 36px rgba(0,0,0,0.5);
   display:flex;
   flex-direction:column;
-  gap: 14px;
+  gap: 16px;
 }
 .rmLexiHeader{
   display:flex;
-  align-items:baseline;
+  align-items:center;
   justify-content:space-between;
   text-transform:uppercase;
   letter-spacing:0.2em;
 }
 .rmLexiTitle{
-  font-size:16px;
+  font-size:18px;
   font-weight:800;
 }
 .rmLexiSub{
   font-size:11px;
-  opacity:0.65;
+  opacity:0.7;
 }
-.rmLexiGrid{
+.rmLexiButtons{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+}
+.rmLexiBtnRow{
+  display:grid;
+  gap: 10px;
+}
+.rmLexiBtnRow.rmLexiAlgoRow{
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.rmLexiBtnRow.rmLexiModeRow{
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.rmLexiBtn{
+  position:relative;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04);
+  color: rgba(240,245,252,0.92);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform:uppercase;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap: 8px;
+}
+.rmLexiBtnLed{
+  position:absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(60,255,160,0.15);
+  box-shadow: 0 0 0 rgba(60,255,160,0);
+}
+.rmLexiBtn.on{
+  border-color: rgba(60,255,160,0.45);
+  box-shadow: 0 0 16px rgba(60,255,160,0.2);
+}
+.rmLexiBtn.on .rmLexiBtnLed{
+  background: rgba(60,255,160,0.95);
+  box-shadow: 0 0 14px rgba(60,255,160,0.55);
+}
+.rmLexiBtn:disabled{
+  opacity:0.45;
+  cursor:default;
+}
+.rmLexiLedBar{
   display:grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(8,8,8,0.75);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.rmLexiLedSeg{
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(40,0,0,0.28);
+  border: 1px solid rgba(255,90,90,0.2);
+  min-height: 42px;
+}
+.rmLexiLedLabel{
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  opacity: 0.65;
+}
+.rmLexiLedValue{
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 2px;
+  color: rgba(255,120,120,0.95);
+  text-shadow: 0 0 10px rgba(255,60,60,0.35);
+}
+.rmLexiFlash{
+  animation: rmLexiFlash 0.28s ease-out;
+}
+@keyframes rmLexiFlash{
+  0%{ filter: brightness(1.6); box-shadow: 0 0 0 rgba(255,70,70,0); }
+  100%{ filter: brightness(1.0); box-shadow: 0 0 18px rgba(255,70,70,0.18); }
+}
+.rmLexiKnobs{
+  display:grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.rmLexiPanel .rmDial{
+  width: 130px;
 }
 .rmLexiPanel .rmDialFace{
-  border-color: rgba(120,180,255,0.45);
-  background: radial-gradient(circle at 35% 35%, rgba(190,220,255,0.25), rgba(10,12,20,0.95));
+  border-color: rgba(150,200,255,0.35);
+  background: radial-gradient(circle at 35% 35%, rgba(200,220,255,0.25), rgba(12,14,20,0.96));
 }
 .rmLexiPanel .rmDialNeedle{
-  background: rgba(120,180,255,0.95);
-  box-shadow: 0 0 8px rgba(120,180,255,0.6);
+  background: rgba(150,200,255,0.95);
+  box-shadow: 0 0 8px rgba(150,200,255,0.6);
 }
