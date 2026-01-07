@@ -3080,14 +3080,14 @@ function buildRMEqt1aPanelControl(win, ctrl){
   const find = (arr)=> findParamByPatterns(ps(), arr||[]);
 
   const byIndex = (idx)=> (ps()[idx] || null);
-  const pLF     = ()=> byIndex(10) || find(ex.lsfFind)     || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
+  const pLF     = ()=> byIndex(0) || find(ex.lsfFind)     || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
   const pLBoost = ()=> byIndex(1) || find(ex.pushFind)     || ps().find(p=>/\bpush\b|\blow\b.*\bboost\b/i.test(String(p.name||""))) || null;
   const pLAtt   = ()=> byIndex(2) || find(ex.pullFind)     || ps().find(p=>/\bpull\b|\blow\b.*\batten\b/i.test(String(p.name||""))) || null;
-  const pPeakFreq = ()=> byIndex(9) || find(ex.peakFreqFind) || ps().find(p=>/\bfreq\s*peak\b|\bpeak\s*freq\b/i.test(String(p.name||""))) || null;
+  const pPeakFreq = ()=> byIndex(3) || find(ex.peakFreqFind) || ps().find(p=>/\bpeak\b|\bfreq\s*peak\b|\bpeak\s*freq\b/i.test(String(p.name||""))) || null;
   const pBW     = ()=> byIndex(4) || find(ex.midQFind)     || ps().find(p=>/\bbandwidth\b|\bmid\s*q\b|\bq\b/i.test(String(p.name||""))) || null;
   const pHBoost = ()=> byIndex(5) || find(ex.highGainFind) || ps().find(p=>/\bhigh\b.*\bgain\b|\bhigh\b.*\bboost\b/i.test(String(p.name||""))) || null;
   const pHAtt   = ()=> byIndex(7) || find(ex.midGainFind)  || ps().find(p=>/\batten\b/i.test(String(p.name||"")) && !/\bpull\b/i.test(String(p.name||""))) || null;
-  const pHAttSel = ()=> byIndex(11) || find(ex.hsfFind)    || ps().find(p=>/\bhsf\b|\bhigh\s*frequency\b/i.test(String(p.name||""))) || null;
+  const pHAttSel = ()=> byIndex(6) || find(ex.hsfFind)    || ps().find(p=>/\bhsf\b|\bhigh\s*frequency\b/i.test(String(p.name||""))) || null;
   const pOut    = ()=> byIndex(8) || find(ex.outFind)      || ps().find(p=>/\boutput\b|\bvolume\b/i.test(String(p.name||""))) || null;
   const pBypass = ()=> find(ex.bypassFind)   || ps().find(p=>/\bbypass\b|\bon\/off\b|\bpower\b|\benable\b|\bactive\b/i.test(String(p.name||""))) || null;
 
@@ -3143,7 +3143,7 @@ function buildRMEqt1aPanelControl(win, ctrl){
   const bwDial = buildRmDialControl(win, "BANDWIDTH", pBW);
   const highFreq = buildRmDialControl(win, "HIGH FREQ", pPeakFreq, {
     steps: 7,
-    valueFormatter: fixedValueFormatter([3, 4, 5, 8, 10, 12, 15])
+    valueFormatter: fixedValueFormatter([3, 4, 5, 8, 10, 12, 16])
   });
 
   const led = document.createElement("div");
