@@ -207,7 +207,9 @@
           midGainFind:[/^gain\s*\(db\)$/i,/\bmid\b.*gain/i,/^gain$/i],
           hsfFind:[/hsf/i],
           highGainFind:[/gain\s*\(db\).*hsf|high.*gain/i],
-          outFind:[/output/i]
+          attenSelFind:[/atten.*(sel|freq|select)/i],
+          bypassFind:[/bypass|power|enable|active|on\/off/i],
+          outFind:[/output|volume/i]
         }}
       ] }
     ]
@@ -2487,7 +2489,16 @@ function buildRMDelayMachinePanelControl(win, ctrl){
 
   // --- Knob widget
   function mkKnob(label, options){
-    const {idx, minRaw, maxRaw, valueToText, onUserStart, onUserChangeEnd} = options;
+    const {
+      idx,
+      minRaw,
+      maxRaw,
+      valueToText,
+      onUserStart,
+      onUserChangeEnd,
+      paramToKnob,
+      knobToParam
+    } = options;
 
     const wrap = document.createElement('div');
     wrap.className = 'rmDM2KnobWrap';
@@ -2551,7 +2562,8 @@ function buildRMDelayMachinePanelControl(win, ctrl){
     const getNFromParam = ()=>{
       const p = P(idx);
       if (!p) return 0;
-      return clamp01(p.value ?? 0);
+      const n = clamp01(p.value ?? 0);
+      return paramToKnob ? clamp01(paramToKnob(n, p)) : n;
     };
 
     const getTextFromParam = ()=>{
@@ -2567,7 +2579,8 @@ function buildRMDelayMachinePanelControl(win, ctrl){
     };
 
     const applyN = (n)=>{
-      setParam(idx, n);
+      const paramN = knobToParam ? clamp01(knobToParam(n)) : n;
+      setParam(idx, paramN);
       setVisual(n, getTextFromParam());
     };
 
@@ -2660,10 +2673,29 @@ function buildRMDelayMachinePanelControl(win, ctrl){
     onUserStart: ()=>{ clearSync(); },
   });
 
+  const dampPctFromRaw = (raw)=>{
+    if (!Number.isFinite(raw)) return 0;
+    if (raw <= -5){
+      return ((raw + 40) / 35) * 40;
+    }
+    return 40 + ((raw + 5) / 5) * 60;
+  };
+  const dampRawFromPct = (pct)=>{
+    const p = clamp01(pct / 100) * 100;
+    if (p <= 40){
+      return -40 + (p / 40) * 35;
+    }
+    return -5 + ((p - 40) / 60) * 5;
+  };
+  const dampPctFromNorm = (n)=> dampPctFromRaw(rawFromNorm(clamp01(n), -40, 0));
+  const dampNormFromPct = (pct)=> normFromRaw(dampRawFromPct(pct), -40, 0);
+
   const kbDamp = mkKnob('DAMP', {
     idx: IDX.fbDb,
     minRaw: -40, maxRaw: 0,
-    valueToText: (n, raw)=>`${Math.round(raw)}dB`,
+    valueToText: (n, raw)=>`${Math.round(dampPctFromRaw(raw))}%`,
+    paramToKnob: (n)=> dampPctFromNorm(n) / 100,
+    knobToParam: (n)=> dampNormFromPct(n * 100)
   });
 
   const kbHPF = mkKnob('HPF', {
@@ -2924,7 +2956,8 @@ function buildRMDelayMachinePanelControl(win, ctrl){
 
     const pFb = P(IDX.fbDb);
     const fbRaw = pFb && Number.isFinite(pFb.raw) ? pFb.raw : (pFb ? rawFromNorm(clamp01(pFb.value||0), -40, 0) : null);
-    flashSeg(segDamp, fbRaw!=null ? `${Math.round(fbRaw)}dB` : '—');
+    const fbPct = fbRaw!=null ? dampPctFromRaw(fbRaw) : null;
+    flashSeg(segDamp, fbPct!=null ? `${Math.round(fbPct)}%` : '—');
 
     // HPF is in Hz (0..1000)
     const pH = P(IDX.hpf);
@@ -3039,72 +3072,132 @@ function buildRMEqt1aPanelControl(win, ctrl){
   header.innerHTML = `<div class="rmPultecTitle">RM EQT-1A</div><div class="rmPultecSub">PULTEC STYLE EQ</div>`;
   panel.appendChild(header);
 
-  const grid = document.createElement("div");
-  grid.className = "rmPultecGrid";
-  panel.appendChild(grid);
+  const layout = document.createElement("div");
+  layout.className = "rmPultecLayout";
+  panel.appendChild(layout);
 
   const ps = ()=> (Array.isArray(win.params) ? win.params : []);
   const find = (arr)=> findParamByPatterns(ps(), arr||[]);
 
-  const pLF     = ()=> find(ex.lsfFind)     || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
-  const pLBoost = ()=> find(ex.pushFind)    || ps().find(p=>/\bpush\b|\blow\b.*\bboost\b/i.test(String(p.name||""))) || null;
-  const pLAtt   = ()=> find(ex.pullFind)    || ps().find(p=>/\bpull\b|\blow\b.*\batten\b/i.test(String(p.name||""))) || null;
-  const pBW     = ()=> find(ex.midQFind)    || ps().find(p=>/\bbandwidth\b|\bmid\s*q\b|\bq\b/i.test(String(p.name||""))) || null;
-  const pHF     = ()=> find(ex.hsfFind)     || find(ex.peakFind) || ps().find(p=>/\bhigh\s*frequency\b|\bhsf\b|\bpeak\b/i.test(String(p.name||""))) || null;
-  const pHBoost = ()=> find(ex.highGainFind)|| ps().find(p=>/\bhigh\b.*\bgain\b|\bhigh\b.*\bboost\b/i.test(String(p.name||""))) || null;
+  const pLF     = ()=> find(ex.lsfFind)      || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
+  const pLBoost = ()=> find(ex.pushFind)     || ps().find(p=>/\bpush\b|\blow\b.*\bboost\b/i.test(String(p.name||""))) || null;
+  const pLAtt   = ()=> find(ex.pullFind)     || ps().find(p=>/\bpull\b|\blow\b.*\batten\b/i.test(String(p.name||""))) || null;
+  const pBW     = ()=> find(ex.midQFind)     || ps().find(p=>/\bbandwidth\b|\bmid\s*q\b|\bq\b/i.test(String(p.name||""))) || null;
+  const pHBoostFreq = ()=> find(ex.hsfFind)  || find(ex.peakFind) || ps().find(p=>/\bhigh\s*frequency\b|\bhsf\b|\bpeak\b/i.test(String(p.name||""))) || null;
+  const pHBoost = ()=> find(ex.highGainFind) || ps().find(p=>/\bhigh\b.*\bgain\b|\bhigh\b.*\bboost\b/i.test(String(p.name||""))) || null;
   const pHAtt   = ()=>{
     const arr = ps();
-    const hit = arr.find(p=>/\batten\b/i.test(String(p.name||"")) && !/\bpull\b/i.test(String(p.name||"")));
+    const hit = arr.find(p=>/\batten\b/i.test(String(p.name||"")) && !/\bpull\b/i.test(String(p.name||"")) && !(/\bsel\b|\bfreq\b/i.test(String(p.name||""))));
     if (hit) return hit;
     return find(ex.midGainFind) || arr.find(p=>/\bgain\b/i.test(String(p.name||"")) && p !== pHBoost()) || null;
   };
-  const pOut    = ()=> find(ex.outFind)     || ps().find(p=>/\boutput\b/i.test(String(p.name||""))) || null;
+  const pHAttSel = ()=>{
+    const arr = ps();
+    return find(ex.attenSelFind) || arr.find(p=>/\batten\b.*(sel|freq|select)\b/i.test(String(p.name||""))) || null;
+  };
+  const pOut    = ()=> find(ex.outFind)      || ps().find(p=>/\boutput\b|\bvolume\b/i.test(String(p.name||""))) || null;
+  const pBypass = ()=> find(ex.bypassFind)   || ps().find(p=>/\bbypass\b|\bon\/off\b|\bpower\b|\benable\b|\bactive\b/i.test(String(p.name||""))) || null;
 
-  const low = document.createElement("div");
-  low.className = "rmPultecSection";
-  low.innerHTML = `<div class="rmPultecSectionTitle">LOW</div>`;
-  const lowKnobs = document.createElement("div");
-  lowKnobs.className = "rmPultecKnobs";
-  const lfDial = buildRmDialControl(win, "FREQ", pLF, {steps: 4});
+  const clamp01 = (x)=> Math.max(0, Math.min(1, x||0));
+  const fixedValueFormatter = (values, suffix = "")=> (p)=>{
+    if (!p) return "—";
+    const idx = Math.round(clamp01(p.value) * (values.length - 1));
+    return `${values[idx]}${suffix}`;
+  };
+  const formatOutput = (p)=>{
+    if (!p) return "—";
+    let raw = Number.isFinite(p.raw) ? p.raw : null;
+    if (raw == null){
+      if (Number.isFinite(p.min) && Number.isFinite(p.max)){
+        raw = p.min + (p.max - p.min) * clamp01(p.value);
+      }else{
+        raw = -60 + clamp01(p.value) * 72;
+      }
+    }
+    if (raw <= -59.5) return "−∞";
+    const rounded = Math.round(raw * 10) / 10;
+    return `${rounded > 0 ? "+" : ""}${rounded}`;
+  };
+
+  const topRow = document.createElement("div");
+  topRow.className = "rmPultecRow rmPultecTop";
+  layout.appendChild(topRow);
+
+  const bottomRow = document.createElement("div");
+  bottomRow.className = "rmPultecRow rmPultecBottom";
+  layout.appendChild(bottomRow);
+
   const lBoost = buildRmDialControl(win, "BOOST", pLBoost);
   const lAtt = buildRmDialControl(win, "ATTEN", pLAtt);
-  [lfDial, lBoost, lAtt].forEach(d=>lowKnobs.appendChild(d.el));
-  low.appendChild(lowKnobs);
-
-  const mid = document.createElement("div");
-  mid.className = "rmPultecSection";
-  mid.innerHTML = `<div class="rmPultecSectionTitle">MID / OUT</div>`;
-  const midKnobs = document.createElement("div");
-  midKnobs.className = "rmPultecKnobs";
-  const bwDial = buildRmDialControl(win, "BANDWIDTH", pBW);
-  const outDial = buildRmDialControl(win, "OUTPUT", pOut);
-  [bwDial, outDial].forEach(d=>midKnobs.appendChild(d.el));
-  mid.appendChild(midKnobs);
-
-  const high = document.createElement("div");
-  high.className = "rmPultecSection";
-  high.innerHTML = `<div class="rmPultecSectionTitle">HIGH</div>`;
-  const highKnobs = document.createElement("div");
-  highKnobs.className = "rmPultecKnobs";
-  const hfDial = buildRmDialControl(win, "FREQ", pHF, {steps: 7});
   const hBoost = buildRmDialControl(win, "BOOST", pHBoost);
   const hAtt = buildRmDialControl(win, "ATTEN", pHAtt);
-  [hfDial, hBoost, hAtt].forEach(d=>highKnobs.appendChild(d.el));
-  high.appendChild(highKnobs);
+  const hAttSel = buildRmDialControl(win, "ATTEN SEL", pHAttSel, {
+    steps: 3,
+    valueFormatter: fixedValueFormatter([5, 10, 20])
+  });
 
-  grid.appendChild(low);
-  grid.appendChild(mid);
-  grid.appendChild(high);
+  [lBoost, lAtt, hBoost, hAtt, hAttSel].forEach(d=>topRow.appendChild(d.el));
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "rmPultecToggle";
+  toggle.textContent = "IN";
+
+  const lowFreq = buildRmDialControl(win, "LOW FREQ", pLF, {
+    steps: 4,
+    valueFormatter: fixedValueFormatter([20, 30, 60, 100])
+  });
+  const bwDial = buildRmDialControl(win, "BANDWIDTH", pBW);
+  const highFreq = buildRmDialControl(win, "HIGH FREQ", pHBoostFreq, {
+    steps: 7,
+    valueFormatter: fixedValueFormatter([3, 4, 5, 8, 10, 12, 15])
+  });
+
+  const led = document.createElement("div");
+  led.className = "rmPultecLed";
+
+  const outDial = buildRmDialControl(win, "VOLUME", pOut, { valueFormatter: formatOutput });
+
+  bottomRow.appendChild(toggle);
+  bottomRow.appendChild(lowFreq.el);
+  bottomRow.appendChild(bwDial.el);
+  bottomRow.appendChild(highFreq.el);
+  bottomRow.appendChild(led);
+  bottomRow.appendChild(outDial.el);
+
+  toggle.addEventListener("click", ()=>{
+    const p = pBypass();
+    if (!p) return;
+    const isBypass = /\bbypass\b/i.test(String(p.name||""));
+    const on = isBypass ? (p.value||0) < 0.5 : (p.value||0) >= 0.5;
+    const next = isBypass ? (on ? 1 : 0) : (on ? 0 : 1);
+    setParamNormalized(win, p.index, clamp01(next));
+    p.value = clamp01(next);
+    try{ setDraggedParamValue(win, p.index, clamp01(next)); }catch(_){}
+    update();
+  });
 
   const update = ()=>{
-    lfDial.update();
     lBoost.update();
     lAtt.update();
-    bwDial.update();
-    outDial.update();
-    hfDial.update();
     hBoost.update();
     hAtt.update();
+    hAttSel.update();
+    lowFreq.update();
+    bwDial.update();
+    highFreq.update();
+    outDial.update();
+
+    const p = pBypass();
+    if (!p){
+      toggle.classList.remove("on");
+      led.classList.remove("on");
+    }else{
+      const isBypass = /\bbypass\b/i.test(String(p.name||""));
+      const on = isBypass ? (p.value||0) < 0.5 : (p.value||0) >= 0.5;
+      toggle.classList.toggle("on", on);
+      led.classList.toggle("on", on);
+    }
   };
 
   ctrl.update = ()=>update();
