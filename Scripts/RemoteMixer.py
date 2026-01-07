@@ -580,6 +580,7 @@ def build_state():
             "tracks": tracks,
             "projectName": projName,
             "projectPath": projPath,
+            "transport": get_transport_state(),
             "ts": _now(),
             "version": VERSION}
 
@@ -651,6 +652,126 @@ def get_track_peaks(track):
 
     # fallback: UI peaks (hold)
     return _ui_peaks_lin(track)
+
+
+def get_project_bpm():
+    try:
+        if "RPR_Master_GetTempo" in globals():
+            bpm = RPR_Master_GetTempo()
+            if isinstance(bpm, tuple): bpm = bpm[0]
+            return float(bpm)
+    except Exception:
+        pass
+    try:
+        if "RPR_TimeMap_GetDividedBpm" in globals():
+            bpm = RPR_TimeMap_GetDividedBpm(0)
+            if isinstance(bpm, tuple): bpm = bpm[0]
+            return float(bpm)
+    except Exception:
+        pass
+    return None
+
+
+def get_regions():
+    regions = []
+    try:
+        res = RPR_CountProjectMarkers(0, 0, 0)
+        if isinstance(res, tuple):
+            total = int(res[0])
+        else:
+            total = int(res)
+    except Exception:
+        total = 0
+
+    for i in range(total):
+        try:
+            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, 0, 0)
+            if isinstance(r, tuple):
+                isrgn = int(r[1]) if len(r) > 1 else 0
+                start = float(r[2]) if len(r) > 2 else 0.0
+                end = float(r[3]) if len(r) > 3 else 0.0
+                name = str(r[4]) if len(r) > 4 else ""
+                idx = int(r[5]) if len(r) > 5 else i
+            else:
+                continue
+            if isrgn:
+                regions.append({"index": idx, "name": name, "start": start, "end": end})
+        except Exception:
+            continue
+    return regions
+
+
+def get_transport_state():
+    try:
+        ps = RPR_GetPlayState()
+        if isinstance(ps, tuple): ps = ps[0]
+        play_state = int(ps)
+    except Exception:
+        play_state = 0
+    playing = (play_state & 1) != 0
+    paused = (play_state & 2) != 0
+    recording = (play_state & 4) != 0
+
+    pos = None
+    try:
+        if playing or paused or recording:
+            if "RPR_GetPlayPosition2" in globals():
+                pos = RPR_GetPlayPosition2()
+            else:
+                pos = RPR_GetPlayPosition()
+        else:
+            pos = RPR_GetCursorPosition()
+        if isinstance(pos, tuple): pos = pos[0]
+        pos = float(pos)
+    except Exception:
+        pos = 0.0
+
+    bpm = get_project_bpm()
+
+    bar = beat = 0
+    beat_frac = 0.0
+    try:
+        res = RPR_TimeMap2_timeToBeats(0, pos, 0, 0, 0, 0)
+        if isinstance(res, tuple):
+            beats = float(res[0]) if len(res) > 0 else 0.0
+            measures = int(res[1]) if len(res) > 1 else 0
+            beat = int(beats) + 1
+            beat_frac = beats - int(beats)
+            bar = int(measures) + 1
+    except Exception:
+        bar = 0
+        beat = 0
+        beat_frac = 0.0
+
+    regions = get_regions()
+    region_name = ""
+    region_index = None
+    try:
+        rinfo = RPR_GetLastMarkerAndCurRegion(0, pos, 0, 0)
+        if isinstance(rinfo, tuple) and len(rinfo) > 2:
+            region_index = int(rinfo[2])
+    except Exception:
+        region_index = None
+    if region_index is not None:
+        for r in regions:
+            if int(r.get("index", -1)) == region_index:
+                region_name = r.get("name", "")
+                break
+
+    return {
+        "playState": play_state,
+        "playing": playing,
+        "paused": paused,
+        "recording": recording,
+        "position": pos,
+        "bpm": bpm,
+        "bar": bar,
+        "beat": beat,
+        "beatFrac": beat_frac,
+        "regionName": region_name,
+        "regionIndex": region_index,
+        "regions": regions
+    }
 
 
 def build_meter():
@@ -816,6 +937,57 @@ def handle_cmd(cmd, sock):
     try:
         if typ == "reqState":
             _send(sock, build_state()); return
+        if typ == "transport":
+            action = cmd.get("action", "")
+            if action == "play":
+                try: RPR_OnPlayButton()
+                except Exception: pass
+            elif action == "stop":
+                try: RPR_OnStopButton()
+                except Exception: pass
+            elif action == "pause":
+                try: RPR_OnPauseButton()
+                except Exception: pass
+            elif action == "record":
+                try: RPR_OnRecordButton()
+                except Exception: pass
+            return
+        if typ == "setBpm":
+            bpm = float(cmd.get("bpm", 120.0))
+            bpm = max(20.0, min(300.0, bpm))
+            try:
+                if "RPR_SetCurrentBPM" in globals():
+                    RPR_SetCurrentBPM(0, bpm, True)
+                elif "RPR_SetTempoTimeSigMarker" in globals():
+                    RPR_SetTempoTimeSigMarker(0, -1, 0, -1, -1, bpm, 0, 0, False)
+            except Exception:
+                pass
+            return
+        if typ == "gotoRegion":
+            idx = int(cmd.get("index", -1))
+            if idx >= 0:
+                try:
+                    res = RPR_CountProjectMarkers(0, 0, 0)
+                    total = int(res[0]) if isinstance(res, tuple) else int(res)
+                except Exception:
+                    total = 0
+                for i in range(total):
+                    try:
+                        r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, 0, 0)
+                        if not isinstance(r, tuple) or len(r) < 6:
+                            continue
+                        isrgn = int(r[1])
+                        start = float(r[2])
+                        mark_idx = int(r[5])
+                        if isrgn and mark_idx == idx:
+                            try:
+                                RPR_SetEditCurPos2(0, start, True, True)
+                            except Exception:
+                                RPR_SetEditCurPos(start, True, True)
+                            break
+                    except Exception:
+                        continue
+            return
         if typ == "setVol":
             guid = cmd.get("guid","")
             vol = float(cmd.get("vol", 1.0))

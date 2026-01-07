@@ -5966,8 +5966,7 @@ applyResponsiveMode();
 
   // ---------- Config ----------
   const DEFAULT_CFG = {
-    mode: "live",                 // live / studio
-    layout: "reaper",             // currently single
+    theme: "dark",
     masterEnabled: true,
     masterSide: "left",           // left / right
     showFxBar: true,
@@ -5999,6 +5998,12 @@ applyResponsiveMode();
   // Defaults
   if (cfg.showColorFooter === undefined) cfg.showColorFooter = true;
   if (cfg.footerIntensity === undefined) cfg.footerIntensity = 0.35;
+  if (!cfg.theme) cfg.theme = "dark";
+
+  function applyTheme(){
+    document.body.classList.toggle("light", cfg.theme === "light");
+  }
+  applyTheme();
 
   // Multiuser
   let projectInfo = null;   // {projectId, projectName, users, admin, ui}
@@ -6010,6 +6015,39 @@ applyResponsiveMode();
   const brandEl = document.getElementById("brand");
   let ws = null;
   let wsConnected = false;
+
+  const formatTimecode = (sec)=>{
+    if (!Number.isFinite(sec)) return "00:00:00.00";
+    const s = Math.max(0, sec);
+    const hrs = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = Math.floor(s % 60);
+    const frac = Math.floor((s - Math.floor(s)) * 100);
+    const pad = (n, l=2)=> String(n).padStart(l, "0");
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}.${pad(frac)}`;
+  };
+
+  const updateTransportUI = (transport)=>{
+    if (!transport) return;
+    if (transportTime) transportTime.textContent = formatTimecode(transport.position);
+    if (transportBars){
+      const bar = Number.isFinite(transport.bar) ? transport.bar : 1;
+      const beat = Number.isFinite(transport.beat) ? transport.beat : 1;
+      const sub = Number.isFinite(transport.beatFrac) ? Math.round(transport.beatFrac * 100) : 0;
+      transportBars.textContent = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
+    }
+    if (transportRegion){
+      const name = transport.regionName || "—";
+      transportRegion.textContent = `Region: ${name}`;
+    }
+    if (transportBpm){
+      const bpm = Number.isFinite(transport.bpm) ? (Math.round(transport.bpm*10)/10).toFixed(1) : "—";
+      transportBpm.textContent = `${bpm} BPM`;
+    }
+    if (transportPlay) transportPlay.classList.toggle("on", !!transport.playing && !transport.paused);
+    if (transportPause) transportPause.classList.toggle("on", !!transport.paused);
+    if (transportRec) transportRec.classList.toggle("on", !!transport.recording);
+  };
 
   let lastState = null;     // {master, tracks[]}
   let lastMeters = null;    // {frames[]}
@@ -6219,6 +6257,7 @@ function hideUserPicker(){
         const normProj = normalizeProjectName(proj);
         if (brandEl) brandEl.textContent = normProj;
         if (normProj) document.title = normProj;
+        updateTransportUI(msg.transport);
 
         rebuildIndices();
         renderOrUpdate();
@@ -7304,8 +7343,118 @@ const FX_ADD_CATALOG = [
   {name:"RM_Lexikan2", add:"JS: RM_Lexikan2||JS:RM_Lexikan2||RM_Lexikan2"}
 ];
 
+  function renderRegionsModal(){
+    modalTitle.textContent = "Regions";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+    const wrap = document.createElement("div");
+    const regions = (lastState && lastState.transport && Array.isArray(lastState.transport.regions)) ? lastState.transport.regions : [];
+    if (!regions.length){
+      wrap.innerHTML = `<div class="small">No regions in project.</div>`;
+      modalBody.appendChild(wrap);
+      return;
+    }
+    const list = document.createElement("div");
+    list.className = "fxList";
+    regions.forEach((r)=>{
+      const row = document.createElement("div");
+      row.className = "fxItem";
+      row.innerHTML = `<div class="nm">${escapeHtml(r.name || "Region")}</div>
+        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
+      row.querySelector("button").addEventListener("click", ()=>{
+        wsSend({type:"gotoRegion", index: r.index});
+        closeModal();
+      });
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+    modalBody.appendChild(wrap);
+  }
+
+  function renderBpmModal(){
+    modalTitle.textContent = "BPM";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    const current = Number.isFinite(openModal.draftBpm) ? openModal.draftBpm : 120;
+    openModal.draftBpm = current;
+    const clampBpm = (v)=> Math.max(20, Math.min(300, v));
+
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<label>Tempo</label>
+      <div style="display:flex; align-items:center; gap:10px; flex:1;">
+        <input class="rng" type="range" min="20" max="300" step="0.1" value="${current}">
+        <input class="inp" type="number" min="20" max="300" step="0.1" value="${current}" style="width:90px;">
+      </div>`;
+    wrap.appendChild(row);
+
+    const tapRow = document.createElement("div");
+    tapRow.className = "row";
+    tapRow.innerHTML = `<label>Tap tempo</label><button class="miniBtn">Tap</button><div class="small" style="margin-left:auto">tap 4x+</div>`;
+    wrap.appendChild(tapRow);
+
+    const btnRow = document.createElement("div");
+    btnRow.className = "row";
+    btnRow.style.justifyContent = "flex-end";
+    btnRow.innerHTML = `<button class="miniBtn">Cancel</button><button class="miniBtn on">Apply</button>`;
+    wrap.appendChild(btnRow);
+
+    const slider = row.querySelector("input.rng");
+    const input = row.querySelector("input.inp");
+    const tapBtn = tapRow.querySelector("button");
+    const [cancelBtn, applyBtn] = btnRow.querySelectorAll("button");
+
+    const setDraft = (v)=>{
+      const n = Math.round(clampBpm(v) * 10) / 10;
+      openModal.draftBpm = n;
+      slider.value = String(n);
+      input.value = String(n);
+    };
+
+    slider.addEventListener("input", ()=> setDraft(parseFloat(slider.value)));
+    input.addEventListener("input", ()=> setDraft(parseFloat(input.value)));
+
+    let taps = [];
+    tapBtn.addEventListener("click", ()=>{
+      const now = performance.now();
+      taps.push(now);
+      if (taps.length > 6) taps = taps.slice(-6);
+      if (taps.length >= 2){
+        const intervals = [];
+        for (let i=1;i<taps.length;i++) intervals.push(taps[i]-taps[i-1]);
+        const avg = intervals.reduce((a,b)=>a+b,0) / intervals.length;
+        if (avg > 0){
+          const bpm = 60000 / avg;
+          setDraft(bpm);
+        }
+      }
+    });
+
+    cancelBtn.addEventListener("click", closeModal);
+    applyBtn.addEventListener("click", ()=>{
+      wsSend({type:"setBpm", bpm: openModal.draftBpm});
+      closeModal();
+    });
+
+    modalBody.appendChild(wrap);
+  }
+
   function renderModal(){
     if (!openModal) return;
+    if (openModal.kind === "settings"){
+      renderSettingsModal();
+      return;
+    }
+    if (openModal.kind === "regions"){
+      renderRegionsModal();
+      return;
+    }
+    if (openModal.kind === "bpm"){
+      renderBpmModal();
+      return;
+    }
     const t = trackByGuid.get(openModal.guid);
     modalTitle.textContent = (t ? (t.kind==="master" ? "MASTER" : t.name) : "Track");
     tabsEl.innerHTML = "";
@@ -7438,8 +7587,7 @@ const FX_ADD_CATALOG = [
       renderOrUpdate();
     });
     bFX.addEventListener("click", ()=> {
-      if (cfg.mode==="studio") wsSend({type:"showFxChain", guid:t.guid});
-      else openFxUIOrMenu(t.guid);
+      openFxUIOrMenu(t.guid);
     });
     wrap.appendChild(bRow);
 
@@ -7596,7 +7744,6 @@ modalBody.appendChild(wrap);
       <button class="miniBtn">Refresh</button>
       <button class="miniBtn">All ON</button>
       <button class="miniBtn">All OFF</button>
-      <div class="small" style="margin-left:auto">mode: ${cfg.mode}</div>
     `;
     const [bR,bOn,bOff] = top.querySelectorAll("button");
     bR.addEventListener("click", ()=>wsSend({type:"reqFxList", guid:t.guid}));
@@ -7710,88 +7857,15 @@ modalBody.appendChild(wrap);
   // ---------- Settings ----------
   const fsBtn = document.getElementById("fsBtn");
   const settingsBtn = document.getElementById("settingsBtn");
-
-  // ---------- PWA (install as app) ----------
-  const installBtn = document.getElementById("installBtn");
-  let deferredInstallPrompt = null;
-
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = () => (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || !!window.navigator.standalone;
-
-  function updateInstallButton(){
-    if (!installBtn) return;
-    if (isStandalone()) { installBtn.style.display = "none"; return; }
-
-    // Android/Chromium install prompt (requires HTTPS + SW)
-    if (deferredInstallPrompt){
-      installBtn.textContent = "Install";
-      installBtn.style.display = "inline-flex";
-      return;
-    }
-
-    // iOS has no beforeinstallprompt, but "Add to Home Screen" works
-    if (isIOS){
-      installBtn.textContent = "Add";
-      installBtn.style.display = "inline-flex";
-      return;
-    }
-
-    // Helpful hint for Android on LAN HTTP (install won't show)
-    if (!window.isSecureContext){
-      installBtn.textContent = "HTTPS";
-      installBtn.style.display = "inline-flex";
-      return;
-    }
-
-    installBtn.style.display = "none";
-  }
-
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    updateInstallButton();
-  });
-
-  window.addEventListener("appinstalled", () => {
-    deferredInstallPrompt = null;
-    updateInstallButton();
-  });
-
-  installBtn?.addEventListener("click", async () => {
-    if (isStandalone()) return;
-
-    if (deferredInstallPrompt){
-      try{
-        deferredInstallPrompt.prompt();
-        const choice = await deferredInstallPrompt.userChoice;
-        if (choice && choice.outcome === "accepted"){
-          deferredInstallPrompt = null;
-        }
-      }catch{}
-      updateInstallButton();
-      return;
-    }
-
-    if (isIOS){
-      alert("iPhone/iPad: открой \"Поделиться\" → \"На экран Домой\". После этого микшер будет открываться как приложение (без адресной строки).\n\nНа iOS автоматический fullscreen невозможен — это ограничение системы, но режим standalone почти как fullscreen.");
-      return;
-    }
-
-    if (!window.isSecureContext){
-      alert("Установка как веб‑приложение на Android (Chrome) требует HTTPS (secure context). Сейчас страница открыта по HTTP на локальном IP, поэтому кнопка Install не появится.\n\nРешение: поднять HTTPS на сервере (самоподписанный сертификат) или открыть через localhost/домен с HTTPS.");
-      return;
-    }
-
-    alert("Установка недоступна в этом браузере/режиме.");
-  });
-
-  // Service worker (needed for Android install prompt)
-  if ("serviceWorker" in navigator){
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(()=>{});
-    });
-  }
-  updateInstallButton();
+  const transportStop = document.getElementById("transportStop");
+  const transportPlay = document.getElementById("transportPlay");
+  const transportPause = document.getElementById("transportPause");
+  const transportRec = document.getElementById("transportRec");
+  const transportTime = document.getElementById("transportTime");
+  const transportBars = document.getElementById("transportBars");
+  const transportRegion = document.getElementById("transportRegion");
+  const transportBpm = document.getElementById("transportBpm");
+  transportRec?.classList.add("rec");
 
   function toggleFullscreen(){
     if (!document.fullscreenElement){
@@ -7806,133 +7880,13 @@ modalBody.appendChild(wrap);
     fsBtn.textContent = document.fullscreenElement ? "⤢" : "⛶";
   });
 
-  function openSettings(){
-    overlay.style.display = "block";
-    modal.style.display = "block";
-    openModal = {guid:"__settings__", tab:"settings"};
-    modalTitle.textContent = "Settings";
-    tabsEl.innerHTML = "";
-    modalBody.innerHTML = "";
+  const SETTINGS_TABS = [
+    {id:"main", label:"Основные"},
+    {id:"ui", label:"Интерфейс"},
+    {id:"tracks", label:"Менеджер треков"}
+  ];
 
-    const wrap = document.createElement("div");
-
-    const mkToggle = (label, key, onChange) => {
-      const row = document.createElement("div");
-      row.className = "row";
-      row.innerHTML = `<label>${label}</label><button class="miniBtn ${cfg[key]?'on':''}">${cfg[key]?'ON':'OFF'}</button>`;
-      const b = row.querySelector("button");
-      b.addEventListener("click", ()=>{
-        cfg[key] = !cfg[key];
-        saveCfg();
-        b.classList.toggle("on", cfg[key]);
-        b.textContent = cfg[key] ? "ON":"OFF";
-        if (onChange) onChange();
-      });
-      return row;
-    };
-
-    
-    // user
-    const userRow = document.createElement("div");
-    userRow.className = "row";
-    const uName = currentUser || "(select)";
-    userRow.innerHTML = `<label>User</label><button class="miniBtn on">${uName}</button><button class="miniBtn">Change</button>`;
-    const userBtns = userRow.querySelectorAll("button");
-    userBtns[1].addEventListener("click", ()=>{ showUserPicker(); });
-    wrap.appendChild(userRow);
-
-    // footer color bar
-    wrap.appendChild(mkToggle("Color footer bar", "showColorFooter", ()=>{ renderOrUpdate(true); wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter}}); }));
-    // footer intensity
-    const intRow = document.createElement("div");
-    intRow.className = "row";
-    const selVal = (cfg.footerIntensity==0.25||cfg.footerIntensity==0.35||cfg.footerIntensity==0.45) ? cfg.footerIntensity : 0.35;
-    intRow.innerHTML = `<label>Footer intensity</label>
-      <select class="sel" ${cfg.showColorFooter?'':'disabled'}>
-        <option value="0.25" ${selVal===0.25?'selected':''}>Low (25%)</option>
-        <option value="0.35" ${selVal===0.35?'selected':''}>Med (35%)</option>
-        <option value="0.45" ${selVal===0.45?'selected':''}>High (45%)</option>
-      </select>`;
-    const sel = intRow.querySelector("select");
-    sel.addEventListener("change", ()=>{
-      const v = parseFloat(sel.value);
-      cfg.footerIntensity = (v===0.25||v===0.35||v===0.45) ? v : 0.35;
-      saveCfg();
-      renderOrUpdate(true);
-      wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter, footerIntensity: cfg.footerIntensity}});
-    });
-    wrap.appendChild(intRow);
-
-
-    wrap.appendChild(mkToggle("Master enabled", "masterEnabled", ()=>renderOrUpdate(true)));
-
-    // master side
-    const side = document.createElement("div");
-    side.className = "row";
-    side.innerHTML = `<label>Master side</label>
-      <button class="miniBtn ${cfg.masterSide==='left'?'on':''}">Left</button>
-      <button class="miniBtn ${cfg.masterSide==='right'?'on':''}">Right</button>`;
-    const [bL,bR] = side.querySelectorAll("button");
-    bL.addEventListener("click", ()=>{ cfg.masterSide="left"; saveCfg(); bL.classList.add("on"); bR.classList.remove("on"); renderOrUpdate(true); });
-    bR.addEventListener("click", ()=>{ cfg.masterSide="right"; saveCfg(); bR.classList.add("on"); bL.classList.remove("on"); renderOrUpdate(true); });
-    wrap.appendChild(side);
-
-    // mode
-    const modeRow = document.createElement("div");
-    modeRow.className = "row";
-    modeRow.innerHTML = `<label>Mode</label>
-      <button class="miniBtn ${cfg.mode==='live'?'on':''}">Live</button>
-      <button class="miniBtn ${cfg.mode==='studio'?'on':''}">Studio</button>`;
-    const [mLive,mStudio] = modeRow.querySelectorAll("button");
-    mLive.addEventListener("click", ()=>{ cfg.mode="live"; mLive.classList.add("on"); mStudio.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    mStudio.addEventListener("click", ()=>{ cfg.mode="studio"; mStudio.classList.add("on"); mLive.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    wrap.appendChild(modeRow);
-
-    // layout
-    const layoutRow = document.createElement("div");
-    layoutRow.className = "row";
-    layoutRow.innerHTML = `<label>Layout</label>
-      <button class="miniBtn ${cfg.layout==='reaper'?'on':''}">Reaper</button>
-      <button class="miniBtn ${cfg.layout==='compact'?'on':''}">Compact</button>`;
-    const [lReaper,lCompact] = layoutRow.querySelectorAll("button");
-    lReaper.addEventListener("click", ()=>{ cfg.layout="reaper"; lReaper.classList.add("on"); lCompact.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    lCompact.addEventListener("click", ()=>{ cfg.layout="compact"; lCompact.classList.add("on"); lReaper.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    wrap.appendChild(layoutRow);
-
-    wrap.appendChild(mkToggle("Show FX slot bar", "showFxBar", ()=>renderOrUpdate(true)));
-    wrap.appendChild(mkToggle("Show Sends slot bar", "showSendsBar", ()=>renderOrUpdate(true)));
-    wrap.appendChild(mkToggle("Show PAN fader", "showPanFader", ()=>renderOrUpdate(true)));
-    wrap.appendChild(mkToggle("Show FX slots list", "showFxSlots", ()=>renderOrUpdate(true)));
-
-    // FX slots visible count
-    if (cfg.fxSlotsShown === undefined) cfg.fxSlotsShown = 4;
-    const slotsRow = document.createElement("div");
-    slotsRow.className = "row";
-    const shown = Math.max(4, Math.min(10, parseInt(cfg.fxSlotsShown||4,10)||4));
-    cfg.fxSlotsShown = shown;
-    slotsRow.innerHTML = `<label>FX slots visible</label>
-      <div style="display:flex;align-items:center;gap:10px;min-width:180px;">
-        <input class="rng" type="range" min="4" max="10" value="${shown}">
-        <div class="small" id="fxSlotsShownVal">${shown}</div>
-      </div>`;
-    const rng = slotsRow.querySelector("input");
-    const val = slotsRow.querySelector("#fxSlotsShownVal");
-    rng.addEventListener("input", ()=>{ val.textContent = rng.value; });
-    rng.addEventListener("change", ()=>{
-      cfg.fxSlotsShown = Math.max(4, Math.min(10, parseInt(rng.value,10)||4));
-      saveCfg();
-      renderOrUpdate(true);
-    });
-    wrap.appendChild(slotsRow);
-
-
-    const fs = document.createElement("div");
-    fs.className = "row";
-    fs.innerHTML = `<label>Fullscreen</label><button class="miniBtn">Toggle</button>`;
-    fs.querySelector("button").addEventListener("click", toggleFullscreen);
-    wrap.appendChild(fs);
-
-    // Track manager
+  function renderTrackManagerSection(){
     const tm = document.createElement("div");
     tm.className = "row";
     tm.style.display = "block";
@@ -7943,7 +7897,7 @@ modalBody.appendChild(wrap);
     tmWrap.style.gap = "8px";
     tmWrap.style.margin = "8px 0";
     tmWrap.innerHTML = `
-      <input id="tmSearch" placeholder="Search tracks..." style="flex:1; height:32px; border-radius:10px; border:1px solid rgba(0,0,0,.65); background:#1f2227; color:#e6e6e6; padding:0 10px;">
+      <input id="tmSearch" class="tmSearch" placeholder="Search tracks...">
       <button class="miniBtn" id="tmShowAll">Show all</button>
       <button class="miniBtn" id="tmHideAll">Hide all</button>
     `;
@@ -7955,7 +7909,6 @@ modalBody.appendChild(wrap);
     tm.appendChild(list);
 
     const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
-    // Assignments (admin only)
     let asMon1 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon1) ? projectInfo.assignments.mon1 : []);
     let asMon2 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon2) ? projectInfo.assignments.mon2 : []);
 
@@ -7983,7 +7936,6 @@ modalBody.appendChild(wrap);
           renderList();
         });
 
-        // assignment buttons (admin/main)
         row.querySelectorAll(".asBtn").forEach(btn=>{
           btn.addEventListener("click", (e)=>{
             e.stopPropagation();
@@ -7992,7 +7944,6 @@ modalBody.appendChild(wrap);
             if (set.has(t.guid)) set.delete(t.guid); else set.add(t.guid);
             if (projectInfo && projectInfo.assignments) projectInfo.assignments[target] = Array.from(set);
             wsSend({type:"adminSetAssignments", target, guids:Array.from(set)});
-            // optimistic ui
             btn.classList.toggle("on", set.has(t.guid));
           });
         });
@@ -8015,14 +7966,159 @@ modalBody.appendChild(wrap);
       renderList();
     });
     renderList();
+    return tm;
+  }
 
-    wrap.appendChild(tm);
+  function renderSettingsModal(){
+    modalTitle.textContent = "Настройки";
+    tabsEl.innerHTML = "";
+    SETTINGS_TABS.forEach(tb=>{
+      const b = document.createElement("div");
+      b.className = "tab" + (openModal.tab===tb.id ? " on" : "");
+      b.textContent = tb.label;
+      b.addEventListener("click", ()=>{ openModal.tab = tb.id; renderModal(); });
+      tabsEl.appendChild(b);
+    });
+
+    modalBody.innerHTML = "";
+    const wrap = document.createElement("div");
+
+    const mkToggle = (label, key, onChange) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `<label>${label}</label><button class="miniBtn ${cfg[key]?'on':''}">${cfg[key]?'ON':'OFF'}</button>`;
+      const b = row.querySelector("button");
+      b.addEventListener("click", ()=>{
+        cfg[key] = !cfg[key];
+        saveCfg();
+        b.classList.toggle("on", cfg[key]);
+        b.textContent = cfg[key] ? "ON":"OFF";
+        if (onChange) onChange();
+      });
+      return row;
+    };
+
+    if (openModal.tab === "main"){
+      const userRow = document.createElement("div");
+      userRow.className = "row";
+      const uName = currentUser || "(select)";
+      userRow.innerHTML = `<label>User</label><button class="miniBtn on">${uName}</button><button class="miniBtn">Change</button>`;
+      const userBtns = userRow.querySelectorAll("button");
+      userBtns[1].addEventListener("click", ()=>{ showUserPicker(); });
+      wrap.appendChild(userRow);
+
+      wrap.appendChild(mkToggle("Master enabled", "masterEnabled", ()=>renderOrUpdate(true)));
+
+      const side = document.createElement("div");
+      side.className = "row";
+      side.innerHTML = `<label>Master side</label>
+        <button class="miniBtn ${cfg.masterSide==='left'?'on':''}">Left</button>
+        <button class="miniBtn ${cfg.masterSide==='right'?'on':''}">Right</button>`;
+      const [bL,bR] = side.querySelectorAll("button");
+      bL.addEventListener("click", ()=>{ cfg.masterSide="left"; saveCfg(); bL.classList.add("on"); bR.classList.remove("on"); renderOrUpdate(true); });
+      bR.addEventListener("click", ()=>{ cfg.masterSide="right"; saveCfg(); bR.classList.add("on"); bL.classList.remove("on"); renderOrUpdate(true); });
+      wrap.appendChild(side);
+
+      const fs = document.createElement("div");
+      fs.className = "row";
+      fs.innerHTML = `<label>Fullscreen</label><button class="miniBtn">Toggle</button>`;
+      fs.querySelector("button").addEventListener("click", toggleFullscreen);
+      wrap.appendChild(fs);
+    }
+
+    if (openModal.tab === "ui"){
+      const themeRow = document.createElement("div");
+      themeRow.className = "row";
+      themeRow.innerHTML = `<label>Theme</label>
+        <button class="miniBtn ${cfg.theme==='dark'?'on':''}">Dark</button>
+        <button class="miniBtn ${cfg.theme==='light'?'on':''}">Light</button>`;
+      const [bDark,bLight] = themeRow.querySelectorAll("button");
+      bDark.addEventListener("click", ()=>{ cfg.theme="dark"; saveCfg(); applyTheme(); bDark.classList.add("on"); bLight.classList.remove("on"); });
+      bLight.addEventListener("click", ()=>{ cfg.theme="light"; saveCfg(); applyTheme(); bLight.classList.add("on"); bDark.classList.remove("on"); });
+      wrap.appendChild(themeRow);
+
+      wrap.appendChild(mkToggle("Color footer bar", "showColorFooter", ()=>{ renderOrUpdate(true); wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter}}); }));
+      const intRow = document.createElement("div");
+      intRow.className = "row";
+      const selVal = (cfg.footerIntensity==0.25||cfg.footerIntensity==0.35||cfg.footerIntensity==0.45) ? cfg.footerIntensity : 0.35;
+      intRow.innerHTML = `<label>Footer intensity</label>
+        <select class="sel" ${cfg.showColorFooter?'':'disabled'}>
+          <option value="0.25" ${selVal===0.25?'selected':''}>Low (25%)</option>
+          <option value="0.35" ${selVal===0.35?'selected':''}>Med (35%)</option>
+          <option value="0.45" ${selVal===0.45?'selected':''}>High (45%)</option>
+        </select>`;
+      const sel = intRow.querySelector("select");
+      sel.addEventListener("change", ()=>{
+        const v = parseFloat(sel.value);
+        cfg.footerIntensity = (v===0.25||v===0.35||v===0.45) ? v : 0.35;
+        saveCfg();
+        renderOrUpdate(true);
+        wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter, footerIntensity: cfg.footerIntensity}});
+      });
+      wrap.appendChild(intRow);
+
+      wrap.appendChild(mkToggle("Show FX slot bar", "showFxBar", ()=>renderOrUpdate(true)));
+      wrap.appendChild(mkToggle("Show Sends slot bar", "showSendsBar", ()=>renderOrUpdate(true)));
+      wrap.appendChild(mkToggle("Show PAN fader", "showPanFader", ()=>renderOrUpdate(true)));
+      wrap.appendChild(mkToggle("Show FX slots list", "showFxSlots", ()=>renderOrUpdate(true)));
+
+      if (cfg.fxSlotsShown === undefined) cfg.fxSlotsShown = 4;
+      const slotsRow = document.createElement("div");
+      slotsRow.className = "row";
+      const shown = Math.max(4, Math.min(10, parseInt(cfg.fxSlotsShown||4,10)||4));
+      cfg.fxSlotsShown = shown;
+      slotsRow.innerHTML = `<label>FX slots visible</label>
+        <div style="display:flex;align-items:center;gap:10px;min-width:180px;">
+          <input class="rng" type="range" min="4" max="10" value="${shown}">
+          <div class="small" id="fxSlotsShownVal">${shown}</div>
+        </div>`;
+      const rng = slotsRow.querySelector("input");
+      const val = slotsRow.querySelector("#fxSlotsShownVal");
+      rng.addEventListener("input", ()=>{ val.textContent = rng.value; });
+      rng.addEventListener("change", ()=>{
+        cfg.fxSlotsShown = Math.max(4, Math.min(10, parseInt(rng.value,10)||4));
+        saveCfg();
+        renderOrUpdate(true);
+      });
+      wrap.appendChild(slotsRow);
+    }
+
+    if (openModal.tab === "tracks"){
+      wrap.appendChild(renderTrackManagerSection());
+    }
 
     modalBody.appendChild(wrap);
   }
 
+  function openSettings(){
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    openModal = {kind:"settings", tab:"main"};
+    renderModal();
+  }
+
+  function openRegionsModal(){
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    openModal = {kind:"regions"};
+    renderModal();
+  }
+
+  function openBpmModal(){
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    const bpm = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? lastState.transport.bpm : 120;
+    openModal = {kind:"bpm", draftBpm: bpm};
+    renderModal();
+  }
+
   settingsBtn.addEventListener("click", openSettings);
-  overlay.addEventListener("click", ()=>{ if(openModal && openModal.guid==="__settings__") closeModal(); });
+  transportStop?.addEventListener("click", ()=>wsSend({type:"transport", action:"stop"}));
+  transportPlay?.addEventListener("click", ()=>wsSend({type:"transport", action:"play"}));
+  transportPause?.addEventListener("click", ()=>wsSend({type:"transport", action:"pause"}));
+  transportRec?.addEventListener("click", ()=>wsSend({type:"transport", action:"record"}));
+  transportRegion?.addEventListener("click", openRegionsModal);
+  transportBpm?.addEventListener("click", openBpmModal);
 
   // ---------- Init ----------
   connectWS();
