@@ -182,7 +182,7 @@
           mixInFind:[/mix\s*in/i],
           dryWetFind:[/dry\/?wet|dry\s*wet|mix\s*dry|mix\s*dry\/wet/i],
           widthFind:[/ping\s*\-?pong\s*width|width/i],
-          syncFind:[/tempo\s*sync|sync/i],
+          syncFind:[/tempo\s*sync/i],
           distFind:[/distortion|dist/i],
           tapeFind:[/tape/i],
           crushFind:[/crush/i],
@@ -229,6 +229,10 @@
           tiltFind:[/\btilt\b/i],
           dryWetFind:[/drywet|dry\s*wet/i],
           stereoFind:[/stereospread|stereo\s*spread|width/i],
+          syncFind:[/tempo\s*sync/i],
+          lenNoteFind:[/length\s*sync\s*note|length\s*note/i],
+          preNoteFind:[/predelay\s*sync\s*note|predelay\s*note/i],
+          bpmFind:[/telemetry\s*bpm|bpm/i]
         }}
       ] }
     ]
@@ -1728,7 +1732,7 @@ update();
     const availW = Math.max(10, scope.clientWidth - pad*2);
     const availH = Math.max(10, scope.clientHeight - pad*2);
     let sc = Math.min(availW/BASE_W, availH/BASE_H);
-    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 2.2 : 1.4;
+    const maxScale = (win && win.el && win.el.classList && win.el.classList.contains("fullscreen")) ? 4.2 : 3.6;
     sc = Math.max(0.25, Math.min(maxScale, sc));
     stage.style.width = (BASE_W*sc) + "px";
     stage.style.height = (BASE_H*sc) + "px";
@@ -1829,7 +1833,7 @@ if (!st.raf){
 
   remap();
   update();
-  return {el: stage, update, ctrl};
+  return {el: host, update, ctrl};
 }
 
   // ---- RM_Limiter2: Waves L2-style panel (web) ----
@@ -3080,14 +3084,14 @@ function buildRMEqt1aPanelControl(win, ctrl){
   const find = (arr)=> findParamByPatterns(ps(), arr||[]);
 
   const byIndex = (idx)=> (ps()[idx] || null);
-  const pLF     = ()=> byIndex(10) || find(ex.lsfFind)     || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
+  const pLF     = ()=> byIndex(0) || find(ex.lsfFind)     || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
   const pLBoost = ()=> byIndex(1) || find(ex.pushFind)     || ps().find(p=>/\bpush\b|\blow\b.*\bboost\b/i.test(String(p.name||""))) || null;
   const pLAtt   = ()=> byIndex(2) || find(ex.pullFind)     || ps().find(p=>/\bpull\b|\blow\b.*\batten\b/i.test(String(p.name||""))) || null;
-  const pPeakFreq = ()=> byIndex(9) || find(ex.peakFreqFind) || ps().find(p=>/\bfreq\s*peak\b|\bpeak\s*freq\b/i.test(String(p.name||""))) || null;
+  const pPeakFreq = ()=> byIndex(3) || find(ex.peakFreqFind) || ps().find(p=>/\bpeak\b|\bfreq\s*peak\b|\bpeak\s*freq\b/i.test(String(p.name||""))) || null;
   const pBW     = ()=> byIndex(4) || find(ex.midQFind)     || ps().find(p=>/\bbandwidth\b|\bmid\s*q\b|\bq\b/i.test(String(p.name||""))) || null;
   const pHBoost = ()=> byIndex(5) || find(ex.highGainFind) || ps().find(p=>/\bhigh\b.*\bgain\b|\bhigh\b.*\bboost\b/i.test(String(p.name||""))) || null;
   const pHAtt   = ()=> byIndex(7) || find(ex.midGainFind)  || ps().find(p=>/\batten\b/i.test(String(p.name||"")) && !/\bpull\b/i.test(String(p.name||""))) || null;
-  const pHAttSel = ()=> byIndex(11) || find(ex.hsfFind)    || ps().find(p=>/\bhsf\b|\bhigh\s*frequency\b/i.test(String(p.name||""))) || null;
+  const pHAttSel = ()=> byIndex(6) || find(ex.hsfFind)    || ps().find(p=>/\bhsf\b|\bhigh\s*frequency\b/i.test(String(p.name||""))) || null;
   const pOut    = ()=> byIndex(8) || find(ex.outFind)      || ps().find(p=>/\boutput\b|\bvolume\b/i.test(String(p.name||""))) || null;
   const pBypass = ()=> find(ex.bypassFind)   || ps().find(p=>/\bbypass\b|\bon\/off\b|\bpower\b|\benable\b|\bactive\b/i.test(String(p.name||""))) || null;
 
@@ -3143,7 +3147,7 @@ function buildRMEqt1aPanelControl(win, ctrl){
   const bwDial = buildRmDialControl(win, "BANDWIDTH", pBW);
   const highFreq = buildRmDialControl(win, "HIGH FREQ", pPeakFreq, {
     steps: 7,
-    valueFormatter: fixedValueFormatter([3, 4, 5, 8, 10, 12, 15])
+    valueFormatter: fixedValueFormatter([3, 4, 5, 8, 10, 12, 16])
   });
 
   const led = document.createElement("div");
@@ -3208,45 +3212,441 @@ function buildRMLexi2PanelControl(win, ctrl){
 
   const header = document.createElement("div");
   header.className = "rmLexiHeader";
-  header.innerHTML = `<div class="rmLexiTitle">RM Lexikan2</div><div class="rmLexiSub">MODERN PLATE</div>`;
+  header.innerHTML = `<div class="rmLexiTitle">Lexikan 2</div><div class="rmLexiSub">Tukan Digital Reverb</div>`;
   panel.appendChild(header);
 
-  const grid = document.createElement("div");
-  grid.className = "rmLexiGrid";
-  panel.appendChild(grid);
+  const buttons = document.createElement("div");
+  buttons.className = "rmLexiButtons";
+  panel.appendChild(buttons);
+
+  const algoRow = document.createElement("div");
+  algoRow.className = "rmLexiBtnRow rmLexiAlgoRow";
+  buttons.appendChild(algoRow);
+
+  const modeRow = document.createElement("div");
+  modeRow.className = "rmLexiBtnRow rmLexiModeRow";
+  buttons.appendChild(modeRow);
+
+  const ledBar = document.createElement("div");
+  const infoRow = document.createElement("div");
+  infoRow.className = "rmLexiInfoRow";
+  panel.appendChild(infoRow);
+
+  ledBar.className = "rmLexiLedBar";
+  infoRow.appendChild(ledBar);
+
+  const syncBtn = document.createElement("button");
+  syncBtn.type = "button";
+  syncBtn.className = "rmLexiSyncBtn";
+  syncBtn.textContent = "SYNC";
+  infoRow.appendChild(syncBtn);
+
+  const knobs = document.createElement("div");
+  knobs.className = "rmLexiKnobs";
+  panel.appendChild(knobs);
 
   const ps = ()=> (Array.isArray(win.params) ? win.params : []);
   const find = (arr)=> findParamByPatterns(ps(), arr||[]);
 
-  const pDensity  = ()=> find(ex.densityFind)  || ps().find(p=>/\bdensity\b/i.test(String(p.name||""))) || null;
-  const pPre      = ()=> find(ex.preDelayFind) || ps().find(p=>/pre\s*delay|predelay/i.test(String(p.name||""))) || null;
-  const pERTail   = ()=> find(ex.erTailFind)   || ps().find(p=>/er\s*\/\s*tail|er\/tail|er\s*tail/i.test(String(p.name||""))) || null;
-  const pGap      = ()=> find(ex.gapFind)      || ps().find(p=>/gap\s*delay|tail\s*gap/i.test(String(p.name||""))) || null;
-  const pLPF      = ()=> find(ex.lpfFind)      || ps().find(p=>/lowpass|filter\s*\(lowpass/i.test(String(p.name||""))) || null;
-  const pTilt     = ()=> find(ex.tiltFind)     || ps().find(p=>/\btilt\b/i.test(String(p.name||""))) || null;
-  const pDryWet   = ()=> find(ex.dryWetFind)   || ps().find(p=>/dry\s*wet|drywet/i.test(String(p.name||""))) || null;
-  const pStereo   = ()=> find(ex.stereoFind)   || ps().find(p=>/stereo\s*spread|stereospread|width/i.test(String(p.name||""))) || null;
+  const pAlgo    = ()=> find(ex.algoFind)      || ps().find(p=>/\balgorithm\b/i.test(String(p.name||""))) || null;
+  const pWetSolo = ()=> find(ex.wetFind)       || ps().find(p=>/wet\s*solo|wetsolo/i.test(String(p.name||""))) || null;
+  const pBypass  = ()=> find(ex.bypassFind)    || ps().find(p=>/\bbypass\b/i.test(String(p.name||""))) || null;
+  const pEqMode  = ()=> find(ex.eqModeFind)    || ps().find(p=>/lpf\s*\/\s*tilt|lpf\s*tilt/i.test(String(p.name||""))) || null;
+  const pLength  = ()=> find(ex.lengthFind)    || ps().find(p=>/\bdensity\b/i.test(String(p.name||""))) || null;
+  const pPre     = ()=> find(ex.preDelayFind)  || ps().find(p=>/pre\s*delay|predelay/i.test(String(p.name||""))) || null;
+  const pTilt    = ()=> find(ex.tiltFind)      || ps().find(p=>/\btilt\b/i.test(String(p.name||""))) || null;
+  const pDryWet  = ()=> find(ex.dryWetFind)    || ps().find(p=>/dry\s*wet|drywet/i.test(String(p.name||""))) || null;
+  const pStereo  = ()=> find(ex.stereoFind)    || ps().find(p=>/stereo\s*spread|stereospread|width/i.test(String(p.name||""))) || null;
+  const pSync    = ()=> find(ex.syncFind)      || ps().find(p=>/tempo\s*sync/i.test(String(p.name||""))) || null;
+  const pLenNote = ()=> find(ex.lenNoteFind)   || ps().find(p=>/length\s*sync\s*note|length\s*note/i.test(String(p.name||""))) || null;
+  const pPreNote = ()=> find(ex.preNoteFind)   || ps().find(p=>/predelay\s*sync\s*note|predelay\s*note/i.test(String(p.name||""))) || null;
+  const pBpm     = ()=> find(ex.bpmFind)       || ps().find(p=>/telemetry\s*bpm|\bbpm\b/i.test(String(p.name||""))) || null;
 
-  const dDensity = buildRmDialControl(win, "DENSITY", pDensity);
-  const dPre = buildRmDialControl(win, "PRE-DELAY", pPre);
-  const dER = buildRmDialControl(win, "ER/Tail", pERTail);
-  const dGap = buildRmDialControl(win, "GAP", pGap);
-  const dLPF = buildRmDialControl(win, "LPF", pLPF);
-  const dTilt = buildRmDialControl(win, "TILT", pTilt);
-  const dMix = buildRmDialControl(win, "DRY/WET", pDryWet);
-  const dStereo = buildRmDialControl(win, "STEREO", pStereo);
+  const clamp01 = (x)=> Math.max(0, Math.min(1, x||0));
+  const getRaw = (p, fallbackMin = 0, fallbackMax = 1)=>{
+    if (!p) return null;
+    if (Number.isFinite(p.raw)) return p.raw;
+    if (Number.isFinite(p.min) && Number.isFinite(p.max)){
+      return p.min + (p.max - p.min) * clamp01(p.value||0);
+    }
+    return fallbackMin + (fallbackMax - fallbackMin) * clamp01(p.value||0);
+  };
+  const setParamRaw = (p, raw, fallbackMin = 0, fallbackMax = 1)=>{
+    if (!p) return;
+    const min = Number.isFinite(p.min) ? p.min : fallbackMin;
+    const max = Number.isFinite(p.max) ? p.max : fallbackMax;
+    const denom = (max - min) || 1;
+    const n = clamp01((raw - min) / denom);
+    setParamNormalized(win, p.index, n);
+    p.value = n;
+    try{ setDraggedParamValue(win, p.index, n); }catch(_){}
+  };
 
-  [dDensity, dPre, dER, dGap, dLPF, dTilt, dMix, dStereo].forEach(d=>grid.appendChild(d.el));
+  const notes = [
+    {label:"1/64t", factor: 1/96},
+    {label:"1/64", factor: 1/16},
+    {label:"1/64d", factor: 3/32},
+    {label:"1/32t", factor: 1/48},
+    {label:"1/32", factor: 1/8},
+    {label:"1/32d", factor: 3/16},
+    {label:"1/16t", factor: 1/24},
+    {label:"1/16", factor: 1/4},
+    {label:"1/16d", factor: 3/8},
+    {label:"1/8t", factor: 1/12},
+    {label:"1/8", factor: 1/2},
+    {label:"1/8d", factor: 3/4},
+    {label:"1/4t", factor: 1/6},
+    {label:"1/4", factor: 1},
+    {label:"1/4d", factor: 3/2},
+    {label:"1/2t", factor: 1/3},
+    {label:"1/2", factor: 2},
+    {label:"1/2d", factor: 3},
+    {label:"1 bar", factor: 4},
+    {label:"2 bar", factor: 8}
+  ];
+
+  const getBpm = ()=>{
+    const p = pBpm();
+    if (!p) return null;
+    if (Number.isFinite(p.raw)) return p.raw;
+    if (Number.isFinite(p.min) && Number.isFinite(p.max)){
+      return p.min + (p.max - p.min) * clamp01(p.value||0);
+    }
+    return 300 * clamp01(p.value||0);
+  };
+
+  const isSyncOn = ()=>{
+    const p = pSync();
+    return !!p && clamp01(p.value||0) >= 0.5;
+  };
+
+  const noteIndexFromParam = (p)=>{
+    if (!p) return 0;
+    return Math.round(clamp01(p.value||0) * (notes.length - 1));
+  };
+
+  const noteLabelFromParam = (p)=>{
+    const idx = noteIndexFromParam(p);
+    return notes[idx] ? notes[idx].label : "—";
+  };
+
+  const findClosestNote = (ms, bpm)=>{
+    if (!Number.isFinite(ms) || !Number.isFinite(bpm) || bpm <= 0) return 0;
+    const quarter = 60000 / bpm;
+    let best = 0;
+    let min = Infinity;
+    notes.forEach((note, idx)=>{
+      const diff = Math.abs(quarter * note.factor - ms);
+      if (diff < min){
+        min = diff;
+        best = idx;
+      }
+    });
+    return best;
+  };
+
+  const mkBtn = (label)=>{
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "rmLexiBtn";
+    btn.textContent = label;
+    const led = document.createElement("span");
+    led.className = "rmLexiBtnLed";
+    btn.appendChild(led);
+    return btn;
+  };
+
+  const algoButtons = [
+    {label:"AMB", value:0},
+    {label:"ROOM", value:1},
+    {label:"SMALL", value:2},
+    {label:"BIG", value:3},
+    {label:"PLATE", value:4}
+  ].map(({label, value})=>{
+    const btn = mkBtn(label);
+    btn.addEventListener("click", ()=>{
+      const p = pAlgo();
+      if (!p) return;
+      bringPluginToFront(win);
+      suppressPoll(win, 500);
+      setParamRaw(p, value, 0, 4);
+      update();
+    });
+    algoRow.appendChild(btn);
+    return {btn, value};
+  });
+
+  const wetBtn = mkBtn("WET");
+  wetBtn.addEventListener("click", ()=>{
+    const p = pWetSolo();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    const on = clamp01(p.value||0) >= 0.5;
+    setParamRaw(p, on ? 0 : 1, 0, 1);
+    update();
+  });
+  modeRow.appendChild(wetBtn);
+
+  const bypassBtn = mkBtn("BYPASS");
+  bypassBtn.addEventListener("click", ()=>{
+    const p = pBypass();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    const on = clamp01(p.value||0) >= 0.5;
+    setParamRaw(p, on ? 0 : 1, 0, 1);
+    update();
+  });
+  modeRow.appendChild(bypassBtn);
+
+  const brightBtn = mkBtn("BRIGHT");
+  brightBtn.addEventListener("click", ()=>{
+    const p = pEqMode();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    setParamRaw(p, 0, 0, 1);
+    update();
+  });
+  modeRow.appendChild(brightBtn);
+
+  const tiltBtn = mkBtn("TILT");
+  tiltBtn.addEventListener("click", ()=>{
+    const p = pEqMode();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    setParamRaw(p, 1, 0, 1);
+    update();
+  });
+  modeRow.appendChild(tiltBtn);
+
+  syncBtn.addEventListener("click", ()=>{
+    const p = pSync();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 500);
+    const on = clamp01(p.value||0) >= 0.5;
+    const next = on ? 0 : 1;
+    setParamRaw(p, next, 0, 1);
+    if (!on){
+      const bpm = getBpm();
+      const lenIdx = findClosestNote(getRaw(pLength(), 0, 4000), bpm);
+      const preIdx = findClosestNote(getRaw(pPre(), 0, 4000), bpm);
+      const lenNote = pLenNote();
+      const preNote = pPreNote();
+      if (lenNote) setParamRaw(lenNote, lenIdx, 0, notes.length - 1);
+      if (preNote) setParamRaw(preNote, preIdx, 0, notes.length - 1);
+    }
+    update();
+  });
+
+  const mkLedSeg = (label)=>{
+    const seg = document.createElement("div");
+    seg.className = "rmLexiLedSeg";
+    const lab = document.createElement("div");
+    lab.className = "rmLexiLedLabel";
+    lab.textContent = label;
+    const val = document.createElement("div");
+    val.className = "rmLexiLedValue";
+    val.textContent = "—";
+    seg.appendChild(lab);
+    seg.appendChild(val);
+    ledBar.appendChild(seg);
+    return {seg, val, last:""};
+  };
+
+  const ledLength = mkLedSeg("LENGTH");
+  const ledPre = mkLedSeg("PREDELAY");
+  const ledMix = mkLedSeg("DRY/WET");
+  const ledStereo = mkLedSeg("STEREO");
+
+  const flashSeg = (segObj, text)=>{
+    const t = String(text ?? "—");
+    if (segObj.last === t) return;
+    segObj.last = t;
+    segObj.val.textContent = t;
+    segObj.seg.classList.remove("rmLexiFlash");
+    void segObj.seg.offsetWidth;
+    segObj.seg.classList.add("rmLexiFlash");
+    clearTimeout(segObj._t);
+    segObj._t = setTimeout(()=>segObj.seg.classList.remove("rmLexiFlash"), 280);
+  };
+
+  const formatTimeMs = (raw)=>{
+    if (!Number.isFinite(raw)) return "—";
+    if (raw > 1000){
+      return `${(raw/1000).toFixed(2)} s`;
+    }
+    return `${Math.round(raw)} ms`;
+  };
+  const formatMs = (p, fallbackMax)=>{
+    if (!p) return "—";
+    const raw = getRaw(p, 0, fallbackMax);
+    return formatTimeMs(raw);
+  };
+  const formatPercent = (p)=>{
+    if (!p) return "—";
+    const raw = getRaw(p, 0, 1);
+    if (!Number.isFinite(raw)) return "—";
+    return `${Math.round(raw * 100)}%`;
+  };
+  const formatTilt = (p)=>{
+    if (!p) return "—";
+    const raw = getRaw(p, -6, 6);
+    if (!Number.isFinite(raw)) return "—";
+    const rounded = Math.round(raw * 10) / 10;
+    return `${rounded > 0 ? "+" : ""}${rounded} dB`;
+  };
+
+  const buildLexiDial = (label, getParamFn, options = {})=>{
+    const {valueFormatter, getSyncOn, getNoteParamFn} = options;
+    const wrap = document.createElement("div");
+    wrap.className = "rmDial";
+
+    const lab = document.createElement("div");
+    lab.className = "rmDialLabel";
+    lab.textContent = label;
+    const face = document.createElement("div");
+    face.className = "rmDialFace";
+    const needle = document.createElement("div");
+    needle.className = "rmDialNeedle";
+    face.appendChild(needle);
+    const val = document.createElement("div");
+    val.className = "rmDialValue";
+    val.textContent = "—";
+
+    wrap.appendChild(lab);
+    wrap.appendChild(face);
+    wrap.appendChild(val);
+
+    let drag = null;
+    const clamp = (x)=>Math.max(0, Math.min(1, x||0));
+    const getParams = ()=>{
+      const noteParam = getNoteParamFn ? getNoteParamFn() : null;
+      const syncOn = !!noteParam && getSyncOn && getSyncOn();
+      return {syncOn, valueParam: getParamFn(), noteParam};
+    };
+
+    face.addEventListener("pointerdown", (ev)=>{
+      const {syncOn, valueParam, noteParam} = getParams();
+      const p = syncOn ? noteParam : valueParam;
+      if (!p) return;
+      bringPluginToFront(win);
+      beginParamDrag(win, p.index);
+      suppressPoll(win, 800);
+      drag = {id: ev.pointerId, y: ev.clientY, start: clamp(p.value||0), idx: p.index, syncOn};
+      face.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      ev.stopPropagation();
+    });
+    face.addEventListener("pointermove", (ev)=>{
+      if (!drag || drag.id !== ev.pointerId) return;
+      const dy = ev.clientY - drag.y;
+      let next = clamp(drag.start - dy*0.004);
+      if (drag.syncOn){
+        const step = 1/(notes.length-1);
+        next = Math.round(next/step) * step;
+      }
+      setParamNormalized(win, drag.idx, next);
+      try{ setDraggedParamValue(win, drag.idx, next); }catch(_){}
+      update();
+    });
+    const end = (ev)=>{
+      if (!drag || drag.id !== ev.pointerId) return;
+      const {syncOn, valueParam, noteParam} = getParams();
+      const p = syncOn ? noteParam : valueParam;
+      drag = null;
+      if (p) endParamDrag(win, p.index);
+      try{ face.releasePointerCapture(ev.pointerId); }catch(_){}
+    };
+    face.addEventListener("pointerup", end);
+    face.addEventListener("pointercancel", end);
+
+    const updateDial = ()=>{
+      const {syncOn, valueParam, noteParam} = getParams();
+      const needleParam = syncOn ? noteParam : valueParam;
+      const n = needleParam ? clamp(needleParam.value) : 0;
+      const angle = -135 + (270 * n);
+      needle.style.transform = `translate(-50%,-100%) rotate(${angle}deg)`;
+      if (!valueParam && !noteParam){
+        val.textContent = "—";
+      }else if (valueFormatter){
+        val.textContent = valueFormatter(valueParam, syncOn, noteParam);
+      }else if (syncOn && noteParam){
+        val.textContent = noteLabelFromParam(noteParam);
+      }else{
+        val.textContent = valueParam ? formatParam(valueParam) : "—";
+      }
+    };
+
+    updateDial();
+    return {el: wrap, update: updateDial};
+  };
+
+  const dLength = buildLexiDial("LENGTH", pLength, {
+    getSyncOn: isSyncOn,
+    getNoteParamFn: pLenNote,
+    valueFormatter: (p, syncOn, noteParam)=> syncOn ? noteLabelFromParam(noteParam) : formatMs(p, 4000)
+  });
+  const dPre = buildLexiDial("PREDELAY", pPre, {
+    getSyncOn: isSyncOn,
+    getNoteParamFn: pPreNote,
+    valueFormatter: (p, syncOn, noteParam)=> syncOn ? noteLabelFromParam(noteParam) : formatMs(p, 4000)
+  });
+  const dTilt = buildRmDialControl(win, "TILT", pTilt, {
+    valueFormatter: formatTilt
+  });
+  const dMix = buildRmDialControl(win, "DRY/WET", pDryWet, {
+    valueFormatter: formatPercent
+  });
+  const dStereo = buildRmDialControl(win, "STEREO", pStereo, {
+    valueFormatter: formatPercent
+  });
+
+  [dLength, dPre, dTilt, dMix, dStereo].forEach(d=>knobs.appendChild(d.el));
 
   const update = ()=>{
-    dDensity.update();
+    dLength.update();
     dPre.update();
-    dER.update();
-    dGap.update();
-    dLPF.update();
     dTilt.update();
     dMix.update();
     dStereo.update();
+
+    const algoParam = pAlgo();
+    const algoRaw = getRaw(algoParam, 0, 4);
+    algoButtons.forEach(({btn, value})=>{
+      btn.disabled = !algoParam;
+      btn.classList.toggle("on", Number.isFinite(algoRaw) && Math.round(algoRaw) === value);
+    });
+
+    const wetParam = pWetSolo();
+    wetBtn.disabled = !wetParam;
+    wetBtn.classList.toggle("on", wetParam ? clamp01(wetParam.value||0) >= 0.5 : false);
+
+    const bypassParam = pBypass();
+    bypassBtn.disabled = !bypassParam;
+    bypassBtn.classList.toggle("on", bypassParam ? clamp01(bypassParam.value||0) >= 0.5 : false);
+
+    const eqParam = pEqMode();
+    const eqRaw = getRaw(eqParam, 0, 1);
+    brightBtn.disabled = !eqParam;
+    tiltBtn.disabled = !eqParam;
+    brightBtn.classList.toggle("on", Number.isFinite(eqRaw) && Math.round(eqRaw) === 0);
+    tiltBtn.classList.toggle("on", Number.isFinite(eqRaw) && Math.round(eqRaw) === 1);
+
+    const syncParam = pSync();
+    const syncOn = isSyncOn();
+    syncBtn.disabled = !syncParam;
+    syncBtn.classList.toggle("on", syncOn);
+
+    const lengthLabel = syncOn && pLenNote() ? noteLabelFromParam(pLenNote()) : formatMs(pLength(), 4000);
+    const preLabel = syncOn && pPreNote() ? noteLabelFromParam(pPreNote()) : formatMs(pPre(), 4000);
+    flashSeg(ledLength, lengthLabel);
+    flashSeg(ledPre, preLabel);
+    flashSeg(ledMix, formatPercent(pDryWet()));
+    flashSeg(ledStereo, formatPercent(pStereo()));
   };
 
   ctrl.update = ()=>update();
@@ -5566,8 +5966,7 @@ applyResponsiveMode();
 
   // ---------- Config ----------
   const DEFAULT_CFG = {
-    mode: "live",                 // live / studio
-    layout: "reaper",             // currently single
+    theme: "dark",
     masterEnabled: true,
     masterSide: "left",           // left / right
     showFxBar: true,
@@ -5599,6 +5998,12 @@ applyResponsiveMode();
   // Defaults
   if (cfg.showColorFooter === undefined) cfg.showColorFooter = true;
   if (cfg.footerIntensity === undefined) cfg.footerIntensity = 0.35;
+  if (!cfg.theme) cfg.theme = "dark";
+
+  function applyTheme(){
+    document.body.classList.toggle("light", cfg.theme === "light");
+  }
+  applyTheme();
 
   // Multiuser
   let projectInfo = null;   // {projectId, projectName, users, admin, ui}
@@ -5611,6 +6016,92 @@ applyResponsiveMode();
   let ws = null;
   let wsConnected = false;
 
+  const normalizeProjectName = (name)=>{
+    const raw = String(name || "").trim();
+    if (!raw) return "new project";
+    if (/^\(ReaProject\*?\)/i.test(raw)) return "new project";
+    return raw;
+  };
+
+  const getProjectLabel = ()=>{
+    const proj = (lastState && (lastState.projectName || lastState.project || lastState.projName || lastState.proj || (lastState.project && lastState.project.name))) ||
+      (projectInfo && projectInfo.projectName) ||
+      (brandEl && brandEl.textContent) ||
+      "";
+    return normalizeProjectName(proj);
+  };
+
+  const formatTimecode = (sec)=>{
+    if (!Number.isFinite(sec)) return "00:00:00.00";
+    const s = Math.max(0, sec);
+    const hrs = Math.floor(s / 3600);
+    const mins = Math.floor((s % 3600) / 60);
+    const secs = Math.floor(s % 60);
+    const frac = Math.floor((s - Math.floor(s)) * 100);
+    const pad = (n, l=2)=> String(n).padStart(l, "0");
+    return `${pad(hrs)}:${pad(mins)}:${pad(secs)}.${pad(frac)}`;
+  };
+
+  const applyTransportRefs = (transport, refs)=>{
+    if (!transport || !refs) return;
+    if (refs.time){
+      const position = Number.isFinite(transport.position) ? transport.position : parseFloat(transport.position);
+      const next = formatTimecode(Number.isFinite(position) ? position : 0);
+      if (refs.time.textContent !== next) refs.time.textContent = next;
+    }
+    if (refs.bars){
+      const rawBar = Number.isFinite(transport.bar) ? transport.bar : parseFloat(transport.bar);
+      const rawBeat = Number.isFinite(transport.beat) ? transport.beat : parseFloat(transport.beat);
+      const rawFrac = Number.isFinite(transport.beatFrac) ? transport.beatFrac : parseFloat(transport.beatFrac);
+      const bar = Number.isFinite(rawBar) && rawBar > 0 ? rawBar : 1;
+      const beat = Number.isFinite(rawBeat) && rawBeat > 0 ? rawBeat : 1;
+      const sub = Number.isFinite(rawFrac) ? Math.round(rawFrac * 100) : 0;
+      const next = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
+      if (refs.bars.textContent !== next) refs.bars.textContent = next;
+    }
+    if (refs.region){
+      const name = transport.regionName || "—";
+      refs.region.textContent = `Region: ${name}`;
+    }
+    if (refs.bpm){
+      const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
+      refs.bpm.textContent = bpm === null ? "—" : `${bpm} BPM`;
+    }
+    if (refs.bpmInput){
+      const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
+      if (bpm !== null && document.activeElement !== refs.bpmInput){
+        refs.bpmInput.value = String(bpm);
+        if (openModal) openModal.draftBpm = bpm;
+      }
+    }
+    if (refs.play) refs.play.classList.toggle("on", !!transport.playing && !transport.paused);
+    if (refs.pause) refs.pause.classList.toggle("on", !!transport.paused);
+    if (refs.rec) refs.rec.classList.toggle("on", !!transport.recording);
+    if (refs.stop){
+      const stopped = !transport.playing && !transport.paused && !transport.recording;
+      refs.stop.classList.toggle("stopped", stopped);
+    }
+  };
+
+  const updateTransportUI = (transport)=>{
+    if (!transport) return;
+    transportLive.data = Object.assign({}, transport);
+    transportLive.ts = performance.now();
+    applyTransportRefs(transport, {
+      time: transportTime,
+      bars: transportBars,
+      region: transportRegion,
+      bpm: transportBpm,
+      play: transportPlay,
+      pause: transportPause,
+      rec: transportRec,
+      stop: transportStop,
+    });
+    if (openModal && openModal.kind === "transport" && openModal.transportRefs){
+      applyTransportRefs(transport, openModal.transportRefs);
+    }
+  };
+
   let lastState = null;     // {master, tracks[]}
   let lastMeters = null;    // {frames[]}
   let trackByGuid = new Map();
@@ -5620,6 +6111,7 @@ applyResponsiveMode();
   let meterAnim = new Map(); // guid -> {tL,tR,curL,curR,pL,pR}
   let meterAnimRaf = 0;
   let meterAnimLastT = 0;
+  const transportLive = {data: null, ts: 0};
 
   function ensureMeterAnim(){
     if (meterAnimRaf) return;
@@ -5628,11 +6120,11 @@ applyResponsiveMode();
       const dt = Math.min(80, Math.max(0, t - meterAnimLastT));
       meterAnimLastT = t;
 
-      // Exponential smoothing constant (~60ms time constant)
-      const a = 1 - Math.exp(-dt / 60);
+      // Exponential smoothing constant (~110ms time constant)
+      const a = 1 - Math.exp(-dt / 110);
 
       // Peak decay tuned for ~60fps; adapt to dt
-      const decay = Math.pow(0.985, dt / 16.7);
+      const decay = Math.pow(0.99, dt / 16.7);
 
       for (const [guid, st] of meterAnim){
         const el = stripEls.get(guid);
@@ -5646,8 +6138,14 @@ applyResponsiveMode();
         st.curL += (st.tL - st.curL) * a;
         st.curR += (st.tR - st.curR) * a;
 
-        const cL = Math.max(0, Math.min(1, st.curL));
-        const cR = Math.max(0, Math.min(1, st.curR));
+        const norm = (v)=>{
+          if (!Number.isFinite(v)) return 0;
+          const clamped = Math.max(0, Math.min(1, v));
+          const scaled = Math.min(1, clamped * 1.12);
+          return scaled >= 0.995 ? 1 : scaled;
+        };
+        const cL = norm(st.curL);
+        const cR = norm(st.curR);
 
         r.vuFillL.style.height = (cL*100) + "%";
         r.vuFillR.style.height = (cR*100) + "%";
@@ -5656,6 +6154,18 @@ applyResponsiveMode();
         st.pR = Math.max(cR, (st.pR||0) * decay);
         r.vuPeakL.style.transform = `translateY(${-(st.pL*100)}%)`;
         r.vuPeakR.style.transform = `translateY(${-(st.pR*100)}%)`;
+
+        if (r.volDb){
+          const now = performance.now();
+          if (st.clipUntil && st.clipUntil > now && Number.isFinite(st.clipDb)){
+            r.volDb.textContent = `CLIP +${st.clipDb.toFixed(1)} dB`;
+            r.volDb.classList.add("clip");
+          } else if (r.volDb.classList.contains("clip")){
+            const t = trackByGuid.get(guid);
+            r.volDb.textContent = `${dbFromVol(t ? (t.vol || 1.0) : 1.0)} dB`;
+            r.volDb.classList.remove("clip");
+          }
+        }
 
         // also update any open plugin windows track meters for this track (smoothed)
         try{
@@ -5792,7 +6302,7 @@ function hideUserPicker(){
           showUserPicker();
         }
         // Update brand
-        if (projectInfo.projectName) brandEl.textContent = projectInfo.projectName;
+        if (brandEl) brandEl.textContent = normalizeProjectName(projectInfo.projectName);
         return;
       }
       if (msg.type === "user"){
@@ -5809,8 +6319,10 @@ function hideUserPicker(){
         lastState = msg;
         // Project name -> header + document title
         const proj = msg.projectName || msg.project || msg.projName || msg.proj || (msg.project && msg.project.name) || "";
-        if (brandEl) brandEl.textContent = proj || "REAPER Remote Mixer";
-        if (proj) document.title = proj;
+        const normProj = normalizeProjectName(proj);
+        if (brandEl) brandEl.textContent = normProj;
+        if (normProj) document.title = normProj;
+        updateTransportUI(msg.transport);
 
         rebuildIndices();
         renderOrUpdate();
@@ -5889,17 +6401,50 @@ function hideUserPicker(){
     const cl = Math.max(min, Math.min(max, db));
     return (cl - min) / (max - min);
   }
+  function meterFromPeak(pk){
+    if (!Number.isFinite(pk) || pk <= 0) return 0;
+    const db = 20 * Math.log10(pk);
+    const clamped = Math.max(-60, Math.min(0, db));
+    return normFromDb(clamped);
+  }
   function dbFromNorm(n){
     const min=-60, max=12;
     return min + n*(max-min);
   }
+  const faderDbFromVol = (vol)=> (vol<=0) ? -150 : (20*Math.log10(vol));
+  const faderYForDb = (db)=>{
+    const yZero = 1 - normFromDb(0);
+    if (db >= 0){
+      const n = normFromDb(db);
+      return 1 - n;
+    }
+    if (db >= -20){
+      const t = Math.abs(db) / 20;
+      return yZero + (0.75 - yZero) * t;
+    }
+    const clamped = Math.max(-60, db);
+    const t = (Math.abs(clamped) - 20) / 40;
+    return 0.75 + (0.25 * t);
+  };
   function yFromVol(vol){
-    const db = (vol<=0) ? -150 : (20*Math.log10(vol));
-    return 1 - normFromDb(db);
+    const db = faderDbFromVol(vol);
+    return Math.max(0, Math.min(1, faderYForDb(db)));
   }
   function volFromY(y){
-    const n = 1 - Math.max(0, Math.min(1, y));
-    const db = dbFromNorm(n);
+    const clamped = Math.max(0, Math.min(1, y));
+    if (clamped >= 0.995) return 0;
+    const yZero = 1 - normFromDb(0);
+    let db = -150;
+    if (clamped <= yZero){
+      const n = 1 - clamped;
+      db = dbFromNorm(n);
+    }else if (clamped <= 0.75){
+      const t = (clamped - yZero) / (0.75 - yZero);
+      db = -20 * t;
+    }else{
+      const t = (clamped - 0.75) / 0.25;
+      db = -20 - (40 * t);
+    }
     if (db <= -60) return 0;
     return volFromDb(db);
   }
@@ -5929,6 +6474,7 @@ function hideUserPicker(){
   const stack = []; // {guid, indent, lastVisibleGuid}
   const gapL = new Set();
   const gapR = new Set();
+  const groupColors = new Map();
 
   const closeFoldersToIndent = (indent)=>{
     while (stack.length && indent <= stack[stack.length-1].indent){
@@ -5959,7 +6505,17 @@ function hideUserPicker(){
 
     const isVisible = !hiddenByParent;
     if (isVisible){
-      const item = Object.assign({}, t, { _compact: compactByParent });
+      let groupId = null;
+      if (stack.length > 0){
+        groupId = stack[0].guid;
+      } else if (t.folderDepth > 0){
+        groupId = t.guid;
+      }
+      if (t.folderDepth > 0 && stack.length === 0){
+        groupColors.set(t.guid, t.color || "");
+      }
+      const groupColor = groupId ? (groupColors.get(groupId) || "") : "";
+      const item = Object.assign({}, t, { _compact: compactByParent, _folderGroupId: groupId, _folderGroupColor: groupColor });
       out.push(item);
 
       // group start gap
@@ -5997,11 +6553,79 @@ function hideUserPicker(){
 
   // ---------- Rendering ----------
   const mixer = document.getElementById("mixer");
+  const mixerWrap = document.getElementById("mixerWrap");
+  let folderFrames = null;
+  let folderFrameRaf = 0;
+
+  function ensureFolderFrames(){
+    if (!mixerWrap) return null;
+    if (!folderFrames){
+      folderFrames = document.getElementById("folderFrames");
+      if (!folderFrames){
+        folderFrames = document.createElement("div");
+        folderFrames.id = "folderFrames";
+        mixerWrap.appendChild(folderFrames);
+      }
+    }
+    return folderFrames;
+  }
+
+  function updateFolderFrames(){
+    const layer = ensureFolderFrames();
+    if (!layer || !mixerWrap) return;
+    layer.innerHTML = "";
+    const wrapRect = mixerWrap.getBoundingClientRect();
+    const groups = new Map();
+    for (const el of stripEls.values()){
+      const groupId = el.dataset.folderGroup;
+      if (!groupId) continue;
+      const rect = el.getBoundingClientRect();
+      const left = rect.left - wrapRect.left + mixerWrap.scrollLeft;
+      const right = rect.right - wrapRect.left + mixerWrap.scrollLeft;
+      const top = rect.top - wrapRect.top + mixerWrap.scrollTop;
+      const bottom = rect.bottom - wrapRect.top + mixerWrap.scrollTop;
+      const color = el.style.getPropertyValue("--folderGroupColor") || "";
+      const existing = groups.get(groupId);
+      if (!existing){
+        groups.set(groupId, {left, right, top, bottom, color});
+      } else {
+        existing.left = Math.min(existing.left, left);
+        existing.right = Math.max(existing.right, right);
+        existing.top = Math.min(existing.top, top);
+        existing.bottom = Math.max(existing.bottom, bottom);
+      }
+    }
+    const pad = 6;
+    for (const info of groups.values()){
+      const frame = document.createElement("div");
+      frame.className = "folderFrame";
+      frame.style.left = (info.left - pad) + "px";
+      frame.style.top = (info.top - pad) + "px";
+      frame.style.width = Math.max(0, info.right - info.left + pad * 2) + "px";
+      frame.style.height = Math.max(0, info.bottom - info.top + pad * 2) + "px";
+      if (info.color) frame.style.borderColor = info.color;
+      layer.appendChild(frame);
+    }
+  }
+
+  function scheduleFolderFrames(){
+    if (folderFrameRaf) cancelAnimationFrame(folderFrameRaf);
+    folderFrameRaf = requestAnimationFrame(()=>{
+      folderFrameRaf = 0;
+      updateFolderFrames();
+    });
+  }
+
+  if (mixerWrap){
+    mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
+  }
+  window.addEventListener("resize", scheduleFolderFrames, {passive:true});
 
   function clearMixer(){
     mixer.innerHTML = "";
     stripEls.clear();
     meterEls.clear();
+    if (folderFrames) folderFrames.innerHTML = "";
   }
 
   function shouldIncludeMaster(){
@@ -6048,6 +6672,7 @@ function hideUserPicker(){
 
       // Apply meters to ensure elements exist
       if (lastMeters) applyMeters(lastMeters);
+      scheduleFolderFrames();
 
     } catch (e){
       showError(e && e.message ? e.message : String(e));
@@ -6239,6 +6864,18 @@ slotbar.appendChild(folderBtn);
       panBox, panVal: panBox.querySelector(".panVal"), panSlider: panBox.querySelector(".panSlider"),
       folderTag, indentGuide, footerBar, footerNum, footerFolderBtn, fxSlots};
 
+    const applyFaderUi = (vol, yOverride)=>{
+      const refs = el._refs;
+      if (refs && refs.volDb) refs.volDb.textContent = `${dbFromVol(vol)} dB`;
+      const y = (typeof yOverride === "number") ? yOverride : yFromVol(vol);
+      sliderTargets.set(t.guid, y);
+      sliderCurrent.set(t.guid, y);
+      if (refs && refs.thumb && refs.faderBox){
+        const h = refs.faderBox.clientHeight || 420;
+        refs.thumb.style.transform = `translate(-50%, ${Math.max(8, Math.min(h-28, y*h))}px)`;
+      }
+    };
+
     // Events
     title.addEventListener("click", (ev)=>{ ev.stopPropagation(); openTrackMenu(t.guid, "general"); });
     fxBtn.addEventListener("click",(ev)=>{
@@ -6258,7 +6895,7 @@ slotbar.appendChild(folderBtn);
       if (was) fxExpanded.delete(guid);
       else fxExpanded.add(guid);
       // ensure we have the FX list ready when expanding
-      const cur = trackByGuid.get(guid) || t;
+      const cur = Object.assign({}, trackByGuid.get(guid) || t, {_compact: !!t._compact});
       const fxCount = cur.fxCount || 0;
       if (!was && fxCount>0){
         // request list even if cfg.showFxSlots is off
@@ -6270,11 +6907,18 @@ slotbar.appendChild(folderBtn);
 
     if (el._refs.footerFolderBtn) el._refs.footerFolderBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); if (t.kind!=="master" && t.folderDepth>0) cycleFolderMode(t.guid); });
 
+    const resetFader = (ev)=>{
+      if (ev) ev.preventDefault();
+      const vol = 1.0;
+      wsSend({type:"setVol", guid:t.guid, vol}); // 0dB = 1.0
+      applyFaderUi(vol);
+      const localTrack = trackByGuid.get(t.guid) || t;
+      localTrack.vol = vol;
+    };
     // Double click reset (0dB) on fader area
-    hit.addEventListener("dblclick",(ev)=>{
-      ev.preventDefault();
-      wsSend({type:"setVol", guid:t.guid, vol: 1.0}); // 0dB = 1.0
-    });
+    hit.addEventListener("dblclick", resetFader);
+    thumb.addEventListener("dblclick", resetFader);
+    faderBox.addEventListener("dblclick", resetFader);
 
     // Drag fader ONLY when grabbing the handle (prevents false touches while swiping)
     thumb.addEventListener("pointerdown",(ev)=>{
@@ -6285,18 +6929,12 @@ slotbar.appendChild(folderBtn);
       const rect = faderBox.getBoundingClientRect();
       function setFromClientY(clientY){
         const y = (clientY - rect.top) / rect.height;
-        const vv = volFromY(y);
-        wsSend({type:"setVol", guid:t.guid, vol: vv});
-        // immediate UI (move thumb while dragging)
         const yy = Math.max(0, Math.min(1, y));
-        sliderTargets.set(t.guid, yy);
-        sliderCurrent.set(t.guid, yy);
-        const th = el._refs.thumb;
-        const fb = el._refs.faderBox;
-        if (th && fb){
-          const h = fb.clientHeight || 420;
-          th.style.transform = `translate(-50%, ${Math.max(8, Math.min(h-28, yy*h))}px)`;
-        }
+        const vv = volFromY(yy);
+        wsSend({type:"setVol", guid:t.guid, vol: vv});
+        applyFaderUi(vv, yy);
+        const localTrack = trackByGuid.get(t.guid) || t;
+        localTrack.vol = vv;
       }
       setFromClientY(ev.clientY);
       const move = (e)=> setFromClientY(e.clientY);
@@ -6340,9 +6978,18 @@ el.classList.toggle("gapL", !!t._gapL);
 el.classList.toggle("gapR", !!t._gapR);
 
 
-    // accent color
+    // track color (used for outline/frame)
     const col = hexOrEmpty(t.color);
-    r.accent.style.background = col || "transparent";
+    if (el.style){
+      el.style.setProperty("--trackColor", col || "transparent");
+      if (t._folderGroupId){
+        el.style.setProperty("--folderGroupColor", t._folderGroupColor || col || "transparent");
+        el.dataset.folderGroup = t._folderGroupId;
+      } else {
+        el.style.removeProperty("--folderGroupColor");
+        delete el.dataset.folderGroup;
+      }
+    }
 
     // header text
     const nameEl = r.title.querySelector(".name");
@@ -6357,6 +7004,7 @@ el.classList.toggle("gapR", !!t._gapR);
       const isChild = (t.indent>0);
       el.classList.toggle("compactChild", !!t._compact);
       el.classList.toggle("folderStart", (t.folderDepth>0));
+      el.classList.toggle("folderChild", isChild);
       r.indentGuide.style.display = isChild ? "block" : "none";
       const fm = (t.folderDepth>0) ? getFolderMode(t.guid) : "expanded";
 
@@ -6504,6 +7152,41 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
           const rectH = fb.clientHeight || 420;
           const y = next * rectH;
           thumb.style.transform = `translate(-50%, ${Math.max(10, Math.min(rectH-30, y))}px)`;
+        }
+      }
+      if (transportLive.data){
+        const now = performance.now();
+        const t = transportLive.data;
+        const elapsed = Math.max(0, (now - transportLive.ts) / 1000);
+        let position = Number.isFinite(t.position) ? t.position : parseFloat(t.position);
+        if (!Number.isFinite(position)) position = 0;
+        if (t.playing || t.recording) position += elapsed;
+
+        let bar = t.bar;
+        let beat = t.beat;
+        let beatFrac = t.beatFrac;
+        if ((t.playing || t.recording) && Number.isFinite(t.bpm) && Number.isFinite(bar) && Number.isFinite(beat) && Number.isFinite(beatFrac)){
+          const beatsPerBar = 4;
+          const base = (Math.max(1, bar) - 1) * beatsPerBar + (Math.max(1, beat) - 1) + Math.max(0, beatFrac);
+          const total = base + (elapsed * t.bpm / 60);
+          bar = Math.floor(total / beatsPerBar) + 1;
+          const beatInBar = total % beatsPerBar;
+          beat = Math.floor(beatInBar) + 1;
+          beatFrac = beatInBar - Math.floor(beatInBar);
+        }
+        const derived = Object.assign({}, t, {position, bar, beat, beatFrac});
+        applyTransportRefs(derived, {
+          time: transportTime,
+          bars: transportBars,
+          region: transportRegion,
+          bpm: transportBpm,
+          play: transportPlay,
+          pause: transportPause,
+          rec: transportRec,
+          stop: transportStop,
+        });
+        if (openModal && openModal.kind === "transport" && openModal.transportRefs){
+          applyTransportRefs(derived, openModal.transportRefs);
         }
       }
     } catch {}
@@ -6813,16 +7496,21 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         const el = stripEls.get(guid);
         if (!el || !el._refs) continue;
 
-        const pkL = Math.max(0, Math.min(1, (fr.pkL||0) / 1.0));
-        const pkR = Math.max(0, Math.min(1, (fr.pkR||0) / 1.0));
+        const pkL = Math.max(0, Math.min(1, meterFromPeak(fr.pkL||0)));
+        const pkR = Math.max(0, Math.min(1, meterFromPeak(fr.pkR||0)));
 
+        const clipDb = (typeof fr.clipDb === "number") ? fr.clipDb : null;
         let st = meterAnim.get(guid);
         if (!st){
-          st = {tL: pkL, tR: pkR, curL: pkL, curR: pkR, pL: pkL, pR: pkR};
+          st = {tL: pkL, tR: pkR, curL: pkL, curR: pkR, pL: pkL, pR: pkR, clipDb: null, clipUntil: 0};
           meterAnim.set(guid, st);
         } else {
           st.tL = pkL;
           st.tR = pkR;
+        }
+        if (clipDb && clipDb > 0){
+          st.clipDb = Math.max(st.clipDb || 0, clipDb);
+          st.clipUntil = performance.now() + 1500;
         }
       }
       ensureMeterAnim();
@@ -6896,8 +7584,263 @@ const FX_ADD_CATALOG = [
   {name:"RM_Lexikan2", add:"JS: RM_Lexikan2||JS:RM_Lexikan2||RM_Lexikan2"}
 ];
 
+  function renderTransportModal(){
+    modalTitle.textContent = "Transport";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.className = "transportModal";
+    const isPhone = isPhoneLike();
+    if (isPhone) wrap.classList.add("phoneTransport");
+
+    if (isPhone){
+      const title = document.createElement("div");
+      title.className = "transportProject";
+      title.textContent = getProjectLabel();
+      wrap.appendChild(title);
+    }
+
+    const controls = document.createElement("div");
+    controls.className = "transportControls";
+    const mkCtrl = (label, title, action, extraClass)=>{
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.title = title;
+      if (extraClass) btn.classList.add(extraClass);
+      btn.addEventListener("click", ()=>wsSend({type:"transport", action}));
+      return btn;
+    };
+    const stopBtn = mkCtrl("■", "Stop", "stop", "stop");
+    const playBtn = mkCtrl("▶", "Play", "play");
+    const pauseBtn = mkCtrl("❚❚", "Pause", "pause");
+    const recBtn = mkCtrl("●", "Record", "record", "rec");
+    controls.append(stopBtn, playBtn, pauseBtn, recBtn);
+
+    const info = document.createElement("div");
+    info.className = "transportInfo";
+    const timeBtn = document.createElement("button");
+    timeBtn.className = "transportValue";
+    timeBtn.title = "Project time";
+    const barsBtn = document.createElement("button");
+    barsBtn.className = "transportValue";
+    barsBtn.title = "Bars/Beats";
+    const regionBtn = document.createElement("button");
+    regionBtn.className = "transportValue";
+    regionBtn.title = "Region";
+    regionBtn.addEventListener("click", openRegionsModal);
+    const bpmBtn = document.createElement("button");
+    bpmBtn.className = "transportValue";
+    bpmBtn.title = "BPM";
+    bpmBtn.addEventListener("click", openBpmModal);
+    info.append(timeBtn, barsBtn, regionBtn);
+    if (!isPhone) info.appendChild(bpmBtn);
+
+    wrap.appendChild(controls);
+    wrap.appendChild(info);
+
+    let bpmInput = null;
+    if (isPhone){
+      const bpmRow = document.createElement("div");
+      bpmRow.className = "row transportBpmRow";
+      const label = document.createElement("label");
+      label.textContent = "BPM";
+      const input = document.createElement("input");
+      bpmInput = input;
+      input.type = "number";
+      input.min = "20";
+      input.max = "300";
+      input.step = "1";
+      const tapBtn = document.createElement("button");
+      tapBtn.className = "miniBtn";
+      tapBtn.textContent = "Tap";
+      const applyBtn = document.createElement("button");
+      applyBtn.className = "miniBtn on";
+      applyBtn.textContent = "Apply";
+      bpmRow.append(label, input, tapBtn, applyBtn);
+      wrap.appendChild(bpmRow);
+
+      const clampBpm = (v)=>{
+        const n = Number.isFinite(v) ? v : 120;
+        return Math.max(20, Math.min(300, Math.round(n)));
+      };
+      const current = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
+      openModal.draftBpm = current;
+      input.value = String(current);
+
+      const setDraft = (v)=>{
+        const n = clampBpm(v);
+        openModal.draftBpm = n;
+        input.value = String(n);
+      };
+      input.addEventListener("input", ()=> setDraft(parseFloat(input.value)));
+
+      let taps = [];
+      tapBtn.addEventListener("click", ()=>{
+        const now = performance.now();
+        taps.push(now);
+        if (taps.length > 6) taps = taps.slice(-6);
+        if (taps.length >= 2){
+          const intervals = [];
+          for (let i=1;i<taps.length;i++) intervals.push(taps[i]-taps[i-1]);
+          const avg = intervals.reduce((a,b)=>a+b,0) / intervals.length;
+          if (avg > 0){
+            const bpm = 60000 / avg;
+            setDraft(bpm);
+          }
+        }
+      });
+      applyBtn.addEventListener("click", ()=> wsSend({type:"setBpm", bpm: openModal.draftBpm}));
+    }
+
+    modalBody.appendChild(wrap);
+
+    openModal.transportRefs = {
+      time: timeBtn,
+      bars: barsBtn,
+      region: regionBtn,
+      bpm: bpmBtn,
+      bpmInput,
+      play: playBtn,
+      pause: pauseBtn,
+      rec: recBtn,
+      stop: stopBtn,
+    };
+    if (lastState && lastState.transport) updateTransportUI(lastState.transport);
+  }
+
+  function renderRegionsModal(){
+    modalTitle.textContent = "Regions";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+    const wrap = document.createElement("div");
+    const transport = (lastState && lastState.transport) ? lastState.transport : {};
+    const regions = Array.isArray(transport.regions) ? transport.regions : [];
+    const markers = Array.isArray(transport.markers) ? transport.markers : [];
+    if (!regions.length && !markers.length){
+      wrap.innerHTML = `<div class="small">No regions or markers in project.</div>`;
+      modalBody.appendChild(wrap);
+      return;
+    }
+    const list = document.createElement("div");
+    list.className = "fxList";
+    regions.forEach((r)=>{
+      const row = document.createElement("div");
+      row.className = "fxItem";
+      row.innerHTML = `<div class="nm">Region: ${escapeHtml(r.name || "Region")}</div>
+        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
+      row.querySelector("button").addEventListener("click", ()=>{
+        wsSend({type:"gotoRegion", index: r.index});
+        closeModal();
+      });
+      list.appendChild(row);
+    });
+    markers.forEach((m)=>{
+      const row = document.createElement("div");
+      row.className = "fxItem";
+      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(m.name || "Marker")}</div>
+        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
+      row.querySelector("button").addEventListener("click", ()=>{
+        wsSend({type:"gotoMarker", index: m.index});
+        closeModal();
+      });
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+    modalBody.appendChild(wrap);
+  }
+
+  function renderBpmModal(){
+    modalTitle.textContent = "BPM";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    const current = Number.isFinite(openModal.draftBpm) ? openModal.draftBpm : 120;
+    openModal.draftBpm = current;
+    const clampBpm = (v)=>{
+      const n = Number.isFinite(v) ? v : 120;
+      return Math.max(20, Math.min(300, Math.round(n)));
+    };
+
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<label>Tempo</label>
+      <div style="display:flex; align-items:center; gap:10px; flex:1;">
+        <input class="rng" type="range" min="20" max="300" step="1" value="${current}">
+        <input class="inp" type="number" min="20" max="300" step="1" value="${current}" style="width:90px;">
+      </div>`;
+    wrap.appendChild(row);
+
+    const tapRow = document.createElement("div");
+    tapRow.className = "row";
+    tapRow.innerHTML = `<label>Tap tempo</label><button class="miniBtn">Tap</button><div class="small" style="margin-left:auto">tap 4x+</div>`;
+    wrap.appendChild(tapRow);
+
+    const btnRow = document.createElement("div");
+    btnRow.className = "row";
+    btnRow.style.justifyContent = "flex-end";
+    btnRow.innerHTML = `<button class="miniBtn">Cancel</button><button class="miniBtn on">Apply</button>`;
+    wrap.appendChild(btnRow);
+
+    const slider = row.querySelector("input.rng");
+    const input = row.querySelector("input.inp");
+    const tapBtn = tapRow.querySelector("button");
+    const [cancelBtn, applyBtn] = btnRow.querySelectorAll("button");
+
+    const setDraft = (v)=>{
+      const n = clampBpm(v);
+      openModal.draftBpm = n;
+      slider.value = String(n);
+      input.value = String(n);
+    };
+
+    slider.addEventListener("input", ()=> setDraft(parseFloat(slider.value)));
+    input.addEventListener("input", ()=> setDraft(parseFloat(input.value)));
+
+    let taps = [];
+    tapBtn.addEventListener("click", ()=>{
+      const now = performance.now();
+      taps.push(now);
+      if (taps.length > 6) taps = taps.slice(-6);
+      if (taps.length >= 2){
+        const intervals = [];
+        for (let i=1;i<taps.length;i++) intervals.push(taps[i]-taps[i-1]);
+        const avg = intervals.reduce((a,b)=>a+b,0) / intervals.length;
+        if (avg > 0){
+          const bpm = 60000 / avg;
+          setDraft(bpm);
+        }
+      }
+    });
+
+    cancelBtn.addEventListener("click", closeModal);
+    applyBtn.addEventListener("click", ()=>{
+      wsSend({type:"setBpm", bpm: openModal.draftBpm});
+      closeModal();
+    });
+
+    modalBody.appendChild(wrap);
+  }
+
   function renderModal(){
     if (!openModal) return;
+    if (openModal.kind === "settings"){
+      renderSettingsModal();
+      return;
+    }
+    if (openModal.kind === "transport"){
+      renderTransportModal();
+      return;
+    }
+    if (openModal.kind === "regions"){
+      renderRegionsModal();
+      return;
+    }
+    if (openModal.kind === "bpm"){
+      renderBpmModal();
+      return;
+    }
     const t = trackByGuid.get(openModal.guid);
     modalTitle.textContent = (t ? (t.kind==="master" ? "MASTER" : t.name) : "Track");
     tabsEl.innerHTML = "";
@@ -7030,8 +7973,7 @@ const FX_ADD_CATALOG = [
       renderOrUpdate();
     });
     bFX.addEventListener("click", ()=> {
-      if (cfg.mode==="studio") wsSend({type:"showFxChain", guid:t.guid});
-      else openFxUIOrMenu(t.guid);
+      openFxUIOrMenu(t.guid);
     });
     wrap.appendChild(bRow);
 
@@ -7188,7 +8130,6 @@ modalBody.appendChild(wrap);
       <button class="miniBtn">Refresh</button>
       <button class="miniBtn">All ON</button>
       <button class="miniBtn">All OFF</button>
-      <div class="small" style="margin-left:auto">mode: ${cfg.mode}</div>
     `;
     const [bR,bOn,bOff] = top.querySelectorAll("button");
     bR.addEventListener("click", ()=>wsSend({type:"reqFxList", guid:t.guid}));
@@ -7302,88 +8243,16 @@ modalBody.appendChild(wrap);
   // ---------- Settings ----------
   const fsBtn = document.getElementById("fsBtn");
   const settingsBtn = document.getElementById("settingsBtn");
-
-  // ---------- PWA (install as app) ----------
-  const installBtn = document.getElementById("installBtn");
-  let deferredInstallPrompt = null;
-
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = () => (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || !!window.navigator.standalone;
-
-  function updateInstallButton(){
-    if (!installBtn) return;
-    if (isStandalone()) { installBtn.style.display = "none"; return; }
-
-    // Android/Chromium install prompt (requires HTTPS + SW)
-    if (deferredInstallPrompt){
-      installBtn.textContent = "Install";
-      installBtn.style.display = "inline-flex";
-      return;
-    }
-
-    // iOS has no beforeinstallprompt, but "Add to Home Screen" works
-    if (isIOS){
-      installBtn.textContent = "Add";
-      installBtn.style.display = "inline-flex";
-      return;
-    }
-
-    // Helpful hint for Android on LAN HTTP (install won't show)
-    if (!window.isSecureContext){
-      installBtn.textContent = "HTTPS";
-      installBtn.style.display = "inline-flex";
-      return;
-    }
-
-    installBtn.style.display = "none";
-  }
-
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    updateInstallButton();
-  });
-
-  window.addEventListener("appinstalled", () => {
-    deferredInstallPrompt = null;
-    updateInstallButton();
-  });
-
-  installBtn?.addEventListener("click", async () => {
-    if (isStandalone()) return;
-
-    if (deferredInstallPrompt){
-      try{
-        deferredInstallPrompt.prompt();
-        const choice = await deferredInstallPrompt.userChoice;
-        if (choice && choice.outcome === "accepted"){
-          deferredInstallPrompt = null;
-        }
-      }catch{}
-      updateInstallButton();
-      return;
-    }
-
-    if (isIOS){
-      alert("iPhone/iPad: открой \"Поделиться\" → \"На экран Домой\". После этого микшер будет открываться как приложение (без адресной строки).\n\nНа iOS автоматический fullscreen невозможен — это ограничение системы, но режим standalone почти как fullscreen.");
-      return;
-    }
-
-    if (!window.isSecureContext){
-      alert("Установка как веб‑приложение на Android (Chrome) требует HTTPS (secure context). Сейчас страница открыта по HTTP на локальном IP, поэтому кнопка Install не появится.\n\nРешение: поднять HTTPS на сервере (самоподписанный сертификат) или открыть через localhost/домен с HTTPS.");
-      return;
-    }
-
-    alert("Установка недоступна в этом браузере/режиме.");
-  });
-
-  // Service worker (needed for Android install prompt)
-  if ("serviceWorker" in navigator){
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch(()=>{});
-    });
-  }
-  updateInstallButton();
+  const playerBtn = document.getElementById("playerBtn");
+  const transportStop = document.getElementById("transportStop");
+  const transportPlay = document.getElementById("transportPlay");
+  const transportPause = document.getElementById("transportPause");
+  const transportRec = document.getElementById("transportRec");
+  const transportTime = document.getElementById("transportTime");
+  const transportBars = document.getElementById("transportBars");
+  const transportRegion = document.getElementById("transportRegion");
+  const transportBpm = document.getElementById("transportBpm");
+  transportRec?.classList.add("rec");
 
   function toggleFullscreen(){
     if (!document.fullscreenElement){
@@ -7398,133 +8267,13 @@ modalBody.appendChild(wrap);
     fsBtn.textContent = document.fullscreenElement ? "⤢" : "⛶";
   });
 
-  function openSettings(){
-    overlay.style.display = "block";
-    modal.style.display = "block";
-    openModal = {guid:"__settings__", tab:"settings"};
-    modalTitle.textContent = "Settings";
-    tabsEl.innerHTML = "";
-    modalBody.innerHTML = "";
+  const SETTINGS_TABS = [
+    {id:"main", label:"General"},
+    {id:"ui", label:"Interface"},
+    {id:"tracks", label:"Track Manager"}
+  ];
 
-    const wrap = document.createElement("div");
-
-    const mkToggle = (label, key, onChange) => {
-      const row = document.createElement("div");
-      row.className = "row";
-      row.innerHTML = `<label>${label}</label><button class="miniBtn ${cfg[key]?'on':''}">${cfg[key]?'ON':'OFF'}</button>`;
-      const b = row.querySelector("button");
-      b.addEventListener("click", ()=>{
-        cfg[key] = !cfg[key];
-        saveCfg();
-        b.classList.toggle("on", cfg[key]);
-        b.textContent = cfg[key] ? "ON":"OFF";
-        if (onChange) onChange();
-      });
-      return row;
-    };
-
-    
-    // user
-    const userRow = document.createElement("div");
-    userRow.className = "row";
-    const uName = currentUser || "(select)";
-    userRow.innerHTML = `<label>User</label><button class="miniBtn on">${uName}</button><button class="miniBtn">Change</button>`;
-    const userBtns = userRow.querySelectorAll("button");
-    userBtns[1].addEventListener("click", ()=>{ showUserPicker(); });
-    wrap.appendChild(userRow);
-
-    // footer color bar
-    wrap.appendChild(mkToggle("Color footer bar", "showColorFooter", ()=>{ renderOrUpdate(true); wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter}}); }));
-    // footer intensity
-    const intRow = document.createElement("div");
-    intRow.className = "row";
-    const selVal = (cfg.footerIntensity==0.25||cfg.footerIntensity==0.35||cfg.footerIntensity==0.45) ? cfg.footerIntensity : 0.35;
-    intRow.innerHTML = `<label>Footer intensity</label>
-      <select class="sel" ${cfg.showColorFooter?'':'disabled'}>
-        <option value="0.25" ${selVal===0.25?'selected':''}>Low (25%)</option>
-        <option value="0.35" ${selVal===0.35?'selected':''}>Med (35%)</option>
-        <option value="0.45" ${selVal===0.45?'selected':''}>High (45%)</option>
-      </select>`;
-    const sel = intRow.querySelector("select");
-    sel.addEventListener("change", ()=>{
-      const v = parseFloat(sel.value);
-      cfg.footerIntensity = (v===0.25||v===0.35||v===0.45) ? v : 0.35;
-      saveCfg();
-      renderOrUpdate(true);
-      wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter, footerIntensity: cfg.footerIntensity}});
-    });
-    wrap.appendChild(intRow);
-
-
-    wrap.appendChild(mkToggle("Master enabled", "masterEnabled", ()=>renderOrUpdate(true)));
-
-    // master side
-    const side = document.createElement("div");
-    side.className = "row";
-    side.innerHTML = `<label>Master side</label>
-      <button class="miniBtn ${cfg.masterSide==='left'?'on':''}">Left</button>
-      <button class="miniBtn ${cfg.masterSide==='right'?'on':''}">Right</button>`;
-    const [bL,bR] = side.querySelectorAll("button");
-    bL.addEventListener("click", ()=>{ cfg.masterSide="left"; saveCfg(); bL.classList.add("on"); bR.classList.remove("on"); renderOrUpdate(true); });
-    bR.addEventListener("click", ()=>{ cfg.masterSide="right"; saveCfg(); bR.classList.add("on"); bL.classList.remove("on"); renderOrUpdate(true); });
-    wrap.appendChild(side);
-
-    // mode
-    const modeRow = document.createElement("div");
-    modeRow.className = "row";
-    modeRow.innerHTML = `<label>Mode</label>
-      <button class="miniBtn ${cfg.mode==='live'?'on':''}">Live</button>
-      <button class="miniBtn ${cfg.mode==='studio'?'on':''}">Studio</button>`;
-    const [mLive,mStudio] = modeRow.querySelectorAll("button");
-    mLive.addEventListener("click", ()=>{ cfg.mode="live"; mLive.classList.add("on"); mStudio.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    mStudio.addEventListener("click", ()=>{ cfg.mode="studio"; mStudio.classList.add("on"); mLive.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    wrap.appendChild(modeRow);
-
-    // layout
-    const layoutRow = document.createElement("div");
-    layoutRow.className = "row";
-    layoutRow.innerHTML = `<label>Layout</label>
-      <button class="miniBtn ${cfg.layout==='reaper'?'on':''}">Reaper</button>
-      <button class="miniBtn ${cfg.layout==='compact'?'on':''}">Compact</button>`;
-    const [lReaper,lCompact] = layoutRow.querySelectorAll("button");
-    lReaper.addEventListener("click", ()=>{ cfg.layout="reaper"; lReaper.classList.add("on"); lCompact.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    lCompact.addEventListener("click", ()=>{ cfg.layout="compact"; lCompact.classList.add("on"); lReaper.classList.remove("on"); saveCfg(); renderOrUpdate(true); });
-    wrap.appendChild(layoutRow);
-
-    wrap.appendChild(mkToggle("Show FX slot bar", "showFxBar", ()=>renderOrUpdate(true)));
-    wrap.appendChild(mkToggle("Show Sends slot bar", "showSendsBar", ()=>renderOrUpdate(true)));
-    wrap.appendChild(mkToggle("Show PAN fader", "showPanFader", ()=>renderOrUpdate(true)));
-    wrap.appendChild(mkToggle("Show FX slots list", "showFxSlots", ()=>renderOrUpdate(true)));
-
-    // FX slots visible count
-    if (cfg.fxSlotsShown === undefined) cfg.fxSlotsShown = 4;
-    const slotsRow = document.createElement("div");
-    slotsRow.className = "row";
-    const shown = Math.max(4, Math.min(10, parseInt(cfg.fxSlotsShown||4,10)||4));
-    cfg.fxSlotsShown = shown;
-    slotsRow.innerHTML = `<label>FX slots visible</label>
-      <div style="display:flex;align-items:center;gap:10px;min-width:180px;">
-        <input class="rng" type="range" min="4" max="10" value="${shown}">
-        <div class="small" id="fxSlotsShownVal">${shown}</div>
-      </div>`;
-    const rng = slotsRow.querySelector("input");
-    const val = slotsRow.querySelector("#fxSlotsShownVal");
-    rng.addEventListener("input", ()=>{ val.textContent = rng.value; });
-    rng.addEventListener("change", ()=>{
-      cfg.fxSlotsShown = Math.max(4, Math.min(10, parseInt(rng.value,10)||4));
-      saveCfg();
-      renderOrUpdate(true);
-    });
-    wrap.appendChild(slotsRow);
-
-
-    const fs = document.createElement("div");
-    fs.className = "row";
-    fs.innerHTML = `<label>Fullscreen</label><button class="miniBtn">Toggle</button>`;
-    fs.querySelector("button").addEventListener("click", toggleFullscreen);
-    wrap.appendChild(fs);
-
-    // Track manager
+  function renderTrackManagerSection(){
     const tm = document.createElement("div");
     tm.className = "row";
     tm.style.display = "block";
@@ -7535,7 +8284,7 @@ modalBody.appendChild(wrap);
     tmWrap.style.gap = "8px";
     tmWrap.style.margin = "8px 0";
     tmWrap.innerHTML = `
-      <input id="tmSearch" placeholder="Search tracks..." style="flex:1; height:32px; border-radius:10px; border:1px solid rgba(0,0,0,.65); background:#1f2227; color:#e6e6e6; padding:0 10px;">
+      <input id="tmSearch" class="tmSearch" placeholder="Search tracks...">
       <button class="miniBtn" id="tmShowAll">Show all</button>
       <button class="miniBtn" id="tmHideAll">Hide all</button>
     `;
@@ -7547,7 +8296,6 @@ modalBody.appendChild(wrap);
     tm.appendChild(list);
 
     const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
-    // Assignments (admin only)
     let asMon1 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon1) ? projectInfo.assignments.mon1 : []);
     let asMon2 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon2) ? projectInfo.assignments.mon2 : []);
 
@@ -7575,7 +8323,6 @@ modalBody.appendChild(wrap);
           renderList();
         });
 
-        // assignment buttons (admin/main)
         row.querySelectorAll(".asBtn").forEach(btn=>{
           btn.addEventListener("click", (e)=>{
             e.stopPropagation();
@@ -7584,7 +8331,6 @@ modalBody.appendChild(wrap);
             if (set.has(t.guid)) set.delete(t.guid); else set.add(t.guid);
             if (projectInfo && projectInfo.assignments) projectInfo.assignments[target] = Array.from(set);
             wsSend({type:"adminSetAssignments", target, guids:Array.from(set)});
-            // optimistic ui
             btn.classList.toggle("on", set.has(t.guid));
           });
         });
@@ -7607,14 +8353,176 @@ modalBody.appendChild(wrap);
       renderList();
     });
     renderList();
+    return tm;
+  }
 
-    wrap.appendChild(tm);
+  function renderSettingsModal(){
+    modalTitle.textContent = "Настройки";
+    tabsEl.innerHTML = "";
+    SETTINGS_TABS.forEach(tb=>{
+      const b = document.createElement("div");
+      b.className = "tab" + (openModal.tab===tb.id ? " on" : "");
+      b.textContent = tb.label;
+      b.addEventListener("click", ()=>{ openModal.tab = tb.id; renderModal(); });
+      tabsEl.appendChild(b);
+    });
+
+    modalBody.innerHTML = "";
+    const wrap = document.createElement("div");
+
+    const mkToggle = (label, key, onChange) => {
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `<label>${label}</label><button class="miniBtn ${cfg[key]?'on':''}">${cfg[key]?'ON':'OFF'}</button>`;
+      const b = row.querySelector("button");
+      b.addEventListener("click", ()=>{
+        cfg[key] = !cfg[key];
+        saveCfg();
+        b.classList.toggle("on", cfg[key]);
+        b.textContent = cfg[key] ? "ON":"OFF";
+        if (onChange) onChange();
+      });
+      return row;
+    };
+
+    if (openModal.tab === "main"){
+      const userRow = document.createElement("div");
+      userRow.className = "row";
+      const uName = currentUser || "(select)";
+      userRow.innerHTML = `<label>User</label><button class="miniBtn on">${uName}</button><button class="miniBtn">Change</button>`;
+      const userBtns = userRow.querySelectorAll("button");
+      userBtns[1].addEventListener("click", ()=>{ showUserPicker(); });
+      wrap.appendChild(userRow);
+
+      wrap.appendChild(mkToggle("Master enabled", "masterEnabled", ()=>renderOrUpdate(true)));
+
+      const side = document.createElement("div");
+      side.className = "row";
+      side.innerHTML = `<label>Master side</label>
+        <button class="miniBtn ${cfg.masterSide==='left'?'on':''}">Left</button>
+        <button class="miniBtn ${cfg.masterSide==='right'?'on':''}">Right</button>`;
+      const [bL,bR] = side.querySelectorAll("button");
+      bL.addEventListener("click", ()=>{ cfg.masterSide="left"; saveCfg(); bL.classList.add("on"); bR.classList.remove("on"); renderOrUpdate(true); });
+      bR.addEventListener("click", ()=>{ cfg.masterSide="right"; saveCfg(); bR.classList.add("on"); bL.classList.remove("on"); renderOrUpdate(true); });
+      wrap.appendChild(side);
+
+      const fs = document.createElement("div");
+      fs.className = "row";
+      fs.innerHTML = `<label>Fullscreen</label><button class="miniBtn">Toggle</button>`;
+      fs.querySelector("button").addEventListener("click", toggleFullscreen);
+      wrap.appendChild(fs);
+    }
+
+    if (openModal.tab === "ui"){
+      const themeRow = document.createElement("div");
+      themeRow.className = "row";
+      themeRow.innerHTML = `<label>Theme</label>
+        <button class="miniBtn ${cfg.theme==='dark'?'on':''}">Dark</button>
+        <button class="miniBtn ${cfg.theme==='light'?'on':''}">Light</button>`;
+      const [bDark,bLight] = themeRow.querySelectorAll("button");
+      bDark.addEventListener("click", ()=>{ cfg.theme="dark"; saveCfg(); applyTheme(); bDark.classList.add("on"); bLight.classList.remove("on"); });
+      bLight.addEventListener("click", ()=>{ cfg.theme="light"; saveCfg(); applyTheme(); bLight.classList.add("on"); bDark.classList.remove("on"); });
+      wrap.appendChild(themeRow);
+
+      wrap.appendChild(mkToggle("Color footer bar", "showColorFooter", ()=>{ renderOrUpdate(true); wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter}}); }));
+      const intRow = document.createElement("div");
+      intRow.className = "row";
+      const selVal = (cfg.footerIntensity==0.25||cfg.footerIntensity==0.35||cfg.footerIntensity==0.45) ? cfg.footerIntensity : 0.35;
+      intRow.innerHTML = `<label>Footer intensity</label>
+        <select class="sel" ${cfg.showColorFooter?'':'disabled'}>
+          <option value="0.25" ${selVal===0.25?'selected':''}>Low (25%)</option>
+          <option value="0.35" ${selVal===0.35?'selected':''}>Med (35%)</option>
+          <option value="0.45" ${selVal===0.45?'selected':''}>High (45%)</option>
+        </select>`;
+      const sel = intRow.querySelector("select");
+      sel.addEventListener("change", ()=>{
+        const v = parseFloat(sel.value);
+        cfg.footerIntensity = (v===0.25||v===0.35||v===0.45) ? v : 0.35;
+        saveCfg();
+        renderOrUpdate(true);
+        wsSend({type:"setUi", ui:{showColorFooter: cfg.showColorFooter, footerIntensity: cfg.footerIntensity}});
+      });
+      wrap.appendChild(intRow);
+
+      wrap.appendChild(mkToggle("Show FX slot bar", "showFxBar", ()=>renderOrUpdate(true)));
+      wrap.appendChild(mkToggle("Show Sends slot bar", "showSendsBar", ()=>renderOrUpdate(true)));
+      wrap.appendChild(mkToggle("Show PAN fader", "showPanFader", ()=>renderOrUpdate(true)));
+      wrap.appendChild(mkToggle("Show FX slots list", "showFxSlots", ()=>renderOrUpdate(true)));
+
+      if (cfg.fxSlotsShown === undefined) cfg.fxSlotsShown = 4;
+      const slotsRow = document.createElement("div");
+      slotsRow.className = "row";
+      const shown = Math.max(4, Math.min(10, parseInt(cfg.fxSlotsShown||4,10)||4));
+      cfg.fxSlotsShown = shown;
+      slotsRow.innerHTML = `<label>FX slots visible</label>
+        <div style="display:flex;align-items:center;gap:10px;min-width:180px;">
+          <input class="rng" type="range" min="4" max="10" value="${shown}">
+          <div class="small" id="fxSlotsShownVal">${shown}</div>
+        </div>`;
+      const rng = slotsRow.querySelector("input");
+      const val = slotsRow.querySelector("#fxSlotsShownVal");
+      rng.addEventListener("input", ()=>{ val.textContent = rng.value; });
+      rng.addEventListener("change", ()=>{
+        cfg.fxSlotsShown = Math.max(4, Math.min(10, parseInt(rng.value,10)||4));
+        saveCfg();
+        renderOrUpdate(true);
+      });
+      wrap.appendChild(slotsRow);
+    }
+
+    if (openModal.tab === "tracks"){
+      wrap.appendChild(renderTrackManagerSection());
+    }
 
     modalBody.appendChild(wrap);
   }
 
+  function openSettings(){
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    openModal = {kind:"settings", tab:"main"};
+    renderModal();
+  }
+
+  function openTransportModal(){
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    openModal = {kind:"transport", transportRefs: null};
+    renderModal();
+  }
+
+  function openRegionsModal(){
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    openModal = {kind:"regions"};
+    renderModal();
+  }
+
+  function openBpmModal(){
+    const current = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
+    if (isPhoneLike()){
+      const input = prompt("Set BPM", String(current));
+      if (input === null) return;
+      const parsed = Math.round(parseFloat(input));
+      if (!Number.isFinite(parsed)) return;
+      const bpm = Math.max(20, Math.min(300, parsed));
+      wsSend({type:"setBpm", bpm});
+      return;
+    }
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    openModal = {kind:"bpm", draftBpm: current};
+    renderModal();
+  }
+
   settingsBtn.addEventListener("click", openSettings);
-  overlay.addEventListener("click", ()=>{ if(openModal && openModal.guid==="__settings__") closeModal(); });
+  playerBtn?.addEventListener("click", openTransportModal);
+  transportStop?.addEventListener("click", ()=>wsSend({type:"transport", action:"stop"}));
+  transportPlay?.addEventListener("click", ()=>wsSend({type:"transport", action:"play"}));
+  transportPause?.addEventListener("click", ()=>wsSend({type:"transport", action:"pause"}));
+  transportRec?.addEventListener("click", ()=>wsSend({type:"transport", action:"record"}));
+  transportRegion?.addEventListener("click", openRegionsModal);
+  transportBpm?.addEventListener("click", openBpmModal);
 
   // ---------- Init ----------
   connectWS();
