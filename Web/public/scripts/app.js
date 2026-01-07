@@ -5551,6 +5551,13 @@ function applyResponsiveMode(){
     const h = topbar ? Math.round(topbar.getBoundingClientRect().height) : 46;
     root.style.setProperty("--topbarH", (h || 46) + "px");
   }
+
+  const rb = document.getElementById("rulerBar");
+  if (rb && rb.style.display !== "none"){
+    root.style.setProperty("--rulerH", `${Math.round(rb.getBoundingClientRect().height)}px`);
+  } else {
+    root.style.setProperty("--rulerH", "0px");
+  }
 }
 
 function scheduleResponsiveMode(){
@@ -5656,6 +5663,8 @@ applyResponsiveMode();
         st.pR = Math.max(cR, (st.pR||0) * decay);
         r.vuPeakL.style.transform = `translateY(${-(st.pL*100)}%)`;
         r.vuPeakR.style.transform = `translateY(${-(st.pR*100)}%)`;
+
+        updateVolDisplay(guid, r, trackByGuid.get(guid));
 
         // also update any open plugin windows track meters for this track (smoothed)
         try{
@@ -5862,6 +5871,15 @@ function hideUserPicker(){
   // -----
   function escapeHtml(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 
+  function formatTime(seconds){
+    if (!Number.isFinite(seconds)) return "";
+    const s = Math.max(0, seconds);
+    const mins = Math.floor(s / 60);
+    const secs = s - (mins * 60);
+    const secStr = secs.toFixed(2).padStart(5, "0");
+    return `${mins}:${secStr}`;
+  }
+
   function prettyFxName(s){
     const str = String(s||"");
     // remove common REAPER prefixes in UI
@@ -5908,6 +5926,30 @@ function hideUserPicker(){
     h = hexOrEmpty(h);
     if (!h) return null;
     return {r: parseInt(h.slice(1,3),16), g: parseInt(h.slice(3,5),16), b: parseInt(h.slice(5,7),16)};
+  }
+
+  const CLIP_HOLD_MS = 1500;
+  const clipState = new Map(); // guid -> {db, until}
+
+  function formatClipDb(peak){
+    const db = 20 * Math.log10(peak);
+    const rounded = Math.round(db * 10) / 10;
+    const sign = rounded >= 0 ? "+" : "";
+    return `${sign}${rounded.toFixed(1)}`;
+  }
+
+  function updateVolDisplay(guid, refs, track){
+    if (!refs || !refs.volDb) return;
+    const now = performance.now();
+    const st = clipState.get(guid);
+    if (st && st.until > now){
+      refs.volDb.textContent = `${st.db} dB`;
+      refs.volDb.classList.add("clip");
+    } else {
+      if (st) clipState.delete(guid);
+      refs.volDb.textContent = `${dbFromVol((track && track.vol) || 1.0)} dB`;
+      refs.volDb.classList.remove("clip");
+    }
   }
 
 
@@ -5997,11 +6039,70 @@ function hideUserPicker(){
 
   // ---------- Rendering ----------
   const mixer = document.getElementById("mixer");
+  const rulerBar = document.getElementById("rulerBar");
+  const regionsGroup = document.getElementById("regionsGroup");
+  const markersGroup = document.getElementById("markersGroup");
+  const regionsEl = document.getElementById("regions");
+  const markersEl = document.getElementById("markers");
 
   function clearMixer(){
     mixer.innerHTML = "";
     stripEls.clear();
     meterEls.clear();
+  }
+
+  function renderRuler(){
+    if (!rulerBar) return;
+    const regions = (lastState && Array.isArray(lastState.regions)) ? lastState.regions : [];
+    const markers = (lastState && Array.isArray(lastState.markers)) ? lastState.markers : [];
+
+    const hasRegions = renderRulerGroup(regionsGroup, regionsEl, regions, "Region");
+    const hasMarkers = renderRulerGroup(markersGroup, markersEl, markers, "Marker");
+    const show = hasRegions || hasMarkers;
+
+    rulerBar.style.display = show ? "flex" : "none";
+    document.documentElement.style.setProperty("--rulerH", show ? `${rulerBar.offsetHeight}px` : "0px");
+  }
+
+  function renderRulerGroup(groupEl, itemsEl, items, label){
+    if (!groupEl || !itemsEl) return false;
+    if (!items || !items.length){
+      groupEl.style.display = "none";
+      itemsEl.innerHTML = "";
+      return false;
+    }
+    groupEl.style.display = "flex";
+    itemsEl.innerHTML = "";
+    items.forEach((item)=>{
+      const pill = document.createElement("div");
+      pill.className = "rulerPill";
+
+      const col = hexToRgb(item.color);
+      if (col){
+        pill.style.borderColor = `rgba(${col.r}, ${col.g}, ${col.b}, 0.65)`;
+        pill.style.background = `rgba(${col.r}, ${col.g}, ${col.b}, 0.2)`;
+      }
+
+      const tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = label;
+      const name = document.createElement("span");
+      name.className = "nm";
+      name.textContent = item.name ? item.name : `#${item.id}`;
+      const time = document.createElement("span");
+      time.className = "time";
+      if (typeof item.start === "number" && typeof item.end === "number"){
+        time.textContent = `${formatTime(item.start)}–${formatTime(item.end)}`;
+      } else {
+        time.textContent = formatTime(item.pos);
+      }
+
+      pill.appendChild(tag);
+      pill.appendChild(name);
+      pill.appendChild(time);
+      itemsEl.appendChild(pill);
+    });
+    return true;
   }
 
   function shouldIncludeMaster(){
@@ -6017,6 +6118,13 @@ function hideUserPicker(){
     for (const t of vis) items.push(t);
     if (shouldIncludeMaster() && cfg.masterSide === "right") items.push(master);
     return items;
+  }
+
+  function getRenderedTrack(guid){
+    if (!lastState) return trackByGuid.get(guid) || null;
+    if (guid === "MASTER") return lastState.master;
+    const vis = buildVisibleTracks();
+    return vis.find(t=>t.guid === guid) || trackByGuid.get(guid) || null;
   }
 
   function renderOrUpdate(forceRebuild=false){
@@ -6045,6 +6153,8 @@ function hideUserPicker(){
           if (el) updateStrip(el, it);
         }
       }
+
+      renderRuler();
 
       // Apply meters to ensure elements exist
       if (lastMeters) applyMeters(lastMeters);
@@ -6258,7 +6368,7 @@ slotbar.appendChild(folderBtn);
       if (was) fxExpanded.delete(guid);
       else fxExpanded.add(guid);
       // ensure we have the FX list ready when expanding
-      const cur = trackByGuid.get(guid) || t;
+      const cur = getRenderedTrack(guid) || t;
       const fxCount = cur.fxCount || 0;
       if (!was && fxCount>0){
         // request list even if cfg.showFxSlots is off
@@ -6434,9 +6544,8 @@ const allMuted = (sendCount>0 && sends.length>0) ? sends.every(s=>!!s.mute) : fa
 r.sendsBtn.classList.toggle("sendsHas", sendCount>0 && !allMuted);
 r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
 
-    // VOL label
-    const db = dbFromVol(t.vol||1.0);
-    r.volDb.textContent = db + " dB";
+    // VOL label / clip display
+    updateVolDisplay(t.guid, r, t);
 
     // narrow strip detection (hide VOL label on very thin strips)
     const w = (el.getBoundingClientRect ? el.getBoundingClientRect().width : el.offsetWidth);
@@ -6813,8 +6922,12 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         const el = stripEls.get(guid);
         if (!el || !el._refs) continue;
 
-        const pkL = Math.max(0, Math.min(1, (fr.pkL||0) / 1.0));
-        const pkR = Math.max(0, Math.min(1, (fr.pkR||0) / 1.0));
+        const pkL = Math.max(0, (fr.pkL||0) / 1.0);
+        const pkR = Math.max(0, (fr.pkR||0) / 1.0);
+        const clipPeak = Math.max(pkL, pkR);
+        if (clipPeak > 1.0){
+          clipState.set(guid, {db: formatClipDb(clipPeak), until: performance.now() + CLIP_HOLD_MS});
+        }
 
         let st = meterAnim.get(guid);
         if (!st){

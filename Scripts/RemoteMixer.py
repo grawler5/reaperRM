@@ -246,39 +246,39 @@ def _is_master_track(track):
         return False
 
 # --- State gathering ---
+def color_native_hex(native_int):
+    try:
+        native_int = int(native_int)
+    except Exception:
+        return ""
+    if native_int == 0:
+        return ""
+    try:
+        if "RPR_ColorFromNative" in globals():
+            r, g, b = RPR_ColorFromNative(native_int)
+            if isinstance(r, tuple): r = r[0]
+            if isinstance(g, tuple): g = g[0]
+            if isinstance(b, tuple): b = b[0]
+            return "#{:02x}{:02x}{:02x}".format(int(r) & 255, int(g) & 255, int(b) & 255)
+    except Exception:
+        pass
+    # Fallback bit ops (best-effort)
+    r = (native_int & 255)
+    g = (native_int >> 8) & 255
+    b = (native_int >> 16) & 255
+    return "#{:02x}{:02x}{:02x}".format(r, g, b)
+
 def track_color_hex(track):
     """
     Returns '#rrggbb' or '' if no custom color.
     Uses GetTrackColor when available; falls back to I_CUSTOMCOLOR.
     """
-    def _native_to_hex(native_int):
-        try:
-            native_int = int(native_int)
-        except Exception:
-            return ""
-        if native_int == 0:
-            return ""
-        try:
-            if "RPR_ColorFromNative" in globals():
-                r,g,b = RPR_ColorFromNative(native_int)
-                if isinstance(r, tuple): r=r[0]
-                if isinstance(g, tuple): g=g[0]
-                if isinstance(b, tuple): b=b[0]
-                return "#{:02x}{:02x}{:02x}".format(int(r)&255,int(g)&255,int(b)&255)
-        except Exception:
-            pass
-        # Fallback bit ops (best-effort)
-        r = (native_int & 255)
-        g = (native_int >> 8) & 255
-        b = (native_int >> 16) & 255
-        return "#{:02x}{:02x}{:02x}".format(r,g,b)
-
     try:
         c = RPR_GetTrackColor(track)
         if isinstance(c, tuple): c = c[0]
         c = int(c)
         if c != 0:
-            return _native_to_hex(c)
+            return color_native_hex(c)
     except Exception:
         pass
 
@@ -289,7 +289,7 @@ def track_color_hex(track):
         c2 = int(c2)
         if c2 != 0:
             c2 = c2 & 0xFFFFFF  # drop flag bit
-            return _native_to_hex(c2)
+            return color_native_hex(c2)
     except Exception:
         pass
 
@@ -502,10 +502,57 @@ def get_recv_names(track):
         pass
     return names
 
+def get_project_markers_regions():
+    markers = []
+    regions = []
+    try:
+        ret = RPR_CountProjectMarkers(0, 0, 0)
+        if isinstance(ret, tuple):
+            total = ret[0]
+        else:
+            total = ret
+        total = int(total)
+        for i in range(total):
+            info = None
+            if "RPR_EnumProjectMarkers3" in globals():
+                info = RPR_EnumProjectMarkers3(0, i, 0, 0, 0, "", 0, 0)
+            elif "RPR_EnumProjectMarkers2" in globals():
+                info = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 0, 0)
+            elif "RPR_EnumProjectMarkers" in globals():
+                info = RPR_EnumProjectMarkers(i, 0, 0, 0, "", 0)
+            if not isinstance(info, tuple) or len(info) < 6:
+                continue
+            isrgn = int(info[1])
+            pos = float(info[2])
+            rgnend = float(info[3])
+            name = _pick_human_string(info[4], "")
+            idx = int(info[5]) if len(info) > 5 else (i + 1)
+            color = info[6] if len(info) > 6 else 0
+            col = color_native_hex(color)
+            if isrgn:
+                regions.append({
+                    "id": idx,
+                    "name": name,
+                    "start": pos,
+                    "end": rgnend,
+                    "color": col,
+                })
+            else:
+                markers.append({
+                    "id": idx,
+                    "name": name,
+                    "pos": pos,
+                    "color": col,
+                })
+    except Exception:
+        pass
+    return markers, regions
+
 def build_state():
     # master + tracks
     tracks = []
     projName, projPath = get_project_info()
+    markers, regions = get_project_markers_regions()
 
     try:
         n = RPR_CountTracks(0)
@@ -578,6 +625,8 @@ def build_state():
     return {"type":"state",
             "master": master,
             "tracks": tracks,
+            "markers": markers,
+            "regions": regions,
             "projectName": projName,
             "projectPath": projPath,
             "ts": _now(),
