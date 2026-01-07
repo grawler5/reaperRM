@@ -7744,7 +7744,7 @@ const FX_ADD_CATALOG = [
     tabsEl.innerHTML = "";
     modalBody.innerHTML = "";
     const wrap = document.createElement("div");
-    const transport = (lastState && lastState.transport) ? lastState.transport : {};
+    const transport = transportLive.data || ((lastState && lastState.transport) ? lastState.transport : {});
     const regions = Array.isArray(transport.regions) ? transport.regions : [];
     const markers = Array.isArray(transport.markers) ? transport.markers : [];
     if (!regions.length && !markers.length){
