@@ -183,8 +183,8 @@
     pointer-events:none;
   }
   .strip{
-    outline: 2px solid var(--trackColor, transparent);
-    outline-offset: -2px;
+    outline: 3px solid var(--trackColor, transparent);
+    outline-offset: -3px;
   }
   .strip.master{width:140px; background:linear-gradient(#3b3f45,#2a2d31 35%, #1f2126 100%);}
   .strip.child{background:linear-gradient(#353a40,#2a2d31 40%, #1f2126 100%);}
@@ -871,13 +871,13 @@ body.phoneLandscape .strip.fxExpanded .fxSlots{ display:flex !important; }
 }
 .folderFrame{
   position:absolute;
-  border:2px solid rgba(90,120,170,.7);
+  border:3px solid rgba(90,120,170,.7);
   border-radius:12px;
-  box-shadow:0 0 0 1px rgba(0,0,0,.35);
+  box-shadow:0 0 0 2px rgba(0,0,0,.35);
 }
 body.light .folderFrame{
   border-color: rgba(90,120,170,.5);
-  box-shadow:0 0 0 1px rgba(0,0,0,.2);
+  box-shadow:0 0 0 2px rgba(0,0,0,.2);
 }
 
 

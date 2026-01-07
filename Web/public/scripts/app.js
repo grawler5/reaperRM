@@ -6595,13 +6595,14 @@ function hideUserPicker(){
         existing.bottom = Math.max(existing.bottom, bottom);
       }
     }
+    const pad = 6;
     for (const info of groups.values()){
       const frame = document.createElement("div");
       frame.className = "folderFrame";
-      frame.style.left = info.left + "px";
-      frame.style.top = info.top + "px";
-      frame.style.width = Math.max(0, info.right - info.left) + "px";
-      frame.style.height = Math.max(0, info.bottom - info.top) + "px";
+      frame.style.left = (info.left - pad) + "px";
+      frame.style.top = (info.top - pad) + "px";
+      frame.style.width = Math.max(0, info.right - info.left + pad * 2) + "px";
+      frame.style.height = Math.max(0, info.bottom - info.top + pad * 2) + "px";
       if (info.color) frame.style.borderColor = info.color;
       layer.appendChild(frame);
     }
