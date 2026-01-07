@@ -54,17 +54,17 @@ out_pin:right output
 
 @sample
   dryInL = spl0; dryInR = spl1;
-  // --- tempo telemetry (displayed project BPM)
-  pr = play_rate; pr <= 0.001 ? pr = 1;
-  bpm_disp = tempo / pr;
-  slider18 = bpm_disp;
+  // --- tempo telemetry (project BPM)
+  pr = play_rate;
+  pr <= 0 ? pr = 1;
+  slider18 = tempo / pr;
 
   // --- sync: TimeSig/TimeSpec override delay time
   // TimeSig: 0 = free; 1..5 = whole, half, quarter, eighth, sixteenth
   dms = slider1;
   ts = slider10|0;
   ts > 0 ? (
-    bpm = max(1, slider18);
+    bpm = max(1, tempo);
     // base factors in seconds: 240/bpm (whole), 120/bpm (half), 60/bpm (quarter), 30/bpm (eighth), 15/bpm (sixteenth)
     ts == 1 ? base = 240 :
     ts == 2 ? base = 120 :
