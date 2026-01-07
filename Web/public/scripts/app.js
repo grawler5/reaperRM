@@ -6016,6 +6016,21 @@ applyResponsiveMode();
   let ws = null;
   let wsConnected = false;
 
+  const normalizeProjectName = (name)=>{
+    const raw = String(name || "").trim();
+    if (!raw) return "new project";
+    if (/^\(ReaProject\*?\)/i.test(raw)) return "new project";
+    return raw;
+  };
+
+  const getProjectLabel = ()=>{
+    const proj = (lastState && (lastState.projectName || lastState.project || lastState.projName || lastState.proj || (lastState.project && lastState.project.name))) ||
+      (projectInfo && projectInfo.projectName) ||
+      (brandEl && brandEl.textContent) ||
+      "";
+    return normalizeProjectName(proj);
+  };
+
   const formatTimecode = (sec)=>{
     if (!Number.isFinite(sec)) return "00:00:00.00";
     const s = Math.max(0, sec);
@@ -6029,11 +6044,17 @@ applyResponsiveMode();
 
   const applyTransportRefs = (transport, refs)=>{
     if (!transport || !refs) return;
-    if (refs.time) refs.time.textContent = formatTimecode(transport.position);
+    if (refs.time){
+      const position = Number.isFinite(transport.position) ? transport.position : parseFloat(transport.position);
+      refs.time.textContent = formatTimecode(Number.isFinite(position) ? position : 0);
+    }
     if (refs.bars){
-      const bar = Number.isFinite(transport.bar) ? transport.bar : 1;
-      const beat = Number.isFinite(transport.beat) ? transport.beat : 1;
-      const sub = Number.isFinite(transport.beatFrac) ? Math.round(transport.beatFrac * 100) : 0;
+      const rawBar = Number.isFinite(transport.bar) ? transport.bar : parseFloat(transport.bar);
+      const rawBeat = Number.isFinite(transport.beat) ? transport.beat : parseFloat(transport.beat);
+      const rawFrac = Number.isFinite(transport.beatFrac) ? transport.beatFrac : parseFloat(transport.beatFrac);
+      const bar = Number.isFinite(rawBar) && rawBar > 0 ? rawBar : 1;
+      const beat = Number.isFinite(rawBeat) && rawBeat > 0 ? rawBeat : 1;
+      const sub = Number.isFinite(rawFrac) ? Math.round(rawFrac * 100) : 0;
       refs.bars.textContent = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
     }
     if (refs.region){
@@ -6044,9 +6065,20 @@ applyResponsiveMode();
       const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
       refs.bpm.textContent = bpm === null ? "—" : `${bpm} BPM`;
     }
+    if (refs.bpmInput){
+      const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
+      if (bpm !== null && document.activeElement !== refs.bpmInput){
+        refs.bpmInput.value = String(bpm);
+        if (openModal) openModal.draftBpm = bpm;
+      }
+    }
     if (refs.play) refs.play.classList.toggle("on", !!transport.playing && !transport.paused);
     if (refs.pause) refs.pause.classList.toggle("on", !!transport.paused);
     if (refs.rec) refs.rec.classList.toggle("on", !!transport.recording);
+    if (refs.stop){
+      const stopped = !transport.playing && !transport.paused && !transport.recording;
+      refs.stop.classList.toggle("stopped", stopped);
+    }
   };
 
   const updateTransportUI = (transport)=>{
@@ -6059,6 +6091,7 @@ applyResponsiveMode();
       play: transportPlay,
       pause: transportPause,
       rec: transportRec,
+      stop: transportStop,
     });
     if (openModal && openModal.kind === "transport" && openModal.transportRefs){
       applyTransportRefs(transport, openModal.transportRefs);
@@ -6220,13 +6253,6 @@ function hideUserPicker(){
       // server compatibility aliases
       if (msg.type === "reaper_state") msg.type = "state";
       if (msg.type === "reaper_meter") msg.type = "meter";
-
-      const normalizeProjectName = (name)=>{
-        const raw = String(name || "").trim();
-        if (!raw) return "new project";
-        if (/^\(ReaProject\*?\)/i.test(raw)) return "new project";
-        return raw;
-      };
 
       if (msg.type === "projectInfo"){
         projectInfo = msg;
@@ -7406,6 +7432,15 @@ const FX_ADD_CATALOG = [
 
     const wrap = document.createElement("div");
     wrap.className = "transportModal";
+    const isPhone = isPhoneLike();
+    if (isPhone) wrap.classList.add("phoneTransport");
+
+    if (isPhone){
+      const title = document.createElement("div");
+      title.className = "transportProject";
+      title.textContent = getProjectLabel();
+      wrap.appendChild(title);
+    }
 
     const controls = document.createElement("div");
     controls.className = "transportControls";
@@ -7417,9 +7452,9 @@ const FX_ADD_CATALOG = [
       btn.addEventListener("click", ()=>wsSend({type:"transport", action}));
       return btn;
     };
-    const stopBtn = mkCtrl("■", "Stop", "stop");
+    const stopBtn = mkCtrl("■", "Stop", "stop", "stop");
     const playBtn = mkCtrl("▶", "Play", "play");
-    const pauseBtn = mkCtrl("⏸", "Pause", "pause");
+    const pauseBtn = mkCtrl("❚❚", "Pause", "pause");
     const recBtn = mkCtrl("●", "Record", "record", "rec");
     controls.append(stopBtn, playBtn, pauseBtn, recBtn);
 
@@ -7439,10 +7474,66 @@ const FX_ADD_CATALOG = [
     bpmBtn.className = "transportValue";
     bpmBtn.title = "BPM";
     bpmBtn.addEventListener("click", openBpmModal);
-    info.append(timeBtn, barsBtn, regionBtn, bpmBtn);
+    info.append(timeBtn, barsBtn, regionBtn);
+    if (!isPhone) info.appendChild(bpmBtn);
 
     wrap.appendChild(controls);
     wrap.appendChild(info);
+
+    let bpmInput = null;
+    if (isPhone){
+      const bpmRow = document.createElement("div");
+      bpmRow.className = "row transportBpmRow";
+      const label = document.createElement("label");
+      label.textContent = "BPM";
+      const input = document.createElement("input");
+      bpmInput = input;
+      input.type = "number";
+      input.min = "20";
+      input.max = "300";
+      input.step = "1";
+      const tapBtn = document.createElement("button");
+      tapBtn.className = "miniBtn";
+      tapBtn.textContent = "Tap";
+      const applyBtn = document.createElement("button");
+      applyBtn.className = "miniBtn on";
+      applyBtn.textContent = "Apply";
+      bpmRow.append(label, input, tapBtn, applyBtn);
+      wrap.appendChild(bpmRow);
+
+      const clampBpm = (v)=>{
+        const n = Number.isFinite(v) ? v : 120;
+        return Math.max(20, Math.min(300, Math.round(n)));
+      };
+      const current = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
+      openModal.draftBpm = current;
+      input.value = String(current);
+
+      const setDraft = (v)=>{
+        const n = clampBpm(v);
+        openModal.draftBpm = n;
+        input.value = String(n);
+      };
+      input.addEventListener("input", ()=> setDraft(parseFloat(input.value)));
+
+      let taps = [];
+      tapBtn.addEventListener("click", ()=>{
+        const now = performance.now();
+        taps.push(now);
+        if (taps.length > 6) taps = taps.slice(-6);
+        if (taps.length >= 2){
+          const intervals = [];
+          for (let i=1;i<taps.length;i++) intervals.push(taps[i]-taps[i-1]);
+          const avg = intervals.reduce((a,b)=>a+b,0) / intervals.length;
+          if (avg > 0){
+            const bpm = 60000 / avg;
+            setDraft(bpm);
+          }
+        }
+      });
+      applyBtn.addEventListener("click", ()=> wsSend({type:"setBpm", bpm: openModal.draftBpm}));
+    }
+
     modalBody.appendChild(wrap);
 
     openModal.transportRefs = {
@@ -7450,9 +7541,11 @@ const FX_ADD_CATALOG = [
       bars: barsBtn,
       region: regionBtn,
       bpm: bpmBtn,
+      bpmInput,
       play: playBtn,
       pause: pauseBtn,
       rec: recBtn,
+      stop: stopBtn,
     };
     if (lastState && lastState.transport) updateTransportUI(lastState.transport);
   }
@@ -8234,10 +8327,19 @@ modalBody.appendChild(wrap);
   }
 
   function openBpmModal(){
+    const current = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
+    if (isPhoneLike()){
+      const input = prompt("Set BPM", String(current));
+      if (input === null) return;
+      const parsed = Math.round(parseFloat(input));
+      if (!Number.isFinite(parsed)) return;
+      const bpm = Math.max(20, Math.min(300, parsed));
+      wsSend({type:"setBpm", bpm});
+      return;
+    }
     overlay.style.display = "block";
     modal.style.display = "block";
-    const bpm = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
-    openModal = {kind:"bpm", draftBpm: bpm};
+    openModal = {kind:"bpm", draftBpm: current};
     renderModal();
   }
 

@@ -67,10 +67,23 @@
     font-weight:700;
     cursor:pointer;
   }
+  #transportStop,
+  #transportRec,
+  .transportControls .stop,
+  .transportControls .rec{
+    font-size:16px;
+  }
   #transportControls button.on,
   .transportControls button.on{border-color:#2a72ff; box-shadow:0 0 0 1px rgba(60,120,255,.25) inset;}
   #transportControls button.rec.on,
   .transportControls button.rec.on{border-color:#ff4b4b; box-shadow:0 0 0 1px rgba(255,80,80,.35) inset; color:#ffb3b3;}
+  #transportStop.stopped,
+  .transportControls .stop.stopped{
+    border-color:#2a72ff;
+    color:#b7d0ff;
+    box-shadow:0 0 0 1px rgba(60,120,255,.35) inset;
+    animation:stopBlink 1s ease-in-out infinite;
+  }
   #transportInfo,
   .transportInfo{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center;}
   .transportValue{
@@ -88,6 +101,25 @@
   .transportModal{display:flex; flex-direction:column; gap:12px;}
   .transportModal .transportControls{justify-content:center;}
   .transportModal .transportInfo{justify-content:center; gap:10px; flex-wrap:wrap;}
+  .transportModal.phoneTransport .transportControls button{
+    width:44px;
+    height:40px;
+    font-size:18px;
+    border-radius:12px;
+  }
+  .transportModal .transportProject{
+    text-align:center;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.2px;
+  }
+  .transportModal.phoneTransport .transportValue{
+    height:34px;
+    font-size:13px;
+  }
+  .transportBpmRow input[type=number]{
+    width:90px;
+  }
   body.light #transportControls button,
   body.light .transportControls button,
   body.light .transportValue,
@@ -103,6 +135,17 @@
   body.light .transportControls button.on{border-color:#3b78ff; box-shadow:0 0 0 1px rgba(60,120,255,.25) inset;}
   body.light #transportControls button.rec.on,
   body.light .transportControls button.rec.on{border-color:#ff4b4b; box-shadow:0 0 0 1px rgba(255,80,80,.35) inset; color:#b31212;}
+  body.light #transportStop.stopped,
+  body.light .transportControls .stop.stopped{
+    border-color:#3b78ff;
+    color:#1b3a7a;
+    box-shadow:0 0 0 1px rgba(60,120,255,.35) inset;
+  }
+
+  @keyframes stopBlink{
+    0%, 100%{opacity:1;}
+    50%{opacity:0.4;}
+  }
 
   #mixerWrap{
     box-sizing:border-box;

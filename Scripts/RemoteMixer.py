@@ -689,12 +689,12 @@ def get_regions():
 
     for i in range(total):
         try:
-            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, 0, 0)
+            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 0, 0)
             if isinstance(r, tuple):
                 isrgn = int(r[1]) if len(r) > 1 else 0
                 start = float(r[2]) if len(r) > 2 else 0.0
                 end = float(r[3]) if len(r) > 3 else 0.0
-                name = str(r[4]) if len(r) > 4 else ""
+                name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
             else:
                 continue
@@ -732,19 +732,20 @@ def get_transport_state():
 
     bpm = get_project_bpm()
 
-    bar = beat = 0
+    bar = 1
+    beat = 1
     beat_frac = 0.0
     try:
         res = RPR_TimeMap2_timeToBeats(0, pos, 0, 0, 0, 0)
         if isinstance(res, tuple):
             beats = float(res[0]) if len(res) > 0 else 0.0
             measures = int(res[1]) if len(res) > 1 else 0
-            beat = int(beats) + 1
+            beat = max(1, int(beats) + 1)
             beat_frac = beats - int(beats)
-            bar = int(measures) + 1
+            bar = max(1, int(measures) + 1)
     except Exception:
-        bar = 0
-        beat = 0
+        bar = 1
+        beat = 1
         beat_frac = 0.0
 
     regions = get_regions()
@@ -754,6 +755,8 @@ def get_transport_state():
         rinfo = RPR_GetLastMarkerAndCurRegion(0, pos, 0, 0)
         if isinstance(rinfo, tuple) and len(rinfo) > 2:
             region_index = int(rinfo[2])
+            if region_index < 0:
+                region_index = None
     except Exception:
         region_index = None
     if region_index is not None:
