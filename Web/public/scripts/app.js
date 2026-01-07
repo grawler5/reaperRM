@@ -5963,10 +5963,6 @@ window.addEventListener("orientationchange", scheduleResponsiveMode, {passive:tr
 if (mqPhoneLandscape.addEventListener) mqPhoneLandscape.addEventListener("change", scheduleResponsiveMode);
 else if (mqPhoneLandscape.addListener) mqPhoneLandscape.addListener(scheduleResponsiveMode);
 applyResponsiveMode();
-if (mixerWrap){
-  mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
-}
-window.addEventListener("resize", scheduleFolderFrames, {passive:true});
 
   // ---------- Config ----------
   const DEFAULT_CFG = {
@@ -6618,6 +6614,11 @@ function hideUserPicker(){
       updateFolderFrames();
     });
   }
+
+  if (mixerWrap){
+    mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
+  }
+  window.addEventListener("resize", scheduleFolderFrames, {passive:true});
 
   function clearMixer(){
     mixer.innerHTML = "";
