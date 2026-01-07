@@ -202,12 +202,12 @@
           lsfFind:[/lsf/i],
           pushFind:[/push/i],
           pullFind:[/pull/i],
-          peakFind:[/peak\s*\(hz\)|\bpeak\b/i],
+          peakFreqFind:[/freq\s*peak|peak\s*freq/i],
           midQFind:[/mid\s*q|\bq\b/i],
           midGainFind:[/^gain\s*\(db\)$/i,/\bmid\b.*gain/i,/^gain$/i],
           hsfFind:[/hsf/i],
           highGainFind:[/gain\s*\(db\).*hsf|high.*gain/i],
-          attenSelFind:[/atten.*(sel|freq|select)/i],
+          attenSelFind:[/atten.*(sel|freq|select)/i,/\bfreq\s*h\b/i],
           bypassFind:[/bypass|power|enable|active|on\/off/i],
           outFind:[/output|volume/i]
         }}
@@ -3079,23 +3079,16 @@ function buildRMEqt1aPanelControl(win, ctrl){
   const ps = ()=> (Array.isArray(win.params) ? win.params : []);
   const find = (arr)=> findParamByPatterns(ps(), arr||[]);
 
-  const pLF     = ()=> find(ex.lsfFind)      || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
-  const pLBoost = ()=> find(ex.pushFind)     || ps().find(p=>/\bpush\b|\blow\b.*\bboost\b/i.test(String(p.name||""))) || null;
-  const pLAtt   = ()=> find(ex.pullFind)     || ps().find(p=>/\bpull\b|\blow\b.*\batten\b/i.test(String(p.name||""))) || null;
-  const pBW     = ()=> find(ex.midQFind)     || ps().find(p=>/\bbandwidth\b|\bmid\s*q\b|\bq\b/i.test(String(p.name||""))) || null;
-  const pHBoostFreq = ()=> find(ex.hsfFind)  || find(ex.peakFind) || ps().find(p=>/\bhigh\s*frequency\b|\bhsf\b|\bpeak\b/i.test(String(p.name||""))) || null;
-  const pHBoost = ()=> find(ex.highGainFind) || ps().find(p=>/\bhigh\b.*\bgain\b|\bhigh\b.*\bboost\b/i.test(String(p.name||""))) || null;
-  const pHAtt   = ()=>{
-    const arr = ps();
-    const hit = arr.find(p=>/\batten\b/i.test(String(p.name||"")) && !/\bpull\b/i.test(String(p.name||"")) && !(/\bsel\b|\bfreq\b/i.test(String(p.name||""))));
-    if (hit) return hit;
-    return find(ex.midGainFind) || arr.find(p=>/\bgain\b/i.test(String(p.name||"")) && p !== pHBoost()) || null;
-  };
-  const pHAttSel = ()=>{
-    const arr = ps();
-    return find(ex.attenSelFind) || arr.find(p=>/\batten\b.*(sel|freq|select)\b/i.test(String(p.name||""))) || null;
-  };
-  const pOut    = ()=> find(ex.outFind)      || ps().find(p=>/\boutput\b|\bvolume\b/i.test(String(p.name||""))) || null;
+  const byIndex = (idx)=> (ps()[idx] || null);
+  const pLF     = ()=> byIndex(10) || find(ex.lsfFind)     || ps().find(p=>/\blow\s*frequency\b|\blsf\b/i.test(String(p.name||""))) || null;
+  const pLBoost = ()=> byIndex(1) || find(ex.pushFind)     || ps().find(p=>/\bpush\b|\blow\b.*\bboost\b/i.test(String(p.name||""))) || null;
+  const pLAtt   = ()=> byIndex(2) || find(ex.pullFind)     || ps().find(p=>/\bpull\b|\blow\b.*\batten\b/i.test(String(p.name||""))) || null;
+  const pPeakFreq = ()=> byIndex(9) || find(ex.peakFreqFind) || ps().find(p=>/\bfreq\s*peak\b|\bpeak\s*freq\b/i.test(String(p.name||""))) || null;
+  const pBW     = ()=> byIndex(4) || find(ex.midQFind)     || ps().find(p=>/\bbandwidth\b|\bmid\s*q\b|\bq\b/i.test(String(p.name||""))) || null;
+  const pHBoost = ()=> byIndex(5) || find(ex.highGainFind) || ps().find(p=>/\bhigh\b.*\bgain\b|\bhigh\b.*\bboost\b/i.test(String(p.name||""))) || null;
+  const pHAtt   = ()=> byIndex(7) || find(ex.midGainFind)  || ps().find(p=>/\batten\b/i.test(String(p.name||"")) && !/\bpull\b/i.test(String(p.name||""))) || null;
+  const pHAttSel = ()=> byIndex(11) || find(ex.hsfFind)    || ps().find(p=>/\bhsf\b|\bhigh\s*frequency\b/i.test(String(p.name||""))) || null;
+  const pOut    = ()=> byIndex(8) || find(ex.outFind)      || ps().find(p=>/\boutput\b|\bvolume\b/i.test(String(p.name||""))) || null;
   const pBypass = ()=> find(ex.bypassFind)   || ps().find(p=>/\bbypass\b|\bon\/off\b|\bpower\b|\benable\b|\bactive\b/i.test(String(p.name||""))) || null;
 
   const clamp01 = (x)=> Math.max(0, Math.min(1, x||0));
@@ -3111,10 +3104,10 @@ function buildRMEqt1aPanelControl(win, ctrl){
       if (Number.isFinite(p.min) && Number.isFinite(p.max)){
         raw = p.min + (p.max - p.min) * clamp01(p.value);
       }else{
-        raw = -60 + clamp01(p.value) * 72;
+        raw = -12 + clamp01(p.value) * 24;
       }
     }
-    if (raw <= -59.5) return "−∞";
+    if (raw <= -11.9) return "−∞";
     const rounded = Math.round(raw * 10) / 10;
     return `${rounded > 0 ? "+" : ""}${rounded}`;
   };
@@ -3148,7 +3141,7 @@ function buildRMEqt1aPanelControl(win, ctrl){
     valueFormatter: fixedValueFormatter([20, 30, 60, 100])
   });
   const bwDial = buildRmDialControl(win, "BANDWIDTH", pBW);
-  const highFreq = buildRmDialControl(win, "HIGH FREQ", pHBoostFreq, {
+  const highFreq = buildRmDialControl(win, "HIGH FREQ", pPeakFreq, {
     steps: 7,
     valueFormatter: fixedValueFormatter([3, 4, 5, 8, 10, 12, 15])
   });
