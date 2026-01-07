@@ -172,7 +172,7 @@ function filterStateFor(ws, state){
   const user = ws.user;
   if (!user){
     // not selected yet: send nothing track-wise
-    return { type:"state", master:null, tracks:[], projectName: state.projectName, projectPath: state.projectPath, ts: state.ts, version: state.version };
+    return { type:"state", master:null, tracks:[], projectName: state.projectName, projectPath: state.projectPath, transport: state.transport, ts: state.ts, version: state.version };
   }
   if (user === cfg.admin || user === "main" || (cfg.assignments[user] && cfg.assignments[user].all)){
     return state;
