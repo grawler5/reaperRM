@@ -689,7 +689,7 @@ def get_regions():
 
     for i in range(total):
         try:
-            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512, 0, 0)
+            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512, 0)
             if isinstance(r, tuple):
                 isrgn = int(r[1]) if len(r) > 1 else 0
                 start = float(r[2]) if len(r) > 2 else 0.0

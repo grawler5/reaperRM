@@ -862,12 +862,16 @@ body.phoneLandscape .strip.fxExpanded .fxSlots{ display:flex !important; }
 /* Folder framing */
 .strip.folderStart,
 .strip.folderChild{
+  outline: 2px solid rgba(90,120,170,.7);
+  outline-offset: -2px;
   box-shadow:
     inset 0 0 0 1px rgba(90,120,170,.55),
     0 10px 20px rgba(0,0,0,.35);
 }
 body.light .strip.folderStart,
 body.light .strip.folderChild{
+  outline: 2px solid rgba(90,120,170,.5);
+  outline-offset: -2px;
   box-shadow:
     inset 0 0 0 1px rgba(90,120,170,.45),
     0 8px 16px rgba(0,0,0,.18);
@@ -2149,9 +2153,9 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   transform-origin: 0 0;
   will-change: transform;
 }
-.tukanSkin.laSkin{ background-image: url("tukan/la/LABack.png"); }
-.tukanSkin.nc76Skin{ background-image: url("tukan/76/76BackB.png"); }
-.tukanSkin.preSkin{ background-image: url("tukan/pre/PREBack.png"); }
+.tukanSkin.laSkin{ background-image: url("/tukan/la/LABack.png"); }
+.tukanSkin.nc76Skin{ background-image: url("/tukan/76/76BackB.png"); }
+.tukanSkin.preSkin{ background-image: url("/tukan/pre/PREBack.png"); }
 
 .tukanSkin .tkSprite{
   position: absolute;

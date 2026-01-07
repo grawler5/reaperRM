@@ -6141,7 +6141,8 @@ applyResponsiveMode();
         const norm = (v)=>{
           if (!Number.isFinite(v)) return 0;
           const clamped = Math.max(0, Math.min(1, v));
-          return clamped >= 0.995 ? 1 : clamped;
+          const scaled = Math.min(1, clamped * 1.12);
+          return scaled >= 0.995 ? 1 : scaled;
         };
         const cL = norm(st.curL);
         const cR = norm(st.curR);
@@ -6796,7 +6797,7 @@ slotbar.appendChild(folderBtn);
       if (was) fxExpanded.delete(guid);
       else fxExpanded.add(guid);
       // ensure we have the FX list ready when expanding
-      const cur = trackByGuid.get(guid) || t;
+      const cur = Object.assign({}, trackByGuid.get(guid) || t, {_compact: !!t._compact});
       const fxCount = cur.fxCount || 0;
       if (!was && fxCount>0){
         // request list even if cfg.showFxSlots is off
