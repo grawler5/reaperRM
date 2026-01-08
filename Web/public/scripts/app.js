@@ -7835,7 +7835,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
 
   
 const FX_ADD_CATALOG = [
-  {name:"rm-ns", add:"JS: RM_NS||JS:RM_NS||RM_NS"},
+  {name:"RM-NS", add:"JS: RM_NS||JS:RM_NS||RM_NS"},
   {name:"RM Gate", add:"JS: RM_Gate [Telemetry]||JS:RM_Gate [Telemetry]||RM_Gate [Telemetry]"},
   {name:"RM PreAmp", add:"JS: RM_PreAmp [Telemetry]||JS:RM_PreAmp [Telemetry]||RM_PreAmp [Telemetry]"},
   {name:"RM_EQ", add:"JS: RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||JS:RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]"},

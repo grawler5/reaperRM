@@ -1,17 +1,15 @@
-desc:RM_NS (rm-ns)
-slider1:-50<-80,0,1>Threshold (dB)
-slider2:12<0,60,1>Reduction (dB)
-slider3:5<1,200,1>Attack (ms)
-slider4:150<10,1000,1>Release (ms)
+desc:RM_NS (RM-NS)
+slider1:50<0,100,1>Reduction
 
 @init
 gain = 1;
 
 @slider
-thresh_db = slider1;
-reduction_db = slider2;
-atk_ms = max(1, slider3);
-rel_ms = max(1, slider4);
+reduction_amt = max(0, min(100, slider1));
+thresh_db = -10 - (reduction_amt * 0.6);
+reduction_db = 6 + (reduction_amt * 0.42);
+atk_ms = 5 + (reduction_amt * 0.8);
+rel_ms = 120 + (reduction_amt * 5.8);
 atk_coef = exp(-1 / (atk_ms * 0.001 * srate));
 rel_coef = exp(-1 / (rel_ms * 0.001 * srate));
 min_gain = exp(reduction_db * -0.115129254); // -dB to linear
