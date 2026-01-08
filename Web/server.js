@@ -172,7 +172,7 @@ function filterStateFor(ws, state){
   const user = ws.user;
   if (!user){
     // not selected yet: send nothing track-wise
-    return { type:"state", master:null, tracks:[], projectName: state.projectName, projectPath: state.projectPath, ts: state.ts, version: state.version };
+    return { type:"state", master:null, tracks:[], projectName: state.projectName, projectPath: state.projectPath, transport: state.transport, ts: state.ts, version: state.version };
   }
   if (user === cfg.admin || user === "main" || (cfg.assignments[user] && cfg.assignments[user].all)){
     return state;
@@ -239,6 +239,22 @@ wss.on("connection", (ws) => {
       // send latest state/meter filtered
       if (lastState) sendTo(ws, filterStateFor(ws, lastState));
       if (lastMeter) sendTo(ws, filterMeterFor(ws, lastMeter));
+      return;
+    }
+    if (msg.type === "reqRegions"){
+      if (lastState && lastState.transport){
+        const t = lastState.transport;
+        sendTo(ws, {
+          type: "regions",
+          regions: Array.isArray(t.regions) ? t.regions : [],
+          markers: Array.isArray(t.markers) ? t.markers : [],
+          regionName: t.regionName || "",
+          regionIndex: Number.isFinite(t.regionIndex) ? t.regionIndex : null
+        });
+      }
+      if (reaperSock){
+        try{ reaperSock.write(JSON.stringify(msg) + "\n"); }catch{}
+      }
       return;
     }
     if (msg.type === "reqState"){

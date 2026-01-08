@@ -580,6 +580,7 @@ def build_state():
             "tracks": tracks,
             "projectName": projName,
             "projectPath": projPath,
+            "transport": get_transport_state(),
             "ts": _now(),
             "version": VERSION}
 
@@ -589,7 +590,7 @@ def _db_to_lin(db):
     return math.pow(10.0, db/20.0)
 
 def get_track_peaks(track):
-    """Return (L,R) peaks as linear 0..1 floats.
+    """Return (L,R) peaks as linear 0..1 floats plus optional clip dB.
 
     - Prefer Track_GetPeakInfo when available (fast, linear).
     - When track is record-armed, prefer UI peaks (they follow input/monitoring).
@@ -622,12 +623,28 @@ def get_track_peaks(track):
         except Exception:
             return 0.0, 0.0
 
+    def _ui_peaks_clip_db(tr):
+        try:
+            vL = RPR_GetTrackUIPeakHoldDB(tr, 0, False)
+            vR = RPR_GetTrackUIPeakHoldDB(tr, 1, False)
+            if isinstance(vL, tuple): vL = vL[0]
+            if isinstance(vR, tuple): vR = vR[0]
+            vL = float(vL)
+            vR = float(vR)
+            # treat positive dB as clipping
+            if vL > 0.0 or vR > 0.0:
+                return max(vL, vR)
+        except Exception:
+            pass
+        return None
+
     # If track is record-armed, UI peaks are usually the most useful (input/monitor).
     try:
         recarm = RPR_GetMediaTrackInfo_Value(track, "I_RECARM")
         if isinstance(recarm, tuple): recarm = recarm[0]
         if float(recarm) >= 0.5:
-            return _ui_peaks_lin(track)
+            pkL, pkR = _ui_peaks_lin(track)
+            return pkL, pkR, _ui_peaks_clip_db(track)
     except Exception:
         pass
 
@@ -640,17 +657,280 @@ def get_track_peaks(track):
             if isinstance(pkR, tuple): pkR = pkR[0]
             pkL = float(pkL)
             pkR = float(pkR)
+            raw_peak = max(pkL, pkR)
             # If it looks dead, fall back to UI peaks (useful for monitoring cases).
+            clip_db = _ui_peaks_clip_db(track)
+            if clip_db is None and raw_peak > 1.0:
+                try:
+                    clip_db = 20.0 * math.log10(raw_peak)
+                except Exception:
+                    clip_db = None
             if pkL < 1e-6 and pkR < 1e-6:
                 uL, uR = _ui_peaks_lin(track)
                 if uL > pkL or uR > pkR:
-                    return uL, uR
-            return max(0.0, min(1.0, pkL)), max(0.0, min(1.0, pkR))
+                    return uL, uR, clip_db
+            return max(0.0, min(1.0, pkL)), max(0.0, min(1.0, pkR)), clip_db
     except Exception:
         pass
 
     # fallback: UI peaks (hold)
-    return _ui_peaks_lin(track)
+    pkL, pkR = _ui_peaks_lin(track)
+    return pkL, pkR, _ui_peaks_clip_db(track)
+
+
+def get_project_bpm():
+    try:
+        if "RPR_Master_GetTempo" in globals():
+            bpm = RPR_Master_GetTempo()
+            if isinstance(bpm, tuple): bpm = bpm[0]
+            return float(bpm)
+    except Exception:
+        pass
+    try:
+        if "RPR_TimeMap_GetDividedBpm" in globals():
+            bpm = RPR_TimeMap_GetDividedBpm(0)
+            if isinstance(bpm, tuple): bpm = bpm[0]
+            return float(bpm)
+    except Exception:
+        pass
+    return None
+
+
+def get_regions_and_markers():
+    regions = []
+    markers = []
+    try:
+        res = RPR_CountProjectMarkers(0, 0, 0)
+        if isinstance(res, tuple):
+            total = int(res[0]) if len(res) > 0 else 0
+            mk = int(res[1]) if len(res) > 1 else 0
+            rg = int(res[2]) if len(res) > 2 else 0
+            if total <= 0:
+                total = mk + rg
+        else:
+            total = int(res)
+    except Exception:
+        total = 0
+
+    def _fetch_marker_name(i, isrgn):
+        if "RPR_GetSetProjectMarkerByIndex2" in globals():
+            try:
+                r = RPR_GetSetProjectMarkerByIndex2(0, i, isrgn, 0, 0, "", 512, 0)
+                if isinstance(r, tuple):
+                    if len(r) > 4:
+                        nm = _as_str(r[4])
+                        if nm:
+                            return nm
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            return _as_str(v)
+            except Exception:
+                pass
+        return ""
+
+    def _enum_marker(i):
+        if "RPR_EnumProjectMarkers3" in globals():
+            r = None
+            for args in (
+                (0, i, 0, 0, 0, "", 512, 0, 0),
+                (0, i, 0, 0, 0, "", 512, 0),
+            ):
+                try:
+                    r = RPR_EnumProjectMarkers3(*args)
+                except Exception:
+                    r = None
+                if isinstance(r, tuple):
+                    break
+            if isinstance(r, tuple):
+                ret = int(r[0]) if len(r) > 0 else 0
+                isrgn = int(r[1]) if len(r) > 1 else 0
+                start = float(r[2]) if len(r) > 2 else 0.0
+                end = float(r[3]) if len(r) > 3 else 0.0
+                name = _as_str(r[4]) if len(r) > 4 else ""
+                idx = int(r[5]) if len(r) > 5 else i
+                if not name:
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            name = _as_str(v)
+                            break
+                if not isrgn and end > start and end > 0:
+                    isrgn = 1
+                if not name:
+                    name = _fetch_marker_name(i, bool(isrgn))
+                return ret, isrgn, start, end, name, idx
+        if "RPR_EnumProjectMarkers2" in globals():
+            r = None
+            for args in (
+                (0, i, 0, 0, 0, "", 512, 0, 0),
+                (0, i, 0, 0, 0, "", 512, 0),
+                (0, i, 0, 0, 0, "", 512),
+            ):
+                try:
+                    r = RPR_EnumProjectMarkers2(*args)
+                except Exception:
+                    r = None
+                if isinstance(r, tuple):
+                    break
+            if isinstance(r, tuple):
+                ret = int(r[0]) if len(r) > 0 else 0
+                isrgn = int(r[1]) if len(r) > 1 else 0
+                start = float(r[2]) if len(r) > 2 else 0.0
+                end = float(r[3]) if len(r) > 3 else 0.0
+                name = _as_str(r[4]) if len(r) > 4 else ""
+                idx = int(r[5]) if len(r) > 5 else i
+                if not name:
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            name = _as_str(v)
+                            break
+                if not isrgn and end > start and end > 0:
+                    isrgn = 1
+                if not name:
+                    name = _fetch_marker_name(i, bool(isrgn))
+                return ret, isrgn, start, end, name, idx
+        if "RPR_EnumProjectMarkers" in globals():
+            r = None
+            for args in (
+                (i, 0, 0, 0, "", 512),
+                (i, 0, 0, 0, ""),
+            ):
+                try:
+                    r = RPR_EnumProjectMarkers(*args)
+                except Exception:
+                    r = None
+                if isinstance(r, tuple):
+                    break
+            if isinstance(r, tuple):
+                ret = int(r[0]) if len(r) > 0 else 0
+                isrgn = int(r[1]) if len(r) > 1 else 0
+                start = float(r[2]) if len(r) > 2 else 0.0
+                end = float(r[3]) if len(r) > 3 else 0.0
+                name = _as_str(r[4]) if len(r) > 4 else ""
+                idx = int(r[5]) if len(r) > 5 else i
+                if not name:
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            name = _as_str(v)
+                            break
+                if not isrgn and end > start and end > 0:
+                    isrgn = 1
+                if not name:
+                    name = _fetch_marker_name(i, bool(isrgn))
+                return ret, isrgn, start, end, name, idx
+        return None
+
+    max_iter = total if total > 0 else 2048
+    for i in range(max_iter):
+        try:
+            res = _enum_marker(i)
+            if not res:
+                if total <= 0:
+                    break
+                continue
+            ret, isrgn, start, end, name, idx = res
+            if ret == 0:
+                if total <= 0:
+                    break
+                continue
+            if isrgn:
+                regions.append({"index": idx, "name": name, "start": start, "end": end})
+            else:
+                markers.append({"index": idx, "name": name, "position": start})
+        except Exception:
+            continue
+    return regions, markers
+
+
+def get_regions():
+    return get_regions_and_markers()[0]
+
+
+def get_transport_state():
+    try:
+        ps = RPR_GetPlayState()
+        if isinstance(ps, tuple): ps = ps[0]
+        play_state = int(ps)
+    except Exception:
+        play_state = 0
+    playing = (play_state & 1) != 0
+    paused = (play_state & 2) != 0
+    recording = (play_state & 4) != 0
+
+    pos = None
+    try:
+        if playing or paused or recording:
+            if "RPR_GetPlayPosition2" in globals():
+                pos = RPR_GetPlayPosition2()
+            else:
+                pos = RPR_GetPlayPosition()
+        else:
+            pos = RPR_GetCursorPosition()
+        if isinstance(pos, tuple): pos = pos[0]
+        pos = float(pos)
+    except Exception:
+        pos = 0.0
+
+    bpm = get_project_bpm()
+
+    bar = 1
+    beat = 1
+    beat_frac = 0.0
+    try:
+        res = RPR_TimeMap2_timeToBeats(0, pos, 0, 0, 0, 0)
+        if isinstance(res, tuple):
+            beats = float(res[0]) if len(res) > 0 else 0.0
+            measures = int(res[1]) if len(res) > 1 else 0
+            beat = max(1, int(beats) + 1)
+            beat_frac = beats - int(beats)
+            bar = max(1, int(measures) + 1)
+    except Exception:
+        bar = 1
+        beat = 1
+        beat_frac = 0.0
+
+    regions, markers = get_regions_and_markers()
+    region_name = ""
+    region_index = None
+    try:
+        rinfo = RPR_GetLastMarkerAndCurRegion(0, pos, 0, 0)
+        if isinstance(rinfo, tuple) and len(rinfo) > 2:
+            region_index = int(rinfo[2])
+            if region_index < 0:
+                region_index = None
+    except Exception:
+        region_index = None
+    if region_index is not None:
+        for r in regions:
+            if int(r.get("index", -1)) == region_index:
+                region_name = r.get("name", "")
+                break
+    if not region_name and regions:
+        for r in regions:
+            try:
+                rs = float(r.get("start", 0.0))
+                re = float(r.get("end", 0.0))
+            except Exception:
+                continue
+            if rs <= pos <= re:
+                region_name = r.get("name", "")
+                region_index = int(r.get("index", -1))
+                break
+
+    return {
+        "playState": play_state,
+        "playing": playing,
+        "paused": paused,
+        "recording": recording,
+        "position": pos,
+        "bpm": bpm,
+        "bar": bar,
+        "beat": beat,
+        "beatFrac": beat_frac,
+        "regionName": region_name,
+        "regionIndex": region_index,
+        "regions": regions,
+        "markers": markers
+    }
 
 
 def build_meter():
@@ -658,8 +938,8 @@ def build_meter():
     try:
         # master
         m = RPR_GetMasterTrack(0)
-        pkL, pkR = get_track_peaks(m)
-        frames.append({"guid": track_guid(m), "pkL": pkL, "pkR": pkR})
+        pkL, pkR, clip_db = get_track_peaks(m)
+        frames.append({"guid": track_guid(m), "pkL": pkL, "pkR": pkR, "clipDb": clip_db})
     except Exception:
         pass
     try:
@@ -672,8 +952,8 @@ def build_meter():
         tr = RPR_GetTrack(0,i)
         if isinstance(tr, tuple): tr=tr[0]
         if not tr: continue
-        pkL, pkR = get_track_peaks(tr)
-        frames.append({"guid": track_guid(tr), "pkL": pkL, "pkR": pkR})
+        pkL, pkR, clip_db = get_track_peaks(tr)
+        frames.append({"guid": track_guid(tr), "pkL": pkL, "pkR": pkR, "clipDb": clip_db})
     return {"type":"meter", "frames": frames, "ts": _now(), "version": VERSION}
 
 # --- FX helpers ---
@@ -816,6 +1096,77 @@ def handle_cmd(cmd, sock):
     try:
         if typ == "reqState":
             _send(sock, build_state()); return
+        if typ == "transport":
+            action = cmd.get("action", "")
+            if action == "play":
+                try: RPR_OnPlayButton()
+                except Exception: pass
+            elif action == "stop":
+                try: RPR_OnStopButton()
+                except Exception: pass
+            elif action == "pause":
+                try: RPR_OnPauseButton()
+                except Exception: pass
+            elif action == "record":
+                try: RPR_OnRecordButton()
+                except Exception: pass
+            return
+        if typ == "setBpm":
+            bpm = int(round(float(cmd.get("bpm", 120.0))))
+            bpm = max(20, min(300, bpm))
+            try:
+                if "RPR_SetCurrentBPM" in globals():
+                    RPR_SetCurrentBPM(0, bpm, True)
+                elif "RPR_SetTempoTimeSigMarker" in globals():
+                    RPR_SetTempoTimeSigMarker(0, -1, 0, -1, -1, bpm, 0, 0, False)
+            except Exception:
+                pass
+            return
+        if typ == "reqRegions":
+            try:
+                transport = get_transport_state()
+                _send(sock, {
+                    "type": "regions",
+                    "regions": transport.get("regions", []),
+                    "markers": transport.get("markers", []),
+                    "regionName": transport.get("regionName", ""),
+                    "regionIndex": transport.get("regionIndex", None),
+                })
+            except Exception:
+                pass
+            return
+        if typ == "gotoRegion":
+            idx = int(cmd.get("index", -1))
+            if idx >= 0:
+                try:
+                    try:
+                        RPR_GotoMarker(0, idx, True)
+                    except Exception:
+                        regions, _markers = get_regions_and_markers()
+                        start = None
+                        for r in regions:
+                            if int(r.get("index", -1)) == idx:
+                                start = r.get("start", None)
+                                break
+                        if start is not None:
+                            try:
+                                RPR_SetEditCurPos2(0, start, True, True)
+                            except Exception:
+                                RPR_SetEditCurPos(start, True, True)
+                except Exception:
+                    pass
+            return
+        if typ == "gotoMarker":
+            idx = int(cmd.get("index", -1))
+            if idx >= 0:
+                try:
+                    try:
+                        RPR_GotoMarker(0, idx, False)
+                    except Exception:
+                        RPR_GotoMarker(0, idx, 0)
+                except Exception:
+                    pass
+            return
         if typ == "setVol":
             guid = cmd.get("guid","")
             vol = float(cmd.get("vol", 1.0))
