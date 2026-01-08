@@ -35,6 +35,10 @@
       </div>
     </div>
     <div id="rightHeader">
+      <div id="sceneWrap">
+        <select id="sceneSelect" title="Scene"></select>
+        <button id="sceneManageBtn" title="Scene manager">Scenes</button>
+      </div>
       <div id="playerBtn" title="Player">▶︎</div>
       <div id="fsBtn" title="Fullscreen">⛶</div>
       <div id="settingsBtn" title="Settings">⚙︎</div>
@@ -53,7 +57,10 @@
   <div id="modal">
     <div id="modalHeader">
       <div id="modalTitle">Track</div>
-      <button id="closeBtn">✕</button>
+      <div id="modalActions">
+        <button id="renameBtn" title="Rename">✎</button>
+        <button id="closeBtn">✕</button>
+      </div>
     </div>
     <div id="tabs"></div>
     <div id="modalBody"></div>

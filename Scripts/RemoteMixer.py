@@ -172,6 +172,60 @@ def _pick_num(ret, default=0.0):
     except Exception:
         return default
 
+def _track_index(track):
+    try:
+        idx = RPR_GetMediaTrackInfo_Value(track, "IP_TRACKNUMBER")
+        if isinstance(idx, tuple): idx = idx[0]
+        return max(0, int(idx) - 1)
+    except Exception:
+        return 0
+
+def _color_from_hex(s):
+    try:
+        t = _as_str(s).strip().lstrip("#")
+        if len(t) == 3:
+            t = "".join([c*2 for c in t])
+        if len(t) != 6:
+            return None
+        r = int(t[0:2], 16)
+        g = int(t[2:4], 16)
+        b = int(t[4:6], 16)
+        if "RPR_ColorToNative" in globals():
+            col = RPR_ColorToNative(r, g, b)
+            if isinstance(col, tuple): col = col[0]
+        else:
+            col = (r | (g<<8) | (b<<16))
+        return int(col) | 0x1000000
+    except Exception:
+        return None
+
+
+def _track_layout(track, key):
+    try:
+        ret = RPR_GetSetMediaTrackInfo_String(track, key, "", False)
+        layout = _pick_human_string(ret, "")
+        return _as_str(layout)
+    except Exception:
+        return ""
+
+
+def _is_visual_spacer(track):
+    try:
+        layout = _track_layout(track, "P_MCP_LAYOUT")
+        layout_l = _as_str(layout).strip().lower()
+        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
+            return True
+    except Exception:
+        pass
+    try:
+        layout = _track_layout(track, "P_TCP_LAYOUT")
+        layout_l = _as_str(layout).strip().lower()
+        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
+            return True
+    except Exception:
+        pass
+    return False
+
 
 def _safe_json(obj):
     try:
@@ -550,12 +604,16 @@ def build_state():
         if not tr:
             continue
         depth, compact, indent = track_folder_info(tr)
+        name = get_track_name(tr)
+        is_spacer = _is_visual_spacer(tr)
+        if is_spacer and (not name or name == "Track" or name == "Spacer"):
+            name = "Spacer"
         t = {
             "kind":"track",
             "guid": track_guid(tr),
             "id": str(i+1),
             "idx": i+1,
-            "name": get_track_name(tr),
+            "name": name,
             "vol": get_track_vol(tr),
             "pan": get_track_pan(tr),
             "mute": get_track_mute(tr),
@@ -572,6 +630,7 @@ def build_state():
             "folderCompact": int(compact),
             "indent": int(indent),
             "color": track_color_hex(tr),
+            "isSpacer": bool(is_spacer),
         }
         tracks.append(t)
 
@@ -717,23 +776,30 @@ def get_regions_and_markers():
             try:
                 r = RPR_GetSetProjectMarkerByIndex2(0, i, isrgn, 0, 0, "", 512, 0)
                 if isinstance(r, tuple):
-                    if len(r) > 4:
-                        nm = _as_str(r[4])
-                        if nm:
-                            return nm
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            return _as_str(v)
+                    nm = _pick_human_string(r, "")
+                    if nm:
+                        return nm
             except Exception:
                 pass
         return ""
+
+    def _is_numeric_name(s):
+        try:
+            t = _as_str(s).strip()
+            if not t:
+                return False
+            # Reject numeric-only strings like "12.34"
+            float(t)
+            return True
+        except Exception:
+            return False
 
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers3" in globals():
             r = None
             for args in (
-                (0, i, 0, 0, 0, "", 512, 0, 0),
-                (0, i, 0, 0, 0, "", 512, 0),
+                (0, i, 0, 0, 0, "", 0, 0),
+                (0, i, 0, 0, 0, "", 0),
             ):
                 try:
                     r = RPR_EnumProjectMarkers3(*args)
@@ -749,21 +815,19 @@ def get_regions_and_markers():
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
                 if not name:
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            name = _as_str(v)
-                            break
+                    name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
+                if _is_numeric_name(name):
+                    name = ""
                 if not name:
-                    name = _fetch_marker_name(i, bool(isrgn))
+                    name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers2" in globals():
             r = None
             for args in (
-                (0, i, 0, 0, 0, "", 512, 0, 0),
-                (0, i, 0, 0, 0, "", 512, 0),
-                (0, i, 0, 0, 0, "", 512),
+                (0, i, 0, 0, 0, "", 0),
+                (0, i, 0, 0, 0, ""),
             ):
                 try:
                     r = RPR_EnumProjectMarkers2(*args)
@@ -779,14 +843,13 @@ def get_regions_and_markers():
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
                 if not name:
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            name = _as_str(v)
-                            break
+                    name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
+                if _is_numeric_name(name):
+                    name = ""
                 if not name:
-                    name = _fetch_marker_name(i, bool(isrgn))
+                    name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers" in globals():
             r = None
@@ -808,14 +871,13 @@ def get_regions_and_markers():
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
                 if not name:
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            name = _as_str(v)
-                            break
+                    name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
+                if _is_numeric_name(name):
+                    name = ""
                 if not name:
-                    name = _fetch_marker_name(i, bool(isrgn))
+                    name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         return None
 
@@ -1137,22 +1199,67 @@ def handle_cmd(cmd, sock):
             return
         if typ == "gotoRegion":
             idx = int(cmd.get("index", -1))
+            start_pos = None
+            end_pos = None
+            try:
+                if cmd.get("start", None) is not None:
+                    start_pos = float(cmd.get("start"))
+                if cmd.get("end", None) is not None:
+                    end_pos = float(cmd.get("end"))
+            except Exception:
+                start_pos = None
+                end_pos = None
             if idx >= 0:
                 try:
                     try:
                         RPR_GotoMarker(0, idx, True)
                     except Exception:
+                        pass
+                    if start_pos is None:
                         regions, _markers = get_regions_and_markers()
-                        start = None
                         for r in regions:
                             if int(r.get("index", -1)) == idx:
-                                start = r.get("start", None)
+                                start_pos = r.get("start", None)
+                                end_pos = r.get("end", None)
                                 break
-                        if start is not None:
-                            try:
-                                RPR_SetEditCurPos2(0, start, True, True)
-                            except Exception:
-                                RPR_SetEditCurPos(start, True, True)
+                    if start_pos is not None:
+                        try:
+                            RPR_SetEditCurPos2(0, start_pos, True, True)
+                        except Exception:
+                            RPR_SetEditCurPos(start_pos, True, True)
+                except Exception:
+                    pass
+            return
+        if typ == "loopRegion":
+            idx = int(cmd.get("index", -1))
+            start_pos = None
+            end_pos = None
+            try:
+                if cmd.get("start", None) is not None:
+                    start_pos = float(cmd.get("start"))
+                if cmd.get("end", None) is not None:
+                    end_pos = float(cmd.get("end"))
+            except Exception:
+                start_pos = None
+                end_pos = None
+
+            if (start_pos is None or end_pos is None) and idx >= 0:
+                try:
+                    regions, _markers = get_regions_and_markers()
+                    for r in regions:
+                        if int(r.get("index", -1)) == idx:
+                            start_pos = r.get("start", None)
+                            end_pos = r.get("end", None)
+                            break
+                except Exception:
+                    pass
+
+            if start_pos is not None and end_pos is not None:
+                try:
+                    if "RPR_GetSet_LoopTimeRange2" in globals():
+                        RPR_GetSet_LoopTimeRange2(0, True, True, start_pos, end_pos, False)
+                    else:
+                        RPR_GetSet_LoopTimeRange(True, True, start_pos, end_pos, False)
                 except Exception:
                     pass
             return
@@ -1164,6 +1271,17 @@ def handle_cmd(cmd, sock):
                         RPR_GotoMarker(0, idx, False)
                     except Exception:
                         RPR_GotoMarker(0, idx, 0)
+                    _regions, markers = get_regions_and_markers()
+                    pos = None
+                    for m in markers:
+                        if int(m.get("index", -1)) == idx:
+                            pos = m.get("position", None)
+                            break
+                    if pos is not None:
+                        try:
+                            RPR_SetEditCurPos2(0, pos, True, True)
+                        except Exception:
+                            RPR_SetEditCurPos(pos, True, True)
                 except Exception:
                     pass
             return
@@ -1202,6 +1320,127 @@ def handle_cmd(cmd, sock):
             if tr:
                 RPR_SetMediaTrackInfo_Value(tr, "I_RECARM", 1.0 if rec else 0.0)
             return
+        if typ == "addTrack":
+            try:
+                cnt = RPR_CountTracks(0)
+                if isinstance(cnt, tuple): cnt = cnt[0]
+                RPR_InsertTrackAtIndex(int(cnt), True)
+                RPR_TrackList_AdjustWindows(False)
+                RPR_UpdateArrange()
+            except Exception:
+                pass
+            return
+        if typ == "addSpacer":
+            try:
+                cnt = RPR_CountTracks(0)
+                if isinstance(cnt, tuple): cnt = cnt[0]
+                idx = int(cnt)
+                RPR_InsertTrackAtIndex(idx, True)
+                tr = RPR_GetTrack(0, idx)
+                if isinstance(tr, tuple): tr = tr[0]
+                if tr:
+                    try:
+                        RPR_GetSetMediaTrackInfo_String(tr, "P_NAME", "Spacer", True)
+                    except Exception:
+                        pass
+                    try:
+                        RPR_GetSetMediaTrackInfo_String(tr, "P_MCP_LAYOUT", "Spacer", True)
+                        RPR_GetSetMediaTrackInfo_String(tr, "P_TCP_LAYOUT", "Spacer", True)
+                    except Exception:
+                        pass
+                RPR_TrackList_AdjustWindows(False)
+                RPR_UpdateArrange()
+            except Exception:
+                pass
+            return
+        if typ == "moveTrack":
+            guid = cmd.get("guid","")
+            before_guid = cmd.get("beforeGuid", None)
+            to_index = cmd.get("toIndex", None)
+            tr = find_track_by_guid(guid)
+            if tr:
+                src_idx = _track_index(tr)
+                dest_idx = None
+                if before_guid:
+                    tr_before = find_track_by_guid(before_guid)
+                    if tr_before:
+                        dest_idx = _track_index(tr_before)
+                if dest_idx is None and to_index is not None:
+                    try: dest_idx = int(to_index)
+                    except Exception: dest_idx = None
+                if dest_idx is None:
+                    return
+                if dest_idx > src_idx:
+                    dest_idx -= 1
+                try:
+                    RPR_SetOnlyTrackSelected(tr)
+                    RPR_ReorderSelectedTracks(dest_idx, 0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
+            return
+        if typ == "setTrackColor":
+            guid = cmd.get("guid","")
+            color = _color_from_hex(cmd.get("color",""))
+            tr = find_track_by_guid(guid)
+            if tr and color is not None:
+                try:
+                    RPR_SetTrackColor(tr, color)
+                except Exception:
+                    pass
+            return
+        if typ == "createFolderWithTrack":
+            guid = cmd.get("guid","")
+            tr = find_track_by_guid(guid)
+            if tr:
+                idx = _track_index(tr)
+                try:
+                    RPR_InsertTrackAtIndex(idx, True)
+                    folder_tr = RPR_GetTrack(0, idx)
+                    if isinstance(folder_tr, tuple): folder_tr = folder_tr[0]
+                    if folder_tr:
+                        RPR_GetSetMediaTrackInfo_String(folder_tr, "P_NAME", "Folder", True)
+                        RPR_SetMediaTrackInfo_Value(folder_tr, "I_FOLDERDEPTH", 1.0)
+                    tr = find_track_by_guid(guid)
+                    if tr:
+                        depth = RPR_GetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH")
+                        if isinstance(depth, tuple): depth = depth[0]
+                        if int(depth) == 0:
+                            RPR_SetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH", -1.0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
+            return
+        if typ == "moveTrackToFolder":
+            guid = cmd.get("guid","")
+            folder_guid = cmd.get("folderGuid","")
+            tr = find_track_by_guid(guid)
+            folder_tr = find_track_by_guid(folder_guid)
+            if tr and folder_tr:
+                dest_idx = _track_index(folder_tr) + 1
+                src_idx = _track_index(tr)
+                if dest_idx > src_idx:
+                    dest_idx -= 1
+                try:
+                    RPR_SetOnlyTrackSelected(tr)
+                    RPR_ReorderSelectedTracks(dest_idx, 0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
+            return
+        if typ == "renameTrack":
+            guid = cmd.get("guid","")
+            name = _as_str(cmd.get("name",""))
+            tr = find_track_by_guid(guid)
+            if tr and name:
+                try:
+                    RPR_GetSetMediaTrackInfo_String(tr, "P_NAME", name, True)
+                except Exception:
+                    pass
+            return
         if typ == "setSendVol":
             guid = cmd.get("guid","")
             idx = int(cmd.get("index", 0))
@@ -1231,6 +1470,44 @@ def handle_cmd(cmd, sock):
                 try: RPR_SetTrackSendInfo_Value(tr, 0, idx, "I_SENDMODE", mode)
                 except Exception: pass
             return
+        if typ == "setSendSrcChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, 0, idx, "I_SRCCHAN", chan)
+                except Exception: pass
+            return
+        if typ == "setSendDstChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, 0, idx, "I_DSTCHAN", chan)
+                except Exception: pass
+            return
+        if typ == "addSend":
+            guid = cmd.get("guid","")
+            dest_guid = cmd.get("destGuid","")
+            src_chan = cmd.get("srcChan", None)
+            dst_chan = cmd.get("dstChan", None)
+            tr = find_track_by_guid(guid)
+            dest = find_track_by_guid(dest_guid)
+            if tr and dest:
+                try:
+                    idx = RPR_CreateTrackSend(tr, dest)
+                    if isinstance(idx, tuple): idx = idx[0]
+                    if idx is not None and (src_chan is not None or dst_chan is not None):
+                        if src_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(tr, 0, int(idx), "I_SRCCHAN", int(src_chan))
+                            except Exception: pass
+                        if dst_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(tr, 0, int(idx), "I_DSTCHAN", int(dst_chan))
+                            except Exception: pass
+                except Exception: pass
+            return
         if typ == "setRecvVol":
             guid = cmd.get("guid","")
             idx = int(cmd.get("index", 0))
@@ -1247,6 +1524,44 @@ def handle_cmd(cmd, sock):
             tr = find_track_by_guid(guid)
             if tr:
                 try: RPR_SetTrackSendInfo_Value(tr, -1, idx, "B_MUTE", 1.0 if mute else 0.0)
+                except Exception: pass
+            return
+        if typ == "setRecvSrcChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, -1, idx, "I_SRCCHAN", chan)
+                except Exception: pass
+            return
+        if typ == "setRecvDstChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, -1, idx, "I_DSTCHAN", chan)
+                except Exception: pass
+            return
+        if typ == "addReturn":
+            guid = cmd.get("guid","")
+            source_guid = cmd.get("sourceGuid","")
+            src_chan = cmd.get("srcChan", None)
+            dst_chan = cmd.get("dstChan", None)
+            tr = find_track_by_guid(guid)
+            source = find_track_by_guid(source_guid)
+            if tr and source:
+                try:
+                    idx = RPR_CreateTrackSend(source, tr)
+                    if isinstance(idx, tuple): idx = idx[0]
+                    if idx is not None and (src_chan is not None or dst_chan is not None):
+                        if src_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(source, 0, int(idx), "I_SRCCHAN", int(src_chan))
+                            except Exception: pass
+                        if dst_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(source, 0, int(idx), "I_DSTCHAN", int(dst_chan))
+                            except Exception: pass
                 except Exception: pass
             return
         if typ == "setRecInput":
