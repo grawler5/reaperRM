@@ -149,8 +149,8 @@
           kneeFind:[/\bknee\b/i],
           ratioFind:[/\bratio\b/i],
           detectFind:[/detect|detector|side\s*chain\s*source|side\s*chain|sidechain|source/i],
-          lpFind:[/\blp\b|low\s*pass|lowpass/i],
-          hpFind:[/\bhp\b|high\s*pass|highpass/i],
+          lpFind:[/\blp\b|low\s*pass|lowpass|detector\s*lp/i],
+          hpFind:[/\bhp\b|high\s*pass|highpass|detector\s*hp/i],
           bpmSyncFind:[/bpm\s*sync|tempo\s*sync|sync/i],
           autoMakeupFind:[/auto\s*makeup|makeup\b/i],
           limitOutFind:[/limit\s*out|output\s*limit/i],
@@ -179,8 +179,8 @@
           kneeFind:[/\bknee\b/i],
           ratioFind:[/\bratio\b/i],
           detectFind:[/detect|detector|side\s*chain\s*source|side\s*chain|sidechain|source/i],
-          lpFind:[/\blp\b|low\s*pass|lowpass/i],
-          hpFind:[/\bhp\b|high\s*pass|highpass/i],
+          lpFind:[/\blp\b|low\s*pass|lowpass|detector\s*lp/i],
+          hpFind:[/\bhp\b|high\s*pass|highpass|detector\s*hp/i],
           bpmSyncFind:[/bpm\s*sync|tempo\s*sync|sync/i],
           autoMakeupFind:[/auto\s*makeup|makeup\b/i],
           limitOutFind:[/limit\s*out|output\s*limit/i],
@@ -1101,7 +1101,16 @@ function formatParam(p){
     detectRow.appendChild(detectLabel);
     detectRow.appendChild(detectSelect);
     detectCard.appendChild(detectRow);
-    mid.appendChild(detectCard);
+
+    const returnsBtn = document.createElement("button");
+    returnsBtn.type = "button";
+    returnsBtn.className = "rmCompMiniBtn";
+    returnsBtn.textContent = "Returns";
+    returnsBtn.addEventListener("click", ()=>{
+      openTrackMenu(win.guid, "sends");
+    });
+    detectCard.appendChild(returnsBtn);
+    left.appendChild(detectCard);
 
     const filterCard = document.createElement("div");
     filterCard.className = "rmCompCard";
@@ -6851,6 +6860,21 @@ applyResponsiveMode();
   let dragDropEl = null;
   let dragDropTargetEl = null;
 
+  function applyOptimisticMove(guid, beforeGuid){
+    if (!lastState || !Array.isArray(lastState.tracks)) return;
+    if (!guid || !beforeGuid || guid === beforeGuid) return;
+    const tracks = lastState.tracks.slice();
+    const fromIdx = tracks.findIndex(t=>t.guid === guid);
+    const toIdx = tracks.findIndex(t=>t.guid === beforeGuid);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = tracks.splice(fromIdx, 1);
+    let insertIdx = toIdx;
+    if (fromIdx < toIdx) insertIdx -= 1;
+    insertIdx = Math.max(0, Math.min(tracks.length, insertIdx));
+    tracks.splice(insertIdx, 0, moved);
+    lastState = Object.assign({}, lastState, {tracks});
+  }
+
   function setTouchDropTarget(el){
     if (touchDropTarget && touchDropTarget !== el){
       touchDropTarget.classList.remove("dropTarget");
@@ -6943,6 +6967,8 @@ applyResponsiveMode();
             ? (getNextTrackGuidAfter(baseGuid, guid) || baseGuid)
             : baseGuid;
           wsSend({type:"moveTrack", guid, beforeGuid: targetBefore});
+          applyOptimisticMove(guid, targetBefore);
+          renderOrUpdate(true);
           setTimeout(()=>wsSend({type:"reqState"}), 10);
         }
       }
@@ -7746,6 +7772,8 @@ applyResponsiveMode();
           ? (getNextTrackGuidAfter(dropGuid, draggingTrackGuid) || dropGuid)
           : dropGuid;
         wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
+        applyOptimisticMove(draggingTrackGuid, beforeGuid);
+        renderOrUpdate(true);
       }
       draggingTrackGuid = null;
       setTimeout(()=>wsSend({type:"reqState"}), 10);
@@ -7822,6 +7850,8 @@ applyResponsiveMode();
             ? (getNextTrackGuidAfter(dropGuid, draggingTrackGuid) || dropGuid)
             : dropGuid;
           wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
+          applyOptimisticMove(draggingTrackGuid, beforeGuid);
+          renderOrUpdate(true);
         }
         draggingTrackGuid = null;
         setTimeout(()=>wsSend({type:"reqState"}), 10);

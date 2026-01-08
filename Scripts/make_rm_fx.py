@@ -137,6 +137,11 @@ slider{cc_in}:0<0,1,0.0001>-Z Telemetry: In Peak
 slider{cc_sc}:0<0,1,0.0001>-Z Telemetry: Sidechain Peak
 slider{cc_out}:0<0,1,0.0001>-Z Telemetry: Out Peak
 slider{cc_gr}:0<0,24,0.01>-Z Telemetry: GR (dB)
+slider{cc_gr + 1}:20000<200,20000,1>Detector LP (Hz)
+slider{cc_gr + 2}:20<20,8000,1>Detector HP (Hz)
+slider{cc_gr + 3}:0<0,1,1>BPM Sync
+slider{cc_gr + 4}:0<0,1,1>Auto Makeup
+slider{cc_gr + 5}:0<0,1,1>Limit Output
 '''), '@init')
 # init pk vars
 cc = ensure_init_vars(cc, 'pkIn=0; pkSC=0; pkOut=0; tele_eps = exp(-46.051701859880914);\n')
@@ -145,6 +150,63 @@ cc = cc.replace('@sample\n', '@sample\n// telemetry peak capture\npkIn = max(pkI
 # after main output assignment, near end of @sample, add pkOut
 # safest: add before first blank line preceding "gr =" (exists)
 cc = cc.replace('\n\n\ngr = db2ratio(cL);', '\n// telemetry: output peak\npkOut = max(pkOut, max(abs(spl0), abs(spl1)));\n\n\ngr = db2ratio(cL);')
+# detector filter + sync + makeup + limiter
+cc = cc.replace('attack = slider4/1000;\nrelease = slider5/1000;\n', textwrap.dedent('''
+attack = slider4/1000;
+release = slider5/1000;
+sync_on = slider{cc_gr + 3} >= 0.5;
+sync_bpm = tempo > 0 ? tempo : 120;
+sync_notes = 12;
+sync_idx = floor(min(sync_notes-1, max(0, (slider5-2) / (1000-2) * (sync_notes-1))));
+sync_table0 = 1/24; sync_table1 = 1/16; sync_table2 = 1/12; sync_table3 = 1/8;
+sync_table4 = 1/6; sync_table5 = 1/4; sync_table6 = 1/3; sync_table7 = 1/2;
+sync_table8 = 2/3; sync_table9 = 1; sync_table10 = 1.5; sync_table11 = 2;
+sync_mul = sync_idx == 0 ? sync_table0
+  : sync_idx == 1 ? sync_table1
+  : sync_idx == 2 ? sync_table2
+  : sync_idx == 3 ? sync_table3
+  : sync_idx == 4 ? sync_table4
+  : sync_idx == 5 ? sync_table5
+  : sync_idx == 6 ? sync_table6
+  : sync_idx == 7 ? sync_table7
+  : sync_idx == 8 ? sync_table8
+  : sync_idx == 9 ? sync_table9
+  : sync_idx == 10 ? sync_table10
+  : sync_table11;
+sync_ms = (60 / max(1, sync_bpm)) * sync_mul * 1000;
+release = sync_on ? (sync_ms/1000) : release;
+'''.replace('{cc_gr + 3}', str(cc_gr + 3))))
+cc = ensure_init_vars(cc, 'detHpL=0; detHpR=0; detHpX1L=0; detHpX1R=0; detLpL=0; detLpR=0;\n')
+cc = cc.replace('output = 10^(slider6/20);', textwrap.dedent(f'''
+makeup_db = (slider{cc_gr + 4} >= 0.5) ? max(0, (slider3-1) * 2.0) : 0;
+output = 10^((slider6 + makeup_db)/20);
+'''))
+cc = cc.replace('slider9 == 1 ? (\ninL = spl2; inR = spl3;\n);\n', textwrap.dedent(f'''
+slider9 == 1 ? (
+inL = spl2; inR = spl3;
+);
+
+hp_hz = slider{cc_gr + 2};
+lp_hz = slider{cc_gr + 1};
+hp_hz > lp_hz ? hp_hz = lp_hz;
+hp_a = exp(-2*$pi*hp_hz/srate);
+lp_a = exp(-2*$pi*lp_hz/srate);
+detHpL = hp_a * (detHpL + inL - detHpX1L); detHpX1L = inL;
+detHpR = hp_a * (detHpR + inR - detHpX1R); detHpX1R = inR;
+detLpL = detLpL + (1 - lp_a) * (detHpL - detLpL);
+detLpR = detLpR + (1 - lp_a) * (detHpR - detLpR);
+'''))
+cc = cc.replace('xL = max(abs(inL),abs(inR));', 'xL = max(abs(detLpL),abs(detLpR));')
+cc = cc.replace('listen == 1 ? (\nspl0 = clean0 * slider12 + ((spl0 * cL) - spl0)  * -output;\nspl1 = clean1 * slider12 + ((spl1 * cL) - spl1)  * -output;\n);\n', textwrap.dedent(f'''
+listen == 1 ? (
+spl0 = clean0 * slider12 + ((spl0 * cL) - spl0)  * -output;
+spl1 = clean1 * slider12 + ((spl1 * cL) - spl1)  * -output;
+);
+slider{cc_gr + 5} >= 0.5 ? (
+  spl0 = min(1, max(-1, spl0));
+  spl1 = min(1, max(-1, spl1));
+);
+'''))
 # add @block for sending and reset
 cc = ensure_block_and_append(cc, textwrap.dedent(f'''
   slider{cc_in} = pkIn;
