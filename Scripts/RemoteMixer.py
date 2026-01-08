@@ -1300,10 +1300,21 @@ def handle_cmd(cmd, sock):
         if typ == "addSend":
             guid = cmd.get("guid","")
             dest_guid = cmd.get("destGuid","")
+            src_chan = cmd.get("srcChan", None)
+            dst_chan = cmd.get("dstChan", None)
             tr = find_track_by_guid(guid)
             dest = find_track_by_guid(dest_guid)
             if tr and dest:
-                try: RPR_CreateTrackSend(tr, dest)
+                try:
+                    idx = RPR_CreateTrackSend(tr, dest)
+                    if isinstance(idx, tuple): idx = idx[0]
+                    if idx is not None and (src_chan is not None or dst_chan is not None):
+                        if src_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(tr, 0, int(idx), "I_SRCCHAN", int(src_chan))
+                            except Exception: pass
+                        if dst_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(tr, 0, int(idx), "I_DSTCHAN", int(dst_chan))
+                            except Exception: pass
                 except Exception: pass
             return
         if typ == "setRecvVol":
@@ -1327,10 +1338,21 @@ def handle_cmd(cmd, sock):
         if typ == "addReturn":
             guid = cmd.get("guid","")
             source_guid = cmd.get("sourceGuid","")
+            src_chan = cmd.get("srcChan", None)
+            dst_chan = cmd.get("dstChan", None)
             tr = find_track_by_guid(guid)
             source = find_track_by_guid(source_guid)
             if tr and source:
-                try: RPR_CreateTrackSend(source, tr)
+                try:
+                    idx = RPR_CreateTrackSend(source, tr)
+                    if isinstance(idx, tuple): idx = idx[0]
+                    if idx is not None and (src_chan is not None or dst_chan is not None):
+                        if src_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(source, 0, int(idx), "I_SRCCHAN", int(src_chan))
+                            except Exception: pass
+                        if dst_chan is not None:
+                            try: RPR_SetTrackSendInfo_Value(source, 0, int(idx), "I_DSTCHAN", int(dst_chan))
+                            except Exception: pass
                 except Exception: pass
             return
         if typ == "setRecInput":

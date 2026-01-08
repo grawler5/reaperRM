@@ -412,13 +412,13 @@
   #modalHeader{height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 10px; border-bottom:1px solid rgba(0,0,0,.7);}
   body.light #modalHeader{border-bottom:1px solid rgba(0,0,0,.15);}
   #modalTitle{font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  #modalActions{display:flex; align-items:center; gap:6px;}
   #renameBtn,
   #closeBtn{width:34px; height:30px; border-radius:9px; border:1px solid rgba(0,0,0,.75); background:#22252a; color:#ddd; cursor:pointer;}
   body.light #renameBtn,
   body.light #closeBtn{background:#f4f6fa; color:#1b1f26; border-color:rgba(0,0,0,.2);}
   #renameBtn:active,
   #closeBtn:active{transform:translateY(1px)}
-  #renameBtn{margin-right:6px;}
   #tabs{display:flex; gap:8px; padding:10px; border-bottom:1px solid rgba(0,0,0,.7);}
   body.light #tabs{border-bottom:1px solid rgba(0,0,0,.15);}
   .tab{padding:6px 10px; border-radius:10px; border:1px solid rgba(0,0,0,.75); background:#22252a; color:#ddd; cursor:pointer; font-size:12px;}

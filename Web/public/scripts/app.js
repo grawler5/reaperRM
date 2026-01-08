@@ -7835,7 +7835,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
 
   
 const FX_ADD_CATALOG = [
-  {name:"Waves NS1", add:"VST3: NS1 Stereo (Waves)||VST: NS1 Stereo (Waves)||NS1"},
+  {name:"rm-ns", add:"JS: RM_NS||JS:RM_NS||RM_NS"},
   {name:"RM Gate", add:"JS: RM_Gate [Telemetry]||JS:RM_Gate [Telemetry]||RM_Gate [Telemetry]"},
   {name:"RM PreAmp", add:"JS: RM_PreAmp [Telemetry]||JS:RM_PreAmp [Telemetry]||RM_PreAmp [Telemetry]"},
   {name:"RM_EQ", add:"JS: RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||JS:RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]"},
@@ -8323,6 +8323,19 @@ modalBody.appendChild(wrap);
     // Accept '3-4' or '3/4'
     return String(s).replace("/", "-");
   }
+  function _chanPairLabel(v){
+    const start = Number(v);
+    if (!Number.isFinite(start)) return "1-2";
+    return `${start + 1}-${start + 2}`;
+  }
+  function _chanPairOptions(maxPairs=8){
+    const opts = [];
+    for (let i=0;i<maxPairs;i++){
+      const v = i * 2;
+      opts.push({value: v, label: _chanPairLabel(v)});
+    }
+    return opts;
+  }
 
   function renderSendsTab(t){
     const sends = (t.sendDetails || []);
@@ -8333,19 +8346,45 @@ modalBody.appendChild(wrap);
     addRow.className = "row";
     const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
     const otherTracks = tracks.filter(tr => tr.guid && tr.guid !== t.guid);
+    const chanOptions = _chanPairOptions(8);
     const opts = otherTracks.map(tr => `<option value="${tr.guid}">${escapeHtml(tr.name || ("Track " + tr.idx))}</option>`).join("");
+    const chanOpts = chanOptions.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
     addRow.innerHTML = `<label>Add send</label>
       <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
         ${opts || `<option value="">No tracks</option>`}
       </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
       <button class="miniBtn" ${opts ? "" : "disabled"}>Add</button>`;
-    const sel = addRow.querySelector("select");
+    const [sel, srcSel, dstSel] = addRow.querySelectorAll("select");
     const addBtn = addRow.querySelector("button");
     addBtn.addEventListener("click", ()=>{
       const destGuid = sel.value;
       if (!destGuid) return;
-      wsSend({type:"addSend", guid:t.guid, destGuid});
-      setTimeout(()=>wsSend({type:"reqState"}), 80);
+      const srcChan = parseInt(srcSel.value, 10);
+      const dstChan = parseInt(dstSel.value, 10);
+      wsSend({type:"addSend", guid:t.guid, destGuid, srcChan, dstChan});
+      const destTrack = otherTracks.find(tr => tr.guid === destGuid);
+      if (destTrack){
+        const next = (t.sendDetails || []).slice();
+        next.push({
+          index: next.length,
+          destName: destTrack.name || ("Track " + destTrack.idx),
+          vol: 1,
+          mute: false,
+          mode: 0,
+          srcCh: _chanPairLabel(srcChan),
+          dstCh: _chanPairLabel(dstChan)
+        });
+        t.sendDetails = next;
+        if (openModal && openModal.guid === t.guid && openModal.tab === "sends") renderModal();
+      }
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+      setTimeout(()=>wsSend({type:"reqState"}), 500);
     });
     wrap.appendChild(addRow);
 
@@ -8423,19 +8462,44 @@ modalBody.appendChild(wrap);
     addRow.className = "row";
     const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
     const otherTracks = tracks.filter(tr => tr.guid && tr.guid !== t.guid);
+    const chanOptions = _chanPairOptions(8);
     const opts = otherTracks.map(tr => `<option value="${tr.guid}">${escapeHtml(tr.name || ("Track " + tr.idx))}</option>`).join("");
+    const chanOpts = chanOptions.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
     addRow.innerHTML = `<label>Add return</label>
       <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
         ${opts || `<option value="">No tracks</option>`}
       </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
       <button class="miniBtn" ${opts ? "" : "disabled"}>Add</button>`;
-    const sel = addRow.querySelector("select");
+    const [sel, srcSel, dstSel] = addRow.querySelectorAll("select");
     const addBtn = addRow.querySelector("button");
     addBtn.addEventListener("click", ()=>{
       const sourceGuid = sel.value;
       if (!sourceGuid) return;
-      wsSend({type:"addReturn", guid:t.guid, sourceGuid});
-      setTimeout(()=>wsSend({type:"reqState"}), 80);
+      const srcChan = parseInt(srcSel.value, 10);
+      const dstChan = parseInt(dstSel.value, 10);
+      wsSend({type:"addReturn", guid:t.guid, sourceGuid, srcChan, dstChan});
+      const sourceTrack = otherTracks.find(tr => tr.guid === sourceGuid);
+      if (sourceTrack){
+        const next = (t.recvDetails || []).slice();
+        next.push({
+          index: next.length,
+          srcName: sourceTrack.name || ("Track " + sourceTrack.idx),
+          vol: 1,
+          mute: false,
+          srcCh: _chanPairLabel(srcChan),
+          dstCh: _chanPairLabel(dstChan)
+        });
+        t.recvDetails = next;
+        if (openModal && openModal.guid === t.guid && openModal.tab === "returns") renderModal();
+      }
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+      setTimeout(()=>wsSend({type:"reqState"}), 500);
     });
     wrap.appendChild(addRow);
 
@@ -8494,11 +8558,13 @@ modalBody.appendChild(wrap);
     top.className = "row";
     top.innerHTML = `<label>FX</label>
       <button class="miniBtn">Refresh</button>
+      <button class="miniBtn">Add FX</button>
       <button class="miniBtn">All ON</button>
       <button class="miniBtn">All OFF</button>
     `;
-    const [bR,bOn,bOff] = top.querySelectorAll("button");
+    const [bR,bAdd,bOn,bOff] = top.querySelectorAll("button");
     bR.addEventListener("click", ()=>wsSend({type:"reqFxList", guid:t.guid}));
+    bAdd.addEventListener("click", (ev)=> openFxAddMenu(t.guid, ev.currentTarget));
     bOn.addEventListener("click", ()=>wsSend({type:"setFxAllEnabled", guid:t.guid, enabled:true}));
     bOff.addEventListener("click", ()=>wsSend({type:"setFxAllEnabled", guid:t.guid, enabled:false}));
     wrap.appendChild(top);
@@ -8543,17 +8609,6 @@ modalBody.appendChild(wrap);
       });
     }
     wrap.appendChild(list);
-
-    const add = document.createElement("div");
-    add.style.marginTop = "14px";
-    add.innerHTML = `<div class="small" style="margin-bottom:8px;">Add FX</div>`;
-    const addRow = document.createElement("div");
-    addRow.className = "row";
-    addRow.innerHTML = `<label></label><button class="miniBtn">Add from catalog…</button>`;
-    const addBtn = addRow.querySelector("button");
-    addBtn.addEventListener("click", (ev)=> openFxAddMenu(t.guid, ev.currentTarget));
-    add.appendChild(addRow);
-    wrap.appendChild(add);
 
     modalBody.appendChild(wrap);
   }
