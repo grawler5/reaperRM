@@ -4944,11 +4944,12 @@ function buildRMEqProQPanelControl(win, ctrl){
       const binCount = idx.specBins.length;
       const fMin = 20;
       const fMax = 20000;
-      const y0 = gainToY(0,h);
       const dbMin = -90;
       const dbMax = 12;
       const tiltRef = 1000;
       const tiltDbPerOct = 1.5;
+      const dbRange = dbMax - dbMin;
+      const yForSpec = (db)=> (1 - ((db - dbMin) / dbRange)) * h;
       if (!specSmooth || specSmooth.length !== binCount){
         specSmooth = new Array(binCount).fill(0);
       }
@@ -5002,13 +5003,13 @@ function buildRMEqProQPanelControl(win, ctrl){
         const tilt = tiltDbPerOct * Math.log2(Math.max(1, f) / tiltRef);
         let db = dbMin + clamp01(v) * (0 - dbMin) + tilt;
         db = clamp(db, dbMin, dbMax);
-        const y = y0 + ((-db)/(-dbMin)) * (h - y0);
+        const y = yForSpec(db);
         if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
       ctx.stroke();
       ctx.restore();
 
-      const fillGrad = ctx.createLinearGradient(0, y0, 0, h);
+      const fillGrad = ctx.createLinearGradient(0, yForSpec(0), 0, h);
       fillGrad.addColorStop(0, "rgba(255,255,255,.18)");
       fillGrad.addColorStop(0.65, "rgba(255,255,255,.08)");
       fillGrad.addColorStop(1, "rgba(255,255,255,0)");
