@@ -1248,8 +1248,10 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 @media (max-height: 650px) and (orientation: landscape) and (pointer: coarse){
   /* RM_EQ fullscreen (phone landscape): use a real column layout so the graph fills
      exactly the space between the header and the Output block (no floating gaps). */
-  .pluginWin.fullscreen.layout_rm_eq4{ --rmEqHdrH:34px; --rmEqOutH:66px; }
-  .pluginWin.fullscreen.layout_rm_eq4 .rmEqProQ{
+  .pluginWin.fullscreen.layout_rm_eq4,
+  .pluginWin.fullscreen.layout_rm_eq2{ --rmEqHdrH:34px; --rmEqOutH:66px; }
+  .pluginWin.fullscreen.layout_rm_eq4 .rmEqProQ,
+  .pluginWin.fullscreen.layout_rm_eq2 .rmEqProQ{
     height:100%;
     display:flex;
     flex-direction:column;
@@ -1258,7 +1260,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
     padding-bottom: calc(var(--rmEqOutH) + 12px + env(safe-area-inset-bottom));
     box-sizing:border-box;
   }
-  \.pluginWin.fullscreen.layout_rm_eq4 .rmEqCanvasWrap{
+  \.pluginWin.fullscreen.layout_rm_eq4 .rmEqCanvasWrap,
+  \.pluginWin.fullscreen.layout_rm_eq2 .rmEqCanvasWrap{
     flex:1 1 auto;
     height:auto !important;
     min-height:0;
@@ -1268,7 +1271,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
     aspect-ratio: unset !important;
     overflow:visible;
   }
-  \.pluginWin.fullscreen.layout_rm_eq4 .rmEqBottomRow{
+  \.pluginWin.fullscreen.layout_rm_eq4 .rmEqBottomRow,
+  \.pluginWin.fullscreen.layout_rm_eq2 .rmEqBottomRow{
     position:fixed;
     left:10px; right:10px;
     bottom: calc(8px + env(safe-area-inset-bottom));
@@ -1279,10 +1283,12 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
     min-height: var(--rmEqOutH);
     z-index: 1050;
   }
-  .pluginWin.fullscreen.layout_rm_eq4 .rmEqBottomLeft input[type=range]{ width:140px; }
+  .pluginWin.fullscreen.layout_rm_eq4 .rmEqBottomLeft input[type=range],
+  .pluginWin.fullscreen.layout_rm_eq2 .rmEqBottomLeft input[type=range]{ width:140px; }
 
   /* Keep the point panel usable: bottom-sheet, slightly smaller, and above Output */
-  .pluginWin.fullscreen.layout_rm_eq4 .rmEqPointPanel{
+  .pluginWin.fullscreen.layout_rm_eq4 .rmEqPointPanel,
+  .pluginWin.fullscreen.layout_rm_eq2 .rmEqPointPanel{
     position:fixed;
     left:10px; right:10px;
     bottom: calc(var(--rmEqOutH) + 10px + env(safe-area-inset-bottom));
@@ -1700,9 +1706,11 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .rmGateMiniKnobs .plugCtrl{ min-width: 122px; }
 
 
-/* ===== RM EQ4: make panel span full width ===== */
-.pluginWin.layout_rm_eq4 .plugGrid{ grid-template-columns: 1fr; justify-items: stretch; }
-.pluginWin.layout_rm_eq4 .plugGrid > .plugCtrl{ height: auto; }
+/* ===== RM EQ: make panel span full width ===== */
+.pluginWin.layout_rm_eq4 .plugGrid,
+.pluginWin.layout_rm_eq2 .plugGrid{ grid-template-columns: 1fr; justify-items: stretch; }
+.pluginWin.layout_rm_eq4 .plugGrid > .plugCtrl,
+.pluginWin.layout_rm_eq2 .plugGrid > .plugCtrl{ height: auto; }
 
 
 /* ---- Tukan skins: aim for 1:1 look (avoid rounding/clipping the original UI) ---- */
@@ -1727,7 +1735,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_1175,
 .pluginWin.layout_rm_delaymachine,
 .pluginWin.layout_rm_lexikan2,
-.pluginWin.layout_rm_eqt1a{
+.pluginWin.layout_rm_eqt1a,
+.pluginWin.layout_rm_eq2{
   border-radius: 0;
 }
 .pluginWin.layout_la1a .pluginWinBody,
@@ -1738,6 +1747,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_1175 .pluginWinBody,
 .pluginWin.layout_rm_gate .pluginWinBody,
 .pluginWin.layout_rm_eq4 .pluginWinBody,
+.pluginWin.layout_rm_eq2 .pluginWinBody,
 .pluginWin.layout_rm_delaymachine .pluginWinBody,
 .pluginWin.layout_rm_lexikan2 .pluginWinBody,
 .pluginWin.layout_rm_eqt1a .pluginWinBody{
@@ -1755,7 +1765,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_1175 .pluginSearch,
 .pluginWin.layout_rm_delaymachine .pluginSearch,
 .pluginWin.layout_rm_lexikan2 .pluginSearch,
-.pluginWin.layout_rm_eqt1a .pluginSearch{
+.pluginWin.layout_rm_eqt1a .pluginSearch,
+.pluginWin.layout_rm_eq2 .pluginSearch{
   display: none;
 }
 .pluginWin.layout_la1a .pluginParamList,
@@ -1766,6 +1777,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_1175 .pluginParamList,
 .pluginWin.layout_rm_gate .pluginParamList,
 .pluginWin.layout_rm_eq4 .pluginParamList,
+.pluginWin.layout_rm_eq2 .pluginParamList,
 .pluginWin.layout_rm_delaymachine .pluginParamList,
 .pluginWin.layout_rm_lexikan2 .pluginParamList,
 .pluginWin.layout_rm_eqt1a .pluginParamList{
@@ -1830,7 +1842,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_lexikan2 .plugSection,
 .pluginWin.layout_rm_eqt1a .plugSection,
 .pluginWin.layout_rm_gate .plugSection,
-.pluginWin.layout_rm_eq4 .plugSection{
+.pluginWin.layout_rm_eq4 .plugSection,
+.pluginWin.layout_rm_eq2 .plugSection{
   padding: 0;
   border: none;
   background: transparent;
@@ -1849,7 +1862,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_1175 .plugGrid,
 .pluginWin.layout_rm_delaymachine .plugGrid,
 .pluginWin.layout_rm_lexikan2 .plugGrid,
-.pluginWin.layout_rm_eqt1a .plugGrid{
+.pluginWin.layout_rm_eqt1a .plugGrid,
+.pluginWin.layout_rm_eq2 .plugGrid{
   gap: 0;
   flex: 1 1 auto;
   display: flex;
@@ -1864,7 +1878,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_1175 .plugGrid > .plugCtrl,
 .pluginWin.layout_rm_delaymachine .plugGrid > .plugCtrl,
 .pluginWin.layout_rm_lexikan2 .plugGrid > .plugCtrl,
-.pluginWin.layout_rm_eqt1a .plugGrid > .plugCtrl{
+.pluginWin.layout_rm_eqt1a .plugGrid > .plugCtrl,
+.pluginWin.layout_rm_eq2 .plugGrid > .plugCtrl{
   flex: 1 1 auto;
 }
 
@@ -1876,7 +1891,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 /* Size presets for RM layouts */
 .pluginWin.layout_ns1:not(.fullscreen){ width:min(520px, 92vw); height:min(520px, 85vh); }
 .pluginWin.layout_rm_gate:not(.fullscreen){ width:min(520px, 92vw); height:min(760px, 90vh); }
-.pluginWin.layout_rm_eq4:not(.fullscreen){ width:min(980px, 92vw); height:min(760px, 90vh); }
+.pluginWin.layout_rm_eq4:not(.fullscreen),
+.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(980px, 92vw); height:min(760px, 90vh); }
 
 /* ---- ReaComp (dark, minimal) ---- */
 .reacompPanel{
@@ -2592,6 +2608,9 @@ background: linear-gradient(180deg,
   outline:2px solid rgba(255,255,255,.28);
   outline-offset:2px;
 }
+.rmEqPoint.hidden{
+  display:none;
+}
 .rmEqControls{
   margin-top:10px;
   display:grid;
@@ -2852,7 +2871,8 @@ background: linear-gradient(180deg,
 /* Extra-small phones: more compact RM_EQ so the graph is larger */
 @media (max-width: 520px), (pointer: coarse) and (max-width: 900px){
   .rmEqCanvasWrap{ height: 56svh; min-height: 220px; max-height: none; width:100%; max-width:100%; }
-  .pluginWin.fullscreen.layout_rm_eq4 .pluginWinBody{ overflow-x:hidden; }
+  .pluginWin.fullscreen.layout_rm_eq4 .pluginWinBody,
+  .pluginWin.fullscreen.layout_rm_eq2 .pluginWinBody{ overflow-x:hidden; }
   .rmEqPointPanel{ padding: 6px 8px 8px; border-radius: 14px; }
   .rmEqPointHdr{ gap:6px; }
   .rmEqPointName{ font-size:15px; }

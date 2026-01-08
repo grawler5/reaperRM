@@ -82,7 +82,15 @@
     match: (name)=> /\bRM[\s_]*EQ4\b/i.test(name),
     title: "RM_EQ",
     sections: [
-      { title: "", controls: [ {type:"rmEqProQPanel"} ] }
+      { title: "", controls: [ {type:"rmEqProQPanel", extra:{brand:"RM_EQ", maxBands:4, allowAdd:false}} ] }
+    ]
+  },
+  {
+    id: "rm_eq2",
+    match: (name)=> /\bRM[\s_]*EQ2\b/i.test(name),
+    title: "RM_EQ2",
+    sections: [
+      { title: "", controls: [ {type:"rmEqProQPanel", extra:{brand:"RM_EQ2", maxBands:20, allowAdd:true}} ] }
     ]
   },
   {
@@ -3998,6 +4006,10 @@ function buildRMDeesserPanelControl(win, ctrl){
 }
 
 function buildRMEqProQPanelControl(win, ctrl){
+  const opts = ctrl.extra || {};
+  const brandLabel = String(opts.brand || "RM_EQ");
+  const maxBands = Number.isFinite(opts.maxBands) ? Math.max(1, Math.round(opts.maxBands)) : 4;
+  const allowAddBands = !!opts.allowAdd;
   const root = document.createElement("div");
   root.className = "rmEqProQ";
   root.tabIndex = 0; // keyboard navigation (←/→)
@@ -4024,7 +4036,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   // Pro-Q chrome (visual only)
   const decoTop = document.createElement("div");
   decoTop.className = "rmEqDecoTop";
-  decoTop.innerHTML = `<div class="rmEqBrand"><span class="rmEqPro">RM_EQ</span></div><div class="rmEqTopHint">Analyzer</div>`;
+  decoTop.innerHTML = `<div class="rmEqBrand"><span class="rmEqPro">${escapeHtml(brandLabel)}</span></div><div class="rmEqTopHint">Analyzer</div>`;
   wrap.appendChild(decoTop);
 
   const decoRight = document.createElement("div");
@@ -4048,6 +4060,7 @@ function buildRMEqProQPanelControl(win, ctrl){
     <div class="rmEqBottomRight">
       <button class="pill" data-role="spec">Spectrum</button>
       <button class="pill" data-role="snap">Snap</button>
+      <button class="pill" data-role="add">Add</button>
       <button class="pill" data-role="zero">0 dB</button>
     </div>
   `;
@@ -4057,6 +4070,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   const outVal = bottomRow.querySelector(".rmEqOutVal");
   const specBtn = bottomRow.querySelector('[data-role="spec"]');
   const snapBtn = bottomRow.querySelector('[data-role="snap"]');
+  const addBtn = bottomRow.querySelector('[data-role="add"]');
   const zeroBtn = bottomRow.querySelector('[data-role="zero"]');
 
   // ===== Point panel (Pro-Q-like) =====
@@ -4200,10 +4214,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   let idx = {
     lcOn:null, lcFreq:null, lcSlope:null,
     hcOn:null, hcFreq:null, hcSlope:null,
-    b1On:null, b1Freq:null, b1Gain:null, b1Q:null, b1Type:null,
-    b2On:null, b2Freq:null, b2Gain:null, b2Q:null, b2Type:null,
-    b3On:null, b3Freq:null, b3Gain:null, b3Q:null, b3Type:null,
-    b4On:null, b4Freq:null, b4Gain:null, b4Q:null, b4Type:null,
+    bands: Array.from({length: maxBands}, ()=>({on:null, freq:null, gain:null, q:null, type:null})),
     outGain:null,
     specOn:null,
     specBins:[]
@@ -4265,14 +4276,16 @@ function buildRMEqProQPanelControl(win, ctrl){
     if (hcFr) idx.hcFreq = hcFr.index;
     if (hcSl) idx.hcSlope = hcSl.index;
 
-    [1,2,3,4].forEach(n=>{
+    for (let n=1; n<=maxBands; n++){
       const pon=bOn(n), pfr=bFr(n), pgn=bGn(n), pq=bQ(n), pty=bTy(n);
-      if (pon) idx[`b${n}On`]=pon.index;
-      if (pfr) idx[`b${n}Freq`]=pfr.index;
-      if (pgn) idx[`b${n}Gain`]=pgn.index;
-      if (pq)  idx[`b${n}Q`]=pq.index;
-      if (pty) idx[`b${n}Type`]=pty.index;
-    });
+      const slot = idx.bands[n-1];
+      if (!slot) continue;
+      slot.on = pon ? pon.index : null;
+      slot.freq = pfr ? pfr.index : null;
+      slot.gain = pgn ? pgn.index : null;
+      slot.q = pq ? pq.index : null;
+      slot.type = pty ? pty.index : null;
+    }
 
     if (out) idx.outGain = out.index;
     if (spec) idx.specOn = spec.index;
@@ -4290,24 +4303,31 @@ function buildRMEqProQPanelControl(win, ctrl){
   };
 
   // ===== Bands/points =====
-  const pointDefs = [
-    {id:"LC", label:"LoCut", color:"#d7d7d7", kind:"cut"},
-    {id:"B1", label:"B1", color:"#66e36f", kind:"band"},
-    {id:"B2", label:"B2", color:"#ffb24a", kind:"band"},
-    {id:"B3", label:"B3", color:"#57a6ff", kind:"band"},
-    {id:"B4", label:"B4", color:"#d96bff", kind:"band"},
-    {id:"HC", label:"HiCut", color:"#d7d7d7", kind:"cut"},
+  const bandColors = [
+    "#66e36f", "#ffb24a", "#57a6ff", "#d96bff", "#ff6b88",
+    "#56e0d7", "#ffd34a", "#8be3ff", "#b9ff8d", "#ffa0e7",
   ];
+  const pointDefs = [{id:"LC", label:"LoCut", color:"#d7d7d7", kind:"cut"}];
+  for (let i=1; i<=maxBands; i++){
+    pointDefs.push({
+      id:`B${i}`,
+      label:`B${i}`,
+      color: bandColors[(i-1) % bandColors.length],
+      kind:"band",
+    });
+  }
+  pointDefs.push({id:"HC", label:"HiCut", color:"#d7d7d7", kind:"cut"});
   const pointOrder = pointDefs.map(d=>d.id);
   const pointEls = {};
-  let selected = "B2";
+  let selected = maxBands >= 1 ? "B1" : "LC";
 
   const getOnParamFor = (id)=>{
     if (id==="LC") return getP(idx.lcOn);
     if (id==="HC") return getP(idx.hcOn);
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}On`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.on) : null;
     }
     return null;
   };
@@ -4316,33 +4336,58 @@ function buildRMEqProQPanelControl(win, ctrl){
     if (id==="HC") return getP(idx.hcFreq);
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}Freq`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.freq) : null;
     }
     return null;
   };
   const getGainParamFor = (id)=>{
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}Gain`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.gain) : null;
     }
     return null;
   };
   const getQParamFor = (id)=>{
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}Q`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.q) : null;
     }
     return null;
   };
   const getTypeParamFor = (id)=>{
     if (!id.startsWith("B")) return null;
     const n = parseInt(id.slice(1),10);
-    return getP(idx[`b${n}Type`]);
+    const slot = idx.bands[n-1];
+    return slot ? getP(slot.type) : null;
   };
   const getSlopeParamFor = (id)=>{
     if (id==="LC") return getP(idx.lcSlope);
     if (id==="HC") return getP(idx.hcSlope);
     return null;
+  };
+  const isBandId = (id)=> id && id.startsWith("B");
+  const bandIsOn = (id)=>{
+    const pOn = getOnParamFor(id);
+    return pOn ? ((pOn.value||0) >= 0.5) : false;
+  };
+  const findNextAvailableBand = ()=>{
+    if (!allowAddBands) return null;
+    for (let i=0;i<maxBands;i++){
+      const slot = idx.bands[i];
+      const pOn = slot ? getP(slot.on) : null;
+      if (pOn && (pOn.value||0) < 0.5) return `B${i+1}`;
+    }
+    return null;
+  };
+  const ensureSelectedActive = ()=>{
+    if (!allowAddBands || !isBandId(selected)) return;
+    if (bandIsOn(selected)) return;
+    const active = pointOrder.find(id=> isBandId(id) && bandIsOn(id));
+    if (active) selected = active;
+    else selected = "LC";
   };
 
   // ===== Freq snapping (1/12 octave) =====
@@ -4433,8 +4478,9 @@ function buildRMEqProQPanelControl(win, ctrl){
         if (pF) setParamRaw(pF, f, 20, 20000);
       } else {
         const n = parseInt(def.id.slice(1),10);
-        const pF = getP(idx[`b${n}Freq`]);
-        const pG = getP(idx[`b${n}Gain`]);
+        const slot = idx.bands[n-1];
+        const pF = slot ? getP(slot.freq) : null;
+        const pG = slot ? getP(slot.gain) : null;
         if (pF) setParamRaw(pF, f, 20, 20000);
         if (pG){
           const g = yToGain(y, rect.height);
@@ -4477,9 +4523,13 @@ function buildRMEqProQPanelControl(win, ctrl){
 
   // ===== Panel interactions =====
   const cycleSelected = (dir)=>{
-    const i = pointOrder.indexOf(selected);
-    const ni = (i<0) ? 0 : (i + dir + pointOrder.length) % pointOrder.length;
-    selected = pointOrder[ni];
+    const order = allowAddBands
+      ? pointOrder.filter(id=> !isBandId(id) || bandIsOn(id))
+      : pointOrder.slice();
+    const useOrder = order.length ? order : pointOrder;
+    const i = useOrder.indexOf(selected);
+    const ni = (i<0) ? 0 : (i + dir + useOrder.length) % useOrder.length;
+    selected = useOrder[ni];
     updatePanel();
     draw();
   };
@@ -4503,6 +4553,7 @@ function buildRMEqProQPanelControl(win, ctrl){
     bringPluginToFront(win);
     const cur = (pOn.value||0) >= 0.5;
     setParamRaw(pOn, cur ? 0 : 1, 0, 1);
+    ensureSelectedActive();
     updatePanel();
     draw();
   });
@@ -4669,6 +4720,45 @@ function buildRMEqProQPanelControl(win, ctrl){
   snapBtn.addEventListener("click", ()=>{
     snapOn = !snapOn;
     setSnapUI();
+  });
+
+  const addBandAt = (clientX, clientY)=>{
+    if (!allowAddBands) return;
+    remap();
+    const nextId = findNextAvailableBand();
+    if (!nextId) return;
+    const rect = wrap.getBoundingClientRect();
+    const cx = (clientX != null) ? clientX : (rect.left + rect.width/2);
+    const cy = (clientY != null) ? clientY : (rect.top + rect.height/2);
+    const x = clamp(cx - rect.left, 0, rect.width);
+    const y = clamp(cy - rect.top, 0, rect.height);
+    const f = xToFreq(x, rect.width);
+    const g = yToGain(y, rect.height);
+
+    const pOn = getOnParamFor(nextId);
+    const pF = getFreqParamFor(nextId);
+    const pG = getGainParamFor(nextId);
+    const pQ = getQParamFor(nextId);
+    const pT = getTypeParamFor(nextId);
+
+    if (pOn) setParamRaw(pOn, 1, 0, 1);
+    if (pF) setParamRaw(pF, f, 20, 20000);
+    if (pG) setParamRaw(pG, clamp(g, -18, 18), -18, 18);
+    if (pQ) setParamRaw(pQ, 1, 0.2, 10);
+    if (pT) setParamRaw(pT, 0, 0, 3);
+
+    selected = nextId;
+    updatePanel();
+    draw();
+  };
+
+  if (addBtn){
+    addBtn.style.display = allowAddBands ? "" : "none";
+    addBtn.addEventListener("click", ()=> addBandAt(null, null));
+  }
+  wrap.addEventListener("dblclick", (ev)=>{
+    if (!allowAddBands) return;
+    addBandAt(ev.clientX, ev.clientY);
   });
 
   // ===== Filter response helpers (match JSFX) =====
@@ -4839,10 +4929,14 @@ function buildRMEqProQPanelControl(win, ctrl){
       ctx.beginPath();
       const y0 = gainToY(0,h);
       const dbMin = -90;
+      const binCount = idx.specBins.length;
+      const fMin = 20;
+      const fMax = 20000;
       idx.specBins.forEach((pi, i)=>{
         const pp = getP(pi);
         const v = pp ? clamp01(pp.value||0) : 0;
-        const x = (i/(idx.specBins.length-1)) * w;
+        const f = fMin * Math.pow(fMax/fMin, i/Math.max(1,(binCount-1)));
+        const x = freqToX(f, w);
         const db = dbMin + v * (0 - dbMin);
         const y = y0 + ((-db)/(-dbMin)) * (h - y0);
         if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
@@ -4856,7 +4950,7 @@ function buildRMEqProQPanelControl(win, ctrl){
     }
 
     // ---- Build per-band curves (colored) + sum curve (white) ----
-    const N = 240;
+    const N = 480;
     const sum = new Array(N).fill(1);
 
     const drawBandCurve = (magArr, color)=>{
@@ -4921,14 +5015,15 @@ function buildRMEqProQPanelControl(win, ctrl){
     }
 
     // Bands B1..B4
-    for (let bn=1; bn<=4; bn++){
+    for (let bn=1; bn<=maxBands; bn++){
       const id = "B"+bn;
       if (!bandEnabled(id)) continue;
 
-      const pf = getP(idx[`b${bn}Freq`]);
-      const pg = getP(idx[`b${bn}Gain`]);
-      const pq = getP(idx[`b${bn}Q`]);
-      const pt = getP(idx[`b${bn}Type`]);
+      const slot = idx.bands[bn-1];
+      const pf = slot ? getP(slot.freq) : null;
+      const pg = slot ? getP(slot.gain) : null;
+      const pq = slot ? getP(slot.q) : null;
+      const pt = slot ? getP(slot.type) : null;
 
       const fc = pf ? rawFromParam(pf, 20, 20000) : 1000;
       const gd = pg ? rawFromParam(pg, -18, 18) : 0;
@@ -5028,12 +5123,18 @@ function buildRMEqProQPanelControl(win, ctrl){
       el.style.top = y+"px";
       el.classList.toggle("sel", selected === def.id);
       el.classList.toggle("off", !isOn);
+      if (allowAddBands && def.kind === "band"){
+        el.classList.toggle("hidden", !isOn && selected !== def.id);
+      } else {
+        el.classList.remove("hidden");
+      }
     });
   }
 
   // ===== Update panel =====
   function updatePanel(){
     remap();
+    ensureSelectedActive();
 
     ttlName.textContent = selected;
 
@@ -5107,6 +5208,12 @@ function buildRMEqProQPanelControl(win, ctrl){
     const pSpec = getP(idx.specOn);
     const sOn = pSpec ? ((pSpec.value||0) >= 0.5) : false;
     specBtn.classList.toggle("on", sOn);
+
+    if (addBtn && allowAddBands){
+      const next = findNextAvailableBand();
+      addBtn.disabled = !next;
+      addBtn.title = next ? "Add band" : "All bands used";
+    }
   }
 
   // ===== Init / observers =====
@@ -6060,8 +6167,10 @@ applyResponsiveMode();
       if (refs.bars.textContent !== next) refs.bars.textContent = next;
     }
     if (refs.region){
-      const name = transport.regionName || "—";
-      refs.region.textContent = `Region: ${name}`;
+      const name = String(transport.regionName || "").trim();
+      const idx = Number.isFinite(transport.regionIndex) ? transport.regionIndex : null;
+      const label = name || (idx !== null ? `#${idx}` : "—");
+      refs.region.textContent = `Region: ${label}`;
     }
     if (refs.bpm){
       const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
@@ -7614,6 +7723,7 @@ const FX_ADD_CATALOG = [
   {name:"RM Gate", add:"JS: RM_Gate [Telemetry]||JS:RM_Gate [Telemetry]||RM_Gate [Telemetry]"},
   {name:"RM PreAmp", add:"JS: RM_PreAmp [Telemetry]||JS:RM_PreAmp [Telemetry]||RM_PreAmp [Telemetry]"},
   {name:"RM_EQ", add:"JS: RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||JS:RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]"},
+  {name:"RM_EQ2", add:"JS: RM_EQ2 (ProQ) + Spectrum v3 [Telemetry]||JS:RM_EQ2 (ProQ) + Spectrum v3 [Telemetry]||RM_EQ2 (ProQ) + Spectrum v3 [Telemetry]"},
   {name:"RM_1175", add:"JS: RM_1175 (1175 core) Hybrid v3||JS:RM_1175 (1175 core) Hybrid v3||RM_1175"},
   {name:"RM_LA1A", add:"JS: RM_LA1A [Telemetry]||JS:RM_LA1A [Telemetry]||RM_LA1A [Telemetry]"},
   {name:"RM_Deesser", add:"JS: RM_Deesser [Telemetry]||JS:RM_Deesser [Telemetry]||RM_Deesser [Telemetry]"},
@@ -7769,24 +7879,57 @@ const FX_ADD_CATALOG = [
     }
     const list = document.createElement("div");
     list.className = "fxList";
+    const fmtRegionName = (r)=>{
+      const name = String(r.name || "").trim();
+      if (name) return name;
+      const idx = Number.isFinite(r.index) ? `#${r.index}` : "";
+      return idx ? `Region ${idx}` : "Region";
+    };
+    const fmtMarkerName = (m)=>{
+      const name = String(m.name || "").trim();
+      if (name) return name;
+      const idx = Number.isFinite(m.index) ? `#${m.index}` : "";
+      return idx ? `Marker ${idx}` : "Marker";
+    };
+    if (regions.length){
+      const hdr = document.createElement("div");
+      hdr.className = "small";
+      hdr.style.margin = "6px 0";
+      hdr.textContent = "Regions";
+      list.appendChild(hdr);
+    }
     regions.forEach((r)=>{
       const row = document.createElement("div");
       row.className = "fxItem";
-      row.innerHTML = `<div class="nm">Region: ${escapeHtml(r.name || "Region")}</div>
+      const start = Number.isFinite(r.start) ? formatTimecode(r.start) : "—";
+      const end = Number.isFinite(r.end) ? formatTimecode(r.end) : "—";
+      row.innerHTML = `<div class="nm">Region: ${escapeHtml(fmtRegionName(r))}</div>
+        <div class="small">${start} → ${end}</div>
         <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
       row.querySelector("button").addEventListener("click", ()=>{
-        wsSend({type:"gotoRegion", index: r.index});
+        const idx = Number.isFinite(r.index) ? r.index : -1;
+        wsSend({type:"gotoRegion", index: idx});
         closeModal();
       });
       list.appendChild(row);
     });
+    if (markers.length){
+      const hdr = document.createElement("div");
+      hdr.className = "small";
+      hdr.style.margin = "10px 0 6px";
+      hdr.textContent = "Markers";
+      list.appendChild(hdr);
+    }
     markers.forEach((m)=>{
       const row = document.createElement("div");
       row.className = "fxItem";
-      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(m.name || "Marker")}</div>
+      const pos = Number.isFinite(m.position) ? formatTimecode(m.position) : "—";
+      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(fmtMarkerName(m))}</div>
+        <div class="small">${pos}</div>
         <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
       row.querySelector("button").addEventListener("click", ()=>{
-        wsSend({type:"gotoMarker", index: m.index});
+        const idx = Number.isFinite(m.index) ? m.index : -1;
+        wsSend({type:"gotoMarker", index: idx});
         closeModal();
       });
       list.appendChild(row);

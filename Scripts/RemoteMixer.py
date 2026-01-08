@@ -1142,17 +1142,18 @@ def handle_cmd(cmd, sock):
                     try:
                         RPR_GotoMarker(0, idx, True)
                     except Exception:
-                        regions, _markers = get_regions_and_markers()
-                        start = None
-                        for r in regions:
-                            if int(r.get("index", -1)) == idx:
-                                start = r.get("start", None)
-                                break
-                        if start is not None:
-                            try:
-                                RPR_SetEditCurPos2(0, start, True, True)
-                            except Exception:
-                                RPR_SetEditCurPos(start, True, True)
+                        pass
+                    regions, _markers = get_regions_and_markers()
+                    start = None
+                    for r in regions:
+                        if int(r.get("index", -1)) == idx:
+                            start = r.get("start", None)
+                            break
+                    if start is not None:
+                        try:
+                            RPR_SetEditCurPos2(0, start, True, True)
+                        except Exception:
+                            RPR_SetEditCurPos(start, True, True)
                 except Exception:
                     pass
             return
@@ -1164,6 +1165,17 @@ def handle_cmd(cmd, sock):
                         RPR_GotoMarker(0, idx, False)
                     except Exception:
                         RPR_GotoMarker(0, idx, 0)
+                    _regions, markers = get_regions_and_markers()
+                    pos = None
+                    for m in markers:
+                        if int(m.get("index", -1)) == idx:
+                            pos = m.get("position", None)
+                            break
+                    if pos is not None:
+                        try:
+                            RPR_SetEditCurPos2(0, pos, True, True)
+                        except Exception:
+                            RPR_SetEditCurPos(pos, True, True)
                 except Exception:
                     pass
             return
