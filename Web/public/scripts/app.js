@@ -55,7 +55,15 @@
     title: "NS1",
     sections: [
       // Waves NS1 exposes the main reduction control as parameter index 2 (NS1 #2)
-      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:2, faderFind:[/^NS1\b/i] }} ] }
+      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:2, faderFind:[/^NS1\b/i], brand:"NS1" }} ] }
+    ]
+  },
+  {
+    id: "rm_ns",
+    match: (name)=> /\bRM[\s_-]*NS\b/i.test(name),
+    title: "RM-NS",
+    sections: [
+      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:0, faderFind:[/^Reduction\b/i], brand:"RM-NS" }} ] }
     ]
   },
   {
@@ -82,7 +90,15 @@
     match: (name)=> /\bRM[\s_]*EQ4\b/i.test(name),
     title: "RM_EQ",
     sections: [
-      { title: "", controls: [ {type:"rmEqProQPanel"} ] }
+      { title: "", controls: [ {type:"rmEqProQPanel", extra:{brand:"RM_EQ", maxBands:4, allowAdd:false}} ] }
+    ]
+  },
+  {
+    id: "rm_eq2",
+    match: (name)=> /\bRM[\s_]*EQ2\b/i.test(name),
+    title: "RM_EQ2",
+    sections: [
+      { title: "", controls: [ {type:"rmEqProQPanel", extra:{brand:"RM_EQ2", maxBands:20, allowAdd:true}} ] }
     ]
   },
   {
@@ -580,14 +596,14 @@ function formatParam(p){
     const readout = document.createElement("div"); readout.className="ns1Readout"; readout.textContent="—";
     faderCol.appendChild(readout);
 
-    const brand = document.createElement("div"); brand.className="ns1Brand"; brand.textContent="NS1";
+    const extra = ctrl.extra||{};
+    const brand = document.createElement("div"); brand.className="ns1Brand"; brand.textContent = extra.brand || "NS1";
     root.appendChild(brand);
     root.appendChild(faderCol);
 
     const clamp01 = (x)=>Math.max(0, Math.min(1, x));
 
     const getFaderParam = ()=>{
-      const extra = ctrl.extra||{};
       let p = null;
       if (Number.isFinite(extra.paramIndex)){
         p = (win.params||[]).find(x=>x.index===extra.paramIndex) || null;
@@ -3998,6 +4014,10 @@ function buildRMDeesserPanelControl(win, ctrl){
 }
 
 function buildRMEqProQPanelControl(win, ctrl){
+  const opts = ctrl.extra || {};
+  const brandLabel = String(opts.brand || "RM_EQ");
+  const maxBands = Number.isFinite(opts.maxBands) ? Math.max(1, Math.round(opts.maxBands)) : 4;
+  const allowAddBands = !!opts.allowAdd;
   const root = document.createElement("div");
   root.className = "rmEqProQ";
   root.tabIndex = 0; // keyboard navigation (←/→)
@@ -4010,6 +4030,7 @@ function buildRMEqProQPanelControl(win, ctrl){
 
   const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
   const clamp01 = (x)=>clamp(x,0,1);
+  let specSmooth = [];
 
   // ===== Graph wrapper =====
   const wrap = document.createElement("div");
@@ -4024,7 +4045,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   // Pro-Q chrome (visual only)
   const decoTop = document.createElement("div");
   decoTop.className = "rmEqDecoTop";
-  decoTop.innerHTML = `<div class="rmEqBrand"><span class="rmEqPro">RM_EQ</span></div><div class="rmEqTopHint">Analyzer</div>`;
+  decoTop.innerHTML = `<div class="rmEqBrand"><span class="rmEqPro">${escapeHtml(brandLabel)}</span></div><div class="rmEqTopHint">Analyzer</div>`;
   wrap.appendChild(decoTop);
 
   const decoRight = document.createElement("div");
@@ -4048,6 +4069,7 @@ function buildRMEqProQPanelControl(win, ctrl){
     <div class="rmEqBottomRight">
       <button class="pill" data-role="spec">Spectrum</button>
       <button class="pill" data-role="snap">Snap</button>
+      <button class="pill" data-role="add">Add</button>
       <button class="pill" data-role="zero">0 dB</button>
     </div>
   `;
@@ -4057,6 +4079,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   const outVal = bottomRow.querySelector(".rmEqOutVal");
   const specBtn = bottomRow.querySelector('[data-role="spec"]');
   const snapBtn = bottomRow.querySelector('[data-role="snap"]');
+  const addBtn = bottomRow.querySelector('[data-role="add"]');
   const zeroBtn = bottomRow.querySelector('[data-role="zero"]');
 
   // ===== Point panel (Pro-Q-like) =====
@@ -4070,6 +4093,7 @@ function buildRMEqProQPanelControl(win, ctrl){
         <div class="rmEqPointSub">—</div>
       </div>
       <div class="rmEqHdrRight">
+        <button class="miniBtn rmEqDelete" data-role="delete">Delete</button>
         <button class="miniBtn rmEqToggle" data-role="toggle">On</button>
         <button class="miniBtn rmEqNav" data-nav="1">›</button>
         <button class="miniBtn rmEqCollapse" data-role="collapse" title="Hide panel">▾</button>
@@ -4139,6 +4163,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   const ttlName = pointPanel.querySelector(".rmEqPointName");
   const ttlSub  = pointPanel.querySelector(".rmEqPointSub");
   const toggleBtn = pointPanel.querySelector('[data-role="toggle"]');
+  const deleteBtn = pointPanel.querySelector('[data-role="delete"]');
   const collapseBtn = pointPanel.querySelector('[data-role="collapse"]');
   const typeBtnsWrap = pointPanel.querySelector('[data-role="typeBtns"]');
   const slopeBtnsWrap = pointPanel.querySelector('[data-role="slopeBtns"]');
@@ -4200,10 +4225,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   let idx = {
     lcOn:null, lcFreq:null, lcSlope:null,
     hcOn:null, hcFreq:null, hcSlope:null,
-    b1On:null, b1Freq:null, b1Gain:null, b1Q:null, b1Type:null,
-    b2On:null, b2Freq:null, b2Gain:null, b2Q:null, b2Type:null,
-    b3On:null, b3Freq:null, b3Gain:null, b3Q:null, b3Type:null,
-    b4On:null, b4Freq:null, b4Gain:null, b4Q:null, b4Type:null,
+    bands: Array.from({length: maxBands}, ()=>({on:null, freq:null, gain:null, q:null, type:null})),
     outGain:null,
     specOn:null,
     specBins:[]
@@ -4265,14 +4287,16 @@ function buildRMEqProQPanelControl(win, ctrl){
     if (hcFr) idx.hcFreq = hcFr.index;
     if (hcSl) idx.hcSlope = hcSl.index;
 
-    [1,2,3,4].forEach(n=>{
+    for (let n=1; n<=maxBands; n++){
       const pon=bOn(n), pfr=bFr(n), pgn=bGn(n), pq=bQ(n), pty=bTy(n);
-      if (pon) idx[`b${n}On`]=pon.index;
-      if (pfr) idx[`b${n}Freq`]=pfr.index;
-      if (pgn) idx[`b${n}Gain`]=pgn.index;
-      if (pq)  idx[`b${n}Q`]=pq.index;
-      if (pty) idx[`b${n}Type`]=pty.index;
-    });
+      const slot = idx.bands[n-1];
+      if (!slot) continue;
+      slot.on = pon ? pon.index : null;
+      slot.freq = pfr ? pfr.index : null;
+      slot.gain = pgn ? pgn.index : null;
+      slot.q = pq ? pq.index : null;
+      slot.type = pty ? pty.index : null;
+    }
 
     if (out) idx.outGain = out.index;
     if (spec) idx.specOn = spec.index;
@@ -4290,24 +4314,31 @@ function buildRMEqProQPanelControl(win, ctrl){
   };
 
   // ===== Bands/points =====
-  const pointDefs = [
-    {id:"LC", label:"LoCut", color:"#d7d7d7", kind:"cut"},
-    {id:"B1", label:"B1", color:"#66e36f", kind:"band"},
-    {id:"B2", label:"B2", color:"#ffb24a", kind:"band"},
-    {id:"B3", label:"B3", color:"#57a6ff", kind:"band"},
-    {id:"B4", label:"B4", color:"#d96bff", kind:"band"},
-    {id:"HC", label:"HiCut", color:"#d7d7d7", kind:"cut"},
+  const bandColors = [
+    "#66e36f", "#ffb24a", "#57a6ff", "#d96bff", "#ff6b88",
+    "#56e0d7", "#ffd34a", "#8be3ff", "#b9ff8d", "#ffa0e7",
   ];
+  const pointDefs = [{id:"LC", label:"LoCut", color:"#d7d7d7", kind:"cut"}];
+  for (let i=1; i<=maxBands; i++){
+    pointDefs.push({
+      id:`B${i}`,
+      label:`B${i}`,
+      color: bandColors[(i-1) % bandColors.length],
+      kind:"band",
+    });
+  }
+  pointDefs.push({id:"HC", label:"HiCut", color:"#d7d7d7", kind:"cut"});
   const pointOrder = pointDefs.map(d=>d.id);
   const pointEls = {};
-  let selected = "B2";
+  let selected = maxBands >= 1 ? "B1" : "LC";
 
   const getOnParamFor = (id)=>{
     if (id==="LC") return getP(idx.lcOn);
     if (id==="HC") return getP(idx.hcOn);
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}On`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.on) : null;
     }
     return null;
   };
@@ -4316,33 +4347,58 @@ function buildRMEqProQPanelControl(win, ctrl){
     if (id==="HC") return getP(idx.hcFreq);
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}Freq`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.freq) : null;
     }
     return null;
   };
   const getGainParamFor = (id)=>{
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}Gain`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.gain) : null;
     }
     return null;
   };
   const getQParamFor = (id)=>{
     if (id.startsWith("B")){
       const n = parseInt(id.slice(1),10);
-      return getP(idx[`b${n}Q`]);
+      const slot = idx.bands[n-1];
+      return slot ? getP(slot.q) : null;
     }
     return null;
   };
   const getTypeParamFor = (id)=>{
     if (!id.startsWith("B")) return null;
     const n = parseInt(id.slice(1),10);
-    return getP(idx[`b${n}Type`]);
+    const slot = idx.bands[n-1];
+    return slot ? getP(slot.type) : null;
   };
   const getSlopeParamFor = (id)=>{
     if (id==="LC") return getP(idx.lcSlope);
     if (id==="HC") return getP(idx.hcSlope);
     return null;
+  };
+  const isBandId = (id)=> id && id.startsWith("B");
+  const bandIsOn = (id)=>{
+    const pOn = getOnParamFor(id);
+    return pOn ? ((pOn.value||0) >= 0.5) : false;
+  };
+  const findNextAvailableBand = ()=>{
+    if (!allowAddBands) return null;
+    for (let i=0;i<maxBands;i++){
+      const slot = idx.bands[i];
+      const pOn = slot ? getP(slot.on) : null;
+      if (pOn && (pOn.value||0) < 0.5) return `B${i+1}`;
+    }
+    return null;
+  };
+  const ensureSelectedActive = ()=>{
+    if (!allowAddBands || !isBandId(selected)) return;
+    if (bandIsOn(selected)) return;
+    const active = pointOrder.find(id=> isBandId(id) && bandIsOn(id));
+    if (active) selected = active;
+    else selected = "LC";
   };
 
   // ===== Freq snapping (1/12 octave) =====
@@ -4433,8 +4489,9 @@ function buildRMEqProQPanelControl(win, ctrl){
         if (pF) setParamRaw(pF, f, 20, 20000);
       } else {
         const n = parseInt(def.id.slice(1),10);
-        const pF = getP(idx[`b${n}Freq`]);
-        const pG = getP(idx[`b${n}Gain`]);
+        const slot = idx.bands[n-1];
+        const pF = slot ? getP(slot.freq) : null;
+        const pG = slot ? getP(slot.gain) : null;
         if (pF) setParamRaw(pF, f, 20, 20000);
         if (pG){
           const g = yToGain(y, rect.height);
@@ -4477,9 +4534,13 @@ function buildRMEqProQPanelControl(win, ctrl){
 
   // ===== Panel interactions =====
   const cycleSelected = (dir)=>{
-    const i = pointOrder.indexOf(selected);
-    const ni = (i<0) ? 0 : (i + dir + pointOrder.length) % pointOrder.length;
-    selected = pointOrder[ni];
+    const order = allowAddBands
+      ? pointOrder.filter(id=> !isBandId(id) || bandIsOn(id))
+      : pointOrder.slice();
+    const useOrder = order.length ? order : pointOrder;
+    const i = useOrder.indexOf(selected);
+    const ni = (i<0) ? 0 : (i + dir + useOrder.length) % useOrder.length;
+    selected = useOrder[ni];
     updatePanel();
     draw();
   };
@@ -4503,9 +4564,24 @@ function buildRMEqProQPanelControl(win, ctrl){
     bringPluginToFront(win);
     const cur = (pOn.value||0) >= 0.5;
     setParamRaw(pOn, cur ? 0 : 1, 0, 1);
+    ensureSelectedActive();
     updatePanel();
     draw();
   });
+
+  if (deleteBtn){
+    deleteBtn.addEventListener("click", ()=>{
+      if (!selected.startsWith("B")) return;
+      remap();
+      const pOn = getOnParamFor(selected);
+      if (!pOn) return;
+      bringPluginToFront(win);
+      setParamRaw(pOn, 0, 0, 1);
+      ensureSelectedActive();
+      updatePanel();
+      draw();
+    });
+  }
 
   typeBtnsWrap.querySelectorAll("button").forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -4671,6 +4747,45 @@ function buildRMEqProQPanelControl(win, ctrl){
     setSnapUI();
   });
 
+  const addBandAt = (clientX, clientY)=>{
+    if (!allowAddBands) return;
+    remap();
+    const nextId = findNextAvailableBand();
+    if (!nextId) return;
+    const rect = wrap.getBoundingClientRect();
+    const cx = (clientX != null) ? clientX : (rect.left + rect.width/2);
+    const cy = (clientY != null) ? clientY : (rect.top + rect.height/2);
+    const x = clamp(cx - rect.left, 0, rect.width);
+    const y = clamp(cy - rect.top, 0, rect.height);
+    const f = xToFreq(x, rect.width);
+    const g = yToGain(y, rect.height);
+
+    const pOn = getOnParamFor(nextId);
+    const pF = getFreqParamFor(nextId);
+    const pG = getGainParamFor(nextId);
+    const pQ = getQParamFor(nextId);
+    const pT = getTypeParamFor(nextId);
+
+    if (pOn) setParamRaw(pOn, 1, 0, 1);
+    if (pF) setParamRaw(pF, f, 20, 20000);
+    if (pG) setParamRaw(pG, clamp(g, -18, 18), -18, 18);
+    if (pQ) setParamRaw(pQ, 1, 0.2, 10);
+    if (pT) setParamRaw(pT, 0, 0, 3);
+
+    selected = nextId;
+    updatePanel();
+    draw();
+  };
+
+  if (addBtn){
+    addBtn.style.display = allowAddBands ? "" : "none";
+    addBtn.addEventListener("click", ()=> addBandAt(null, null));
+  }
+  wrap.addEventListener("dblclick", (ev)=>{
+    if (!allowAddBands) return;
+    addBandAt(ev.clientX, ev.clientY);
+  });
+
   // ===== Filter response helpers (match JSFX) =====
   function biquadMag(coeff, freq, sr){
     const w = 2*Math.PI*freq/sr;
@@ -4834,29 +4949,87 @@ function buildRMEqProQPanelControl(win, ctrl){
     const pSpec = getP(idx.specOn);
     const specOn2 = pSpec ? ((pSpec.value||0) >= 0.5) : false;
     if (specOn2 && idx.specBins && idx.specBins.length){
-      ctx.strokeStyle = "rgba(255,255,255,.35)";
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      const y0 = gainToY(0,h);
+      const binCount = idx.specBins.length;
+      const fMin = 20;
+      const fMax = 20000;
       const dbMin = -90;
-      idx.specBins.forEach((pi, i)=>{
-        const pp = getP(pi);
-        const v = pp ? clamp01(pp.value||0) : 0;
-        const x = (i/(idx.specBins.length-1)) * w;
-        const db = dbMin + v * (0 - dbMin);
-        const y = y0 + ((-db)/(-dbMin)) * (h - y0);
-        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      const dbMax = 12;
+      const tiltRef = 1000;
+      const tiltDbPerOct = 1.5;
+      const dbRange = dbMax - dbMin;
+      const yForSpec = (db)=> (1 - ((db - dbMin) / dbRange)) * h;
+      if (!specSmooth || specSmooth.length !== binCount){
+        specSmooth = new Array(binCount).fill(0);
+      }
+      const bins = new Array(binCount);
+      for (let i=0;i<binCount;i++){
+        const pp = getP(idx.specBins[i]);
+        bins[i] = pp ? clamp01(pp.value||0) : 0;
+      }
+      for (let i=0;i<binCount;i++){
+        const t = i / Math.max(1, binCount - 1);
+        const lowBoost = Math.pow(1 - t, 0.35);
+        const cur = specSmooth[i];
+        const target = bins[i];
+        const attack = 0.55 + 0.35 * lowBoost;
+        const decay = 0.08 + 0.12 * (1 - lowBoost);
+        const a = target > cur ? attack : decay;
+        specSmooth[i] = cur + (target - cur) * a;
+      }
+      const spatial = specSmooth.map((v,i)=>{
+        const v0 = specSmooth[Math.max(0,i-1)];
+        const v1 = specSmooth[Math.min(binCount-1,i+1)];
+        return (v0 + v*2 + v1) / 4;
       });
+
+      const catmull = (p0,p1,p2,p3,t)=>{
+        const t2 = t*t;
+        const t3 = t2*t;
+        return 0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3);
+      };
+
+      const stepsPerBin = allowAddBands ? 10 : 7;
+      const steps = (binCount - 1) * stepsPerBin;
+      ctx.save();
+      ctx.strokeStyle = "rgba(235,235,235,.55)";
+      ctx.lineWidth = 1.35;
+      ctx.shadowColor = "rgba(255,255,255,.20)";
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      for (let i=0;i<=steps;i++){
+        const t = i / Math.max(1, steps);
+        const tWarp = Math.pow(t, 0.6);
+        const raw = tWarp * (binCount - 1);
+        const idx1 = Math.floor(raw);
+        const frac = raw - idx1;
+        const idx0 = Math.max(0, idx1 - 1);
+        const idx2 = Math.min(binCount - 1, idx1 + 1);
+        const idx3 = Math.min(binCount - 1, idx1 + 2);
+        const v = catmull(spatial[idx0], spatial[idx1], spatial[idx2], spatial[idx3], frac);
+        const f = fMin * Math.pow(fMax/fMin, raw / Math.max(1,(binCount - 1)));
+        const x = freqToX(f, w);
+        const tilt = tiltDbPerOct * Math.log2(Math.max(1, f) / tiltRef);
+        let db = dbMin + clamp01(v) * (0 - dbMin) + tilt;
+        db = clamp(db, dbMin, dbMax);
+        const y = yForSpec(db);
+        if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
       ctx.stroke();
-      ctx.globalAlpha = 0.10;
+      ctx.restore();
+
+      const fillGrad = ctx.createLinearGradient(0, yForSpec(0), 0, h);
+      fillGrad.addColorStop(0, "rgba(255,255,255,.18)");
+      fillGrad.addColorStop(0.65, "rgba(255,255,255,.08)");
+      fillGrad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.globalAlpha = 0.12;
       ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
-      ctx.fillStyle = "rgba(255,255,255,.55)";
+      ctx.fillStyle = fillGrad;
       ctx.fill();
       ctx.globalAlpha = 1;
     }
 
     // ---- Build per-band curves (colored) + sum curve (white) ----
-    const N = 240;
+    const N = 480;
     const sum = new Array(N).fill(1);
 
     const drawBandCurve = (magArr, color)=>{
@@ -4921,14 +5094,15 @@ function buildRMEqProQPanelControl(win, ctrl){
     }
 
     // Bands B1..B4
-    for (let bn=1; bn<=4; bn++){
+    for (let bn=1; bn<=maxBands; bn++){
       const id = "B"+bn;
       if (!bandEnabled(id)) continue;
 
-      const pf = getP(idx[`b${bn}Freq`]);
-      const pg = getP(idx[`b${bn}Gain`]);
-      const pq = getP(idx[`b${bn}Q`]);
-      const pt = getP(idx[`b${bn}Type`]);
+      const slot = idx.bands[bn-1];
+      const pf = slot ? getP(slot.freq) : null;
+      const pg = slot ? getP(slot.gain) : null;
+      const pq = slot ? getP(slot.q) : null;
+      const pt = slot ? getP(slot.type) : null;
 
       const fc = pf ? rawFromParam(pf, 20, 20000) : 1000;
       const gd = pg ? rawFromParam(pg, -18, 18) : 0;
@@ -5028,12 +5202,14 @@ function buildRMEqProQPanelControl(win, ctrl){
       el.style.top = y+"px";
       el.classList.toggle("sel", selected === def.id);
       el.classList.toggle("off", !isOn);
+      el.classList.remove("hidden");
     });
   }
 
   // ===== Update panel =====
   function updatePanel(){
     remap();
+    ensureSelectedActive();
 
     ttlName.textContent = selected;
 
@@ -5072,6 +5248,10 @@ function buildRMEqProQPanelControl(win, ctrl){
 
     // type vs slope block
     if (selected.startsWith("B")){
+      if (deleteBtn){
+        deleteBtn.style.display = allowAddBands ? "" : "none";
+        deleteBtn.disabled = !isOn;
+      }
       typeBtnsWrap.style.display = "";
       slopeBtnsWrap.style.display = "none";
 
@@ -5083,6 +5263,10 @@ function buildRMEqProQPanelControl(win, ctrl){
 
       knobEls.q.querySelector(".rmEqKnobLab").textContent = (t===1 || t===2 || t===3) ? "SLOPE" : "Q";
     }else{
+      if (deleteBtn){
+        deleteBtn.style.display = "none";
+        deleteBtn.disabled = true;
+      }
       typeBtnsWrap.style.display = "none";
       slopeBtnsWrap.style.display = "";
 
@@ -5107,6 +5291,12 @@ function buildRMEqProQPanelControl(win, ctrl){
     const pSpec = getP(idx.specOn);
     const sOn = pSpec ? ((pSpec.value||0) >= 0.5) : false;
     specBtn.classList.toggle("on", sOn);
+
+    if (addBtn && allowAddBands){
+      const next = findNextAvailableBand();
+      addBtn.disabled = !next;
+      addBtn.title = next ? "Add band" : "All bands used";
+    }
   }
 
   // ===== Init / observers =====
@@ -5978,6 +6168,7 @@ applyResponsiveMode();
     scene: "default",
     folderView: {},               // guid -> "expanded"|"compact"|"hidden"
     hiddenTracks: {},             // guid -> true (UI only)
+    compactTracks: {},            // guid -> true
   };
 
   function loadCfg(){
@@ -6005,9 +6196,53 @@ applyResponsiveMode();
   }
   applyTheme();
 
-  // Multiuser
-  let projectInfo = null;   // {projectId, projectName, users, admin, ui}
-  let currentUser = null;
+  // Scenes
+  let projectInfo = null;   // {projectId, projectName, ui}
+  let sceneState = { projectId: null, scenes: [], current: "main" };
+
+  const defaultScenes = ()=>[
+    {name:"main", all:true, guids:[]},
+    {name:"mon1", all:false, guids:[]},
+    {name:"mon2", all:false, guids:[]}
+  ];
+  const sceneKey = (pid)=> `rm_scenes_${pid||"default"}`;
+  const sceneCurrentKey = (pid)=> `rm_scene_current_${pid||"default"}`;
+
+  function loadScenes(pid){
+    try{
+      const raw = localStorage.getItem(sceneKey(pid));
+      const obj = raw ? JSON.parse(raw) : null;
+      if (obj && Array.isArray(obj.scenes)){
+        return { projectId: pid, scenes: obj.scenes, current: obj.current || "main" };
+      }
+    }catch{}
+    return { projectId: pid, scenes: defaultScenes(), current: "main" };
+  }
+  function saveScenes(){
+    try{
+      localStorage.setItem(sceneKey(sceneState.projectId), JSON.stringify({scenes: sceneState.scenes, current: sceneState.current}));
+      localStorage.setItem(sceneCurrentKey(sceneState.projectId), sceneState.current);
+    }catch{}
+  }
+  function ensureScenes(pid){
+    const next = loadScenes(pid);
+    if (!next.scenes.find(s=>s.name==="main")){
+      next.scenes = defaultScenes();
+      next.current = "main";
+    }
+    sceneState = next;
+    return sceneState;
+  }
+  function setCurrentScene(name){
+    const found = sceneState.scenes.find(s=>s.name===name);
+    sceneState.current = found ? name : "main";
+    saveScenes();
+    updateSceneSelect();
+    renderOrUpdate(true);
+  }
+  function getCurrentScene(){
+    return sceneState.scenes.find(s=>s.name===sceneState.current) || sceneState.scenes.find(s=>s.name==="main") || {name:"main", all:true, guids:[]};
+  }
 
 
   // ---------- WS ----------
@@ -6060,8 +6295,10 @@ applyResponsiveMode();
       if (refs.bars.textContent !== next) refs.bars.textContent = next;
     }
     if (refs.region){
-      const name = transport.regionName || "—";
-      refs.region.textContent = `Region: ${name}`;
+      const name = String(transport.regionName || "").trim();
+      const idx = Number.isFinite(transport.regionIndex) ? transport.regionIndex : null;
+      const label = name || (idx !== null ? `#${idx}` : "—");
+      refs.region.textContent = `Region: ${label}`;
     }
     if (refs.bpm){
       const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
@@ -6196,6 +6433,110 @@ applyResponsiveMode();
   let sliderTargets = new Map(); // guid -> targetY (0..1)
   let sliderCurrent = new Map(); // guid -> currentY (0..1)
   let draggingGuid = null;
+  let draggingTrackGuid = null;
+  let touchDrag = null;
+  let touchDropTarget = null;
+
+  function setTouchDropTarget(el){
+    if (touchDropTarget && touchDropTarget !== el){
+      touchDropTarget.classList.remove("dropTarget");
+    }
+    touchDropTarget = el;
+    if (touchDropTarget){
+      touchDropTarget.classList.add("dropTarget");
+    }
+  }
+
+  function updateTouchDropTarget(x, y){
+    const el = document.elementFromPoint(x, y);
+    const strip = el ? el.closest(".strip") : null;
+    if (!strip || !strip.dataset.guid || (touchDrag && strip.dataset.guid === touchDrag.guid)){
+      setTouchDropTarget(null);
+      return;
+    }
+    setTouchDropTarget(strip);
+  }
+
+  function startTouchDrag(guid, el, pointerId, x, y){
+    touchDrag = {guid, el, pointerId};
+    draggingTrackGuid = guid;
+    el.classList.add("dragging");
+    document.body.classList.add("draggingTrack");
+    updateTouchDropTarget(x, y);
+  }
+
+  function endTouchDrag(applyMove=true){
+    if (!touchDrag) return;
+    const {guid, el} = touchDrag;
+    if (applyMove && touchDropTarget){
+      const beforeGuid = touchDropTarget.dataset.guid;
+      if (beforeGuid && beforeGuid !== guid){
+        wsSend({type:"moveTrack", guid, beforeGuid});
+        setTimeout(()=>wsSend({type:"reqState"}), 120);
+      }
+    }
+    if (touchDropTarget) touchDropTarget.classList.remove("dropTarget");
+    if (el) el.classList.remove("dragging");
+    document.body.classList.remove("draggingTrack");
+    touchDropTarget = null;
+    touchDrag = null;
+    draggingTrackGuid = null;
+  }
+
+  function canStartTouchDrag(target){
+    if (!target) return false;
+    return !target.closest("input, button, .btn, .faderHit, .thumb, .panSlider, .slotbtn, .fxSlots, .fxSlotActions, .fxMoreBadge");
+  }
+
+  function startHoldDrag(t, el, ev, holdMs){
+    if (!canStartTouchDrag(ev.target)) return;
+    const startX = ev.clientX;
+    const startY = ev.clientY;
+    const pointerId = ev.pointerId;
+    let active = true;
+    const hold = setTimeout(()=>{
+      if (!active) return;
+      startTouchDrag(t.guid, el, pointerId, startX, startY);
+    }, holdMs);
+
+    const move = (e)=>{
+      if (!active) return;
+      const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+      if (!touchDrag && dist > 10){
+        clearTimeout(hold);
+        cleanup();
+        return;
+      }
+      if (touchDrag && touchDrag.pointerId === pointerId){
+        updateTouchDropTarget(e.clientX, e.clientY);
+      }
+    };
+    const up = ()=>{
+      if (!active) return;
+      clearTimeout(hold);
+      cleanup();
+      if (touchDrag && touchDrag.pointerId === pointerId){
+        endTouchDrag(true);
+      }
+    };
+    const cancel = ()=>{
+      if (!active) return;
+      clearTimeout(hold);
+      cleanup();
+      if (touchDrag && touchDrag.pointerId === pointerId){
+        endTouchDrag(false);
+      }
+    };
+    const cleanup = ()=>{
+      active = false;
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerup", up, true);
+      document.removeEventListener("pointercancel", cancel, true);
+    };
+    document.addEventListener("pointermove", move, true);
+    document.addEventListener("pointerup", up, true);
+    document.addEventListener("pointercancel", cancel, true);
+  }
 
   // FX slots cache
   let fxCache = new Map(); // guid -> {fx:[], ts}
@@ -6209,66 +6550,33 @@ applyResponsiveMode();
     try{ ws.send(JSON.stringify(obj)); } catch {}
   }
 
-  
-  // ----- User picker -----
-  // Use lazy DOM lookups to avoid init-order issues
-function showUserPicker(){
-    if (!projectInfo) return;
+  const sceneSelect = document.getElementById("sceneSelect");
+  const sceneManageBtn = document.getElementById("sceneManageBtn");
 
-    const userOverlay = document.getElementById("overlay");
-    const userModal   = document.getElementById("modal");
-    const userGrid    = document.getElementById("modalBody");
-    const modalTitle  = document.getElementById("modalTitle");
-    const tabsEl      = document.getElementById("tabs");
-
-    if (!userOverlay || !userModal || !userGrid || !modalTitle || !tabsEl) return;
-
-    // close any open modal state
-    openModal = null;
-
-    modalTitle.textContent = "Select user";
-    tabsEl.innerHTML = "";
-    userGrid.innerHTML = "";
-
-    const grid = document.createElement("div");
-    grid.style.display = "grid";
-    grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(120px, 1fr))";
-    grid.style.gap = "10px";
-
-    for (const u of (projectInfo.users||[])){
-      const b = document.createElement("button");
-      b.className = "userBtn";
-      b.textContent = u;
-      b.onclick = ()=> selectUser(u);
-      grid.appendChild(b);
+  function updateSceneSelect(){
+    if (!sceneSelect) return;
+    sceneSelect.innerHTML = "";
+    for (const sc of sceneState.scenes){
+      const opt = document.createElement("option");
+      opt.value = sc.name;
+      opt.textContent = sc.name;
+      if (sc.name === sceneState.current) opt.selected = true;
+      sceneSelect.appendChild(opt);
     }
-    userGrid.appendChild(grid);
+  }
 
-    userOverlay.style.display = "block";
-    userModal.style.display = "block";
-  }
-function hideUserPicker(){
-    const userOverlay = document.getElementById("overlay");
-    const userModal   = document.getElementById("modal");
-    const userGrid    = document.getElementById("modalBody");
-    const tabsEl      = document.getElementById("tabs");
-    if (userOverlay) userOverlay.style.display = "none";
-    if (userModal) userModal.style.display = "none";
-    try{
-      if (userGrid) userGrid.innerHTML = "";
-      if (tabsEl) tabsEl.innerHTML = "";
-    }catch(e){}
-  }
-  function selectUser(u){
+  function openSceneManager(){
     if (!projectInfo) return;
-    currentUser = u;
-    try{ localStorage.setItem("rm_user_"+projectInfo.projectId, u); }catch{}
-    hideUserPicker();
-    wsSend({type:"setUser", user:u});
-    // Ask fresh state after switching
-    wsSend({type:"reqState"});
-    renderOrUpdate();
+    openModal = {kind:"scenes"};
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    renderModal();
   }
+
+  if (sceneSelect){
+    sceneSelect.addEventListener("change", ()=> setCurrentScene(sceneSelect.value));
+  }
+  sceneManageBtn?.addEventListener("click", openSceneManager);
 
 
   function connectWS(){
@@ -6295,33 +6603,12 @@ function hideUserPicker(){
           if (typeof projectInfo.ui.footerIntensity === "number") cfg.footerIntensity = projectInfo.ui.footerIntensity;
           saveCfg();
         }
-        // Auto user
-        try{
-          const saved = localStorage.getItem("rm_user_"+projectInfo.projectId);
-          if (saved && (projectInfo.users||[]).includes(saved)){
-            currentUser = saved;
-            wsSend({type:"setUser", user:saved});
-          } else {
-            // default to main if present
-            if ((projectInfo.users||[]).includes("main")){
-              // don't auto-select; show picker first time
-            }
-            showUserPicker();
-          }
-        }catch{
-          showUserPicker();
-        }
+        ensureScenes(projectInfo.projectId);
+        const savedScene = localStorage.getItem(sceneCurrentKey(projectInfo.projectId));
+        if (savedScene) sceneState.current = savedScene;
+        updateSceneSelect();
         // Update brand
         if (brandEl) brandEl.textContent = normalizeProjectName(projectInfo.projectName);
-        return;
-      }
-      if (msg.type === "user"){
-        currentUser = msg.user || currentUser;
-        return;
-      }
-      if (msg.type === "assignments"){
-        // admin panel may refresh assignments; we just re-render
-        renderOrUpdate();
         return;
       }
 
@@ -6497,6 +6784,27 @@ function hideUserPicker(){
   // Build visible track list with folder collapse/compact + hiddenTracks
   function buildVisibleTracks(){
   const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+  const scene = getCurrentScene();
+  const expandWithParents = (allowedSet)=>{
+    if (!allowedSet) return null;
+    const parentsByDepth = [];
+    const include = new Set(allowedSet);
+    for (const t of tracks){
+      const d = Number(t.indent||0);
+      parentsByDepth.length = d;
+      if (include.has(t.guid)){
+        for (const p of parentsByDepth) include.add(p.guid);
+      }
+      if (Number(t.folderDepth||0) > 0){
+        parentsByDepth[d] = { guid: t.guid };
+      }
+    }
+    return include;
+  };
+  let sceneAllowed = null;
+  if (scene && !(scene.all || scene.name === "main")){
+    sceneAllowed = expandWithParents(new Set(scene.guids || []));
+  }
   const out = [];
   const stack = []; // {guid, indent, lastVisibleGuid}
   const gapL = new Set();
@@ -6513,6 +6821,9 @@ function hideUserPicker(){
   };
 
   for (const t of tracks){
+    if (sceneAllowed && !sceneAllowed.has(t.guid)){
+      continue;
+    }
     closeFoldersToIndent(t.indent);
 
     // determine if hidden/compact by any ancestor folder mode
@@ -6542,7 +6853,7 @@ function hideUserPicker(){
         groupColors.set(t.guid, t.color || "");
       }
       const groupColor = groupId ? (groupColors.get(groupId) || "") : "";
-      const item = Object.assign({}, t, { _compact: compactByParent, _folderGroupId: groupId, _folderGroupColor: groupColor });
+      const item = Object.assign({}, t, { _compact: compactByParent || !!cfg.compactTracks[t.guid], _folderGroupId: groupId, _folderGroupColor: groupColor });
       out.push(item);
 
       // group start gap
@@ -6645,6 +6956,53 @@ function hideUserPicker(){
 
   if (mixerWrap){
     mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
+    mixerWrap.addEventListener("dblclick", (ev)=>{
+      if (ev.target.closest(".strip")) return;
+      wsSend({type:"addTrack"});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    mixerWrap.addEventListener("contextmenu", (ev)=>{
+      if (ev.target.closest(".strip")) return;
+      ev.preventDefault();
+      openMixerContextMenu(ev.clientX, ev.clientY);
+    });
+    mixerWrap.addEventListener("pointerdown", (ev)=>{
+      if (ev.pointerType !== "touch") return;
+      if (ev.target.closest(".strip")) return;
+      const startX = ev.clientX;
+      const startY = ev.clientY;
+      let active = true;
+      const hold = setTimeout(()=>{
+        if (!active) return;
+        openMixerContextMenu(startX, startY);
+      }, 650);
+      const move = (e)=>{
+        if (!active) return;
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) > 12){
+          clearTimeout(hold);
+          cleanup();
+        }
+      };
+      const up = ()=>{
+        if (!active) return;
+        clearTimeout(hold);
+        cleanup();
+      };
+      const cancel = ()=>{
+        if (!active) return;
+        clearTimeout(hold);
+        cleanup();
+      };
+      const cleanup = ()=>{
+        active = false;
+        document.removeEventListener("pointermove", move, true);
+        document.removeEventListener("pointerup", up, true);
+        document.removeEventListener("pointercancel", cancel, true);
+      };
+      document.addEventListener("pointermove", move, true);
+      document.addEventListener("pointerup", up, true);
+      document.addEventListener("pointercancel", cancel, true);
+    });
   }
   window.addEventListener("resize", scheduleFolderFrames, {passive:true});
 
@@ -6706,7 +7064,79 @@ function hideUserPicker(){
     }
   }
 
+  function updateSpacerStrip(el, t){
+    if (!el) return;
+    el.classList.add("spacer");
+    el.setAttribute("data-guid", t.guid);
+    const label = el._spacerLabel;
+    if (label){
+      const name = String(t.name || "").trim();
+      label.textContent = name || "Spacer";
+    }
+  }
+
+  function attachTrackReorder(el, t){
+    if (!el || t.kind === "master") return;
+
+    // Drag reorder (mouse)
+    el.setAttribute("draggable", "true");
+    el.addEventListener("dragstart", (ev)=>{
+      draggingTrackGuid = t.guid;
+      ev.dataTransfer.effectAllowed = "move";
+      try{ ev.dataTransfer.setData("text/plain", t.guid); }catch(_){}
+    });
+    el.addEventListener("dragover", (ev)=>{
+      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+    });
+    el.addEventListener("drop", (ev)=>{
+      ev.preventDefault();
+      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
+      wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: t.guid});
+      draggingTrackGuid = null;
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    el.addEventListener("dragend", ()=>{ draggingTrackGuid = null; });
+
+    // Touch hold-to-drag
+    el.addEventListener("pointerdown", (ev)=>{
+      if (ev.pointerType !== "touch") return;
+      startHoldDrag(t, el, ev, 420);
+    });
+
+    // Desktop hold-to-drag
+    el.addEventListener("pointerdown", (ev)=>{
+      if (ev.pointerType !== "mouse") return;
+      if (ev.button !== 0) return;
+      startHoldDrag(t, el, ev, 320);
+    });
+  }
+
+  function createSpacerStrip(t){
+    const el = document.createElement("div");
+    el.className = "strip spacer";
+    el.setAttribute("data-guid", t.guid);
+    const label = document.createElement("div");
+    label.className = "spacerLabel";
+    el.appendChild(label);
+    el._spacerLabel = label;
+
+    el.addEventListener("contextmenu", (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      openTrackContextMenu(t.guid, ev.clientX, ev.clientY);
+    });
+
+    attachTrackReorder(el, t);
+    updateSpacerStrip(el, t);
+    return el;
+  }
+
   function createStrip(t){
+    if (t.kind !== "master" && t.isSpacer){
+      return createSpacerStrip(t);
+    }
     const el = document.createElement("div");
     el.className = "strip" + (t.kind==="master" ? " master" : "");
     el.setAttribute("data-guid", t.guid);
@@ -6903,10 +7333,39 @@ slotbar.appendChild(folderBtn);
       }
     };
 
+    const wireFxHold = (btn)=>{
+      if (!btn) return;
+      let holdT = null;
+      btn._holdTriggered = false;
+      const clearHold = ()=>{
+        if (holdT) clearTimeout(holdT);
+        holdT = null;
+      };
+      btn.addEventListener("pointerdown", (ev)=>{
+        if (ev.button !== 0) return;
+        btn._holdTriggered = false;
+        clearHold();
+        holdT = setTimeout(()=>{
+          btn._holdTriggered = true;
+          wsSend({type:"setFxAllEnabled", guid:t.guid, enabled:false});
+        }, 650);
+      });
+      btn.addEventListener("pointerup", clearHold);
+      btn.addEventListener("pointercancel", clearHold);
+      btn.addEventListener("pointerleave", clearHold);
+    };
+
     // Events
     title.addEventListener("click", (ev)=>{ ev.stopPropagation(); openTrackMenu(t.guid, "general"); });
+    el.addEventListener("contextmenu", (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      openTrackContextMenu(t.guid, ev.clientX, ev.clientY);
+    });
+    attachTrackReorder(el, t);
     fxBtn.addEventListener("click",(ev)=>{
       ev.stopPropagation();
+      if (fxBtn._holdTriggered){ fxBtn._holdTriggered = false; return; }
       openTrackMenu(t.guid,"fx");
     });
     sendsBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); openTrackMenu(t.guid,"sends"); });
@@ -6917,6 +7376,7 @@ slotbar.appendChild(folderBtn);
     recBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); if(t.kind==="master") return; wsSend({type:"setRec", guid:t.guid, rec: !(!!trackByGuid.get(t.guid)?.rec)}); });
     fxBtn2.addEventListener("click",(ev)=>{
       ev.stopPropagation();
+      if (fxBtn2._holdTriggered){ fxBtn2._holdTriggered = false; return; }
       const guid = t.guid;
       const was = fxExpanded.has(guid);
       if (was) fxExpanded.delete(guid);
@@ -6937,6 +7397,8 @@ slotbar.appendChild(folderBtn);
       // apply class + rerender slots
       updateStrip(el, cur, true);
     });
+    wireFxHold(fxBtn);
+    wireFxHold(fxBtn2);
 
     if (el._refs.footerFolderBtn) el._refs.footerFolderBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); if (t.kind!=="master" && t.folderDepth>0) cycleFolderMode(t.guid); });
 
@@ -6997,7 +7459,12 @@ slotbar.appendChild(folderBtn);
   }
 
   function updateStrip(el, t, first=false){
-    if (!el || !el._refs) return;
+    if (!el) return;
+    if (t.kind !== "master" && t.isSpacer){
+      updateSpacerStrip(el, t);
+      return;
+    }
+    if (!el._refs) return;
     const r = el._refs;
 
     // class master/child + soloed
@@ -7292,6 +7759,173 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     _fxAddMenuEl = menu;
   }
 
+  let _trackMenuEl = null;
+  function closeTrackMenu(){
+    if (_trackMenuEl){
+      try{ _trackMenuEl.remove(); }catch(_){}
+      _trackMenuEl = null;
+    }
+  }
+  document.addEventListener("click", (e)=>{
+    if (_trackMenuEl && !(_trackMenuEl.contains(e.target))) closeTrackMenu();
+  }, true);
+
+  let _mixerMenuEl = null;
+  function closeMixerMenu(){
+    if (_mixerMenuEl){
+      try{ _mixerMenuEl.remove(); }catch(_){}
+      _mixerMenuEl = null;
+    }
+  }
+  document.addEventListener("click", (e)=>{
+    if (_mixerMenuEl && !(_mixerMenuEl.contains(e.target))) closeMixerMenu();
+  }, true);
+
+  function openTrackContextMenu(guid, x, y){
+    closeTrackMenu();
+    const t = trackByGuid.get(guid);
+    if (!t) return;
+    const menu = document.createElement("div");
+    menu.className = "trackMenu";
+
+    const mkItem = (label, onClick, disabled=false)=>{
+      const mi = document.createElement("div");
+      mi.className = "mi" + (disabled ? " disabled" : "");
+      mi.textContent = label;
+      if (!disabled){
+        mi.addEventListener("click", (ev)=>{ ev.stopPropagation(); onClick(); closeTrackMenu(); });
+      }
+      menu.appendChild(mi);
+    };
+
+    const mkPalette = (colors)=>{
+      const palette = document.createElement("div");
+      palette.className = "trackColorPalette";
+      colors.forEach((hex)=> {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "swatch";
+        swatch.style.background = hex;
+        swatch.title = hex;
+        swatch.addEventListener("click", (ev)=>{
+          ev.stopPropagation();
+          wsSend({type:"setTrackColor", guid: t.guid, color: hex});
+          setTimeout(()=>wsSend({type:"reqState"}), 80);
+          closeTrackMenu();
+        });
+        palette.appendChild(swatch);
+      });
+      return palette;
+    };
+
+    mkItem("Rename", ()=>{
+      const current = t.name || "";
+      const next = prompt("Rename track", current);
+      if (next === null) return;
+      const name = String(next).trim();
+      if (!name) return;
+      wsSend({type:"renameTrack", guid: t.guid, name});
+      setTimeout(()=>wsSend({type:"reqState"}), 80);
+    });
+    const colorLabel = document.createElement("div");
+    colorLabel.className = "mi label";
+    colorLabel.textContent = "Track color";
+    menu.appendChild(colorLabel);
+    menu.appendChild(mkPalette([
+      "#ff0080",
+      "#008000",
+      "#00ff80",
+      "#ff80c0",
+      "#80ffff",
+      "#004080",
+      "#80ff80",
+      "#ff80ff",
+      "#800080",
+      "#ffc6ff",
+    ]));
+    const compactOn = !!cfg.compactTracks[t.guid];
+    mkItem(compactOn ? "Disable compact view" : "Enable compact view", ()=>{
+      if (compactOn) delete cfg.compactTracks[t.guid];
+      else cfg.compactTracks[t.guid] = true;
+      saveCfg();
+      renderOrUpdate(true);
+    });
+    mkItem("Create folder with this track", ()=>{
+      wsSend({type:"createFolderWithTrack", guid: t.guid});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    const folders = (lastState && lastState.tracks) ? lastState.tracks.filter(tr=>tr.folderDepth>0 && tr.guid !== t.guid) : [];
+    mkItem("Move to folder...", ()=>{
+      if (!folders.length) return;
+      const options = folders.map((f, i)=>`${i+1}: ${f.name || ("Track " + f.idx)}`).join("\n");
+      const pick = prompt(`Select folder:\n${options}`, "1");
+      if (!pick) return;
+      const idx = parseInt(pick, 10);
+      if (!Number.isFinite(idx) || idx < 1 || idx > folders.length) return;
+      wsSend({type:"moveTrackToFolder", guid: t.guid, folderGuid: folders[idx-1].guid});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    }, !folders.length);
+    mkItem("Move track...", ()=>{
+      const total = (lastState && lastState.tracks) ? lastState.tracks.length : 0;
+      const pick = prompt(`Move to track number (1-${total})`, "");
+      if (!pick) return;
+      const idx = parseInt(pick, 10);
+      if (!Number.isFinite(idx) || idx < 1 || idx > total) return;
+      wsSend({type:"moveTrack", guid: t.guid, toIndex: idx-1});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+
+    document.body.appendChild(menu);
+    const pad = 8;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    if (left + mw > vw - pad) left = Math.max(pad, vw - pad - mw);
+    if (top + mh > vh - pad) top = Math.max(pad, vh - pad - mh);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    _trackMenuEl = menu;
+  }
+
+  function openMixerContextMenu(x, y){
+    closeMixerMenu();
+    const menu = document.createElement("div");
+    menu.className = "trackMenu";
+
+    const mkItem = (label, onClick)=>{
+      const mi = document.createElement("div");
+      mi.className = "mi";
+      mi.textContent = label;
+      mi.addEventListener("click", (ev)=>{ ev.stopPropagation(); onClick(); closeMixerMenu(); });
+      menu.appendChild(mi);
+    };
+
+    mkItem("Add track", ()=>{
+      wsSend({type:"addTrack"});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    mkItem("Add visual spacer", ()=>{
+      wsSend({type:"addSpacer"});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    mkItem("Mixer settings", ()=> openSettingsTab("ui"));
+    mkItem("Track manager", ()=> openSettingsTab("tracks"));
+    mkItem("Scene manager", openSceneManager);
+
+    document.body.appendChild(menu);
+    const pad = 8;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    if (left + mw > vw - pad) left = Math.max(pad, vw - pad - mw);
+    if (top + mh > vh - pad) top = Math.max(pad, vh - pad - mh);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    _mixerMenuEl = menu;
+  }
+
   function showSlotActions(row, guid, fx){
     // remove existing
     const old = row.querySelector(".fxSlotActions");
@@ -7567,6 +8201,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
   const tabsEl = document.getElementById("tabs");
   const modalBody = document.getElementById("modalBody");
   const closeBtn = document.getElementById("closeBtn");
+  const renameBtn = document.getElementById("renameBtn");
 
   let openModal = null; // {guid, tab, fxList, fxParams, fxIndex}
 
@@ -7598,6 +8233,20 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
   }
   overlay.addEventListener("click", closeModal);
   closeBtn.addEventListener("click", closeModal);
+  if (renameBtn){
+    renameBtn.addEventListener("click", ()=>{
+      if (!openModal || !openModal.guid) return;
+      const t = trackByGuid.get(openModal.guid);
+      if (!t) return;
+      const current = t.name || "";
+      const next = prompt("Rename track", current);
+      if (next === null) return;
+      const name = String(next).trim();
+      if (!name) return;
+      wsSend({type:"renameTrack", guid: t.guid, name});
+      closeModal();
+    });
+  }
 
   function setTab(tab){
     if (!openModal) return;
@@ -7610,10 +8259,11 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
 
   
 const FX_ADD_CATALOG = [
-  {name:"Waves NS1", add:"VST3: NS1 Stereo (Waves)||VST: NS1 Stereo (Waves)||NS1"},
+  {name:"RM-NS", add:"JS: RM_NS||JS:RM_NS||RM_NS"},
   {name:"RM Gate", add:"JS: RM_Gate [Telemetry]||JS:RM_Gate [Telemetry]||RM_Gate [Telemetry]"},
   {name:"RM PreAmp", add:"JS: RM_PreAmp [Telemetry]||JS:RM_PreAmp [Telemetry]||RM_PreAmp [Telemetry]"},
   {name:"RM_EQ", add:"JS: RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||JS:RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]||RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]"},
+  {name:"RM_EQ2", add:"JS: RM_EQ2 (ProQ) + Spectrum v3 [Telemetry]||JS:RM_EQ2 (ProQ) + Spectrum v3 [Telemetry]||RM_EQ2 (ProQ) + Spectrum v3 [Telemetry]"},
   {name:"RM_1175", add:"JS: RM_1175 (1175 core) Hybrid v3||JS:RM_1175 (1175 core) Hybrid v3||RM_1175"},
   {name:"RM_LA1A", add:"JS: RM_LA1A [Telemetry]||JS:RM_LA1A [Telemetry]||RM_LA1A [Telemetry]"},
   {name:"RM_Deesser", add:"JS: RM_Deesser [Telemetry]||JS:RM_Deesser [Telemetry]||RM_Deesser [Telemetry]"},
@@ -7769,30 +8419,79 @@ const FX_ADD_CATALOG = [
     }
     const list = document.createElement("div");
     list.className = "fxList";
+    const isNumericLabel = (val)=>{
+      const s = String(val || "").trim();
+      return !!(s && /^-?\d+(\.\d+)?$/.test(s));
+    };
+    const fmtRegionName = (r)=>{
+      const name = String(r.name || "").trim();
+      if (name && !isNumericLabel(name)) return name;
+      const idx = Number.isFinite(r.index) ? `#${r.index}` : "";
+      return idx ? `Region ${idx}` : "Region";
+    };
+    const fmtMarkerName = (m)=>{
+      const name = String(m.name || "").trim();
+      if (name && !isNumericLabel(name)) return name;
+      const idx = Number.isFinite(m.index) ? `#${m.index}` : "";
+      return idx ? `Marker ${idx}` : "Marker";
+    };
+    if (regions.length){
+      const hdr = document.createElement("div");
+      hdr.className = "small";
+      hdr.style.margin = "6px 0";
+      hdr.textContent = "Regions";
+      list.appendChild(hdr);
+    }
     regions.forEach((r)=>{
       const row = document.createElement("div");
       row.className = "fxItem";
-      row.innerHTML = `<div class="nm">Region: ${escapeHtml(r.name || "Region")}</div>
-        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
-      row.querySelector("button").addEventListener("click", ()=>{
-        wsSend({type:"gotoRegion", index: r.index});
+      const start = Number.isFinite(r.start) ? formatTimecode(r.start) : "—";
+      const end = Number.isFinite(r.end) ? formatTimecode(r.end) : "—";
+      const startVal = Number.isFinite(r.start) ? r.start : null;
+      const endVal = Number.isFinite(r.end) ? r.end : null;
+      row.innerHTML = `<div class="nm">Region: ${escapeHtml(fmtRegionName(r))}</div>
+        <div class="small">${start} → ${end}</div>
+        <div class="fxCtl">
+          <button class="miniBtn">Go</button>
+          <button class="miniBtn">Loop</button>
+        </div>`;
+      const [goBtn, loopBtn] = row.querySelectorAll("button");
+      goBtn.addEventListener("click", ()=>{
+        const idx = Number.isFinite(r.index) ? r.index : -1;
+        wsSend({type:"gotoRegion", index: idx, start: startVal, end: endVal});
+        closeModal();
+      });
+      loopBtn.addEventListener("click", ()=>{
+        const idx = Number.isFinite(r.index) ? r.index : -1;
+        wsSend({type:"loopRegion", index: idx, start: startVal, end: endVal});
         closeModal();
       });
       list.appendChild(row);
     });
+    if (markers.length){
+      const hdr = document.createElement("div");
+      hdr.className = "small";
+      hdr.style.margin = "10px 0 6px";
+      hdr.textContent = "Markers";
+      list.appendChild(hdr);
+    }
     markers.forEach((m)=>{
       const row = document.createElement("div");
       row.className = "fxItem";
-      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(m.name || "Marker")}</div>
+      const pos = Number.isFinite(m.position) ? formatTimecode(m.position) : "—";
+      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(fmtMarkerName(m))}</div>
+        <div class="small">${pos}</div>
         <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
       row.querySelector("button").addEventListener("click", ()=>{
-        wsSend({type:"gotoMarker", index: m.index});
+        const idx = Number.isFinite(m.index) ? m.index : -1;
+        wsSend({type:"gotoMarker", index: idx});
         closeModal();
       });
       list.appendChild(row);
     });
     wrap.appendChild(list);
     modalBody.appendChild(wrap);
+    return;
   }
 
   function renderBpmModal(){
@@ -7870,8 +8569,16 @@ const FX_ADD_CATALOG = [
 
   function renderModal(){
     if (!openModal) return;
+    if (renameBtn){
+      const showRename = !openModal.kind && !!openModal.guid;
+      renameBtn.style.display = showRename ? "inline-flex" : "none";
+    }
     if (openModal.kind === "settings"){
       renderSettingsModal();
+      return;
+    }
+    if (openModal.kind === "scenes"){
+      renderScenesModal();
       return;
     }
     if (openModal.kind === "transport"){
@@ -7999,9 +8706,8 @@ const FX_ADD_CATALOG = [
       <button class="miniBtn ${t.mute?'on':''}">Mute</button>
       <button class="miniBtn ${t.solo?'on':''}" ${t.kind==="master"?'disabled':''}>Solo</button>
       <button class="miniBtn ${t.rec?'on':''}" ${t.kind==="master"?'disabled':''}>Rec</button>
-      <button class="miniBtn">FX Chain</button>
     `;
-    const [bM,bS,bR,bFX] = bRow.querySelectorAll("button");
+    const [bM,bS,bR] = bRow.querySelectorAll("button");
     bM.addEventListener("click", ()=>{
       const v=!t.mute; t.mute=v; bM.classList.toggle('on',v);
       wsSend({type:"setMute", guid:t.guid, mute:v});
@@ -8017,20 +8723,16 @@ const FX_ADD_CATALOG = [
       wsSend({type:"setRec", guid:t.guid, rec:v});
       renderOrUpdate();
     });
-    bFX.addEventListener("click", ()=> {
-      openFxUIOrMenu(t.guid);
-    });
     wrap.appendChild(bRow);
 
     // Rec input selection when rec armed (and not master)
     if (t.kind !== "master"){
       const ri = document.createElement("div");
       ri.className = "row";
-      const disabled = !t.rec;
       const cur = (typeof t.recInput === "number") ? (t.recInput + 1) : 1;
       let opts = "";
       for (let i=1;i<=16;i++) opts += `<option value="${i}" ${i===cur?'selected':''}>Input ${i}</option>`;
-      ri.innerHTML = `<label>Rec input</label><select ${disabled?'disabled':''} style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">${opts}</select>
+      ri.innerHTML = `<label>Rec input</label><select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">${opts}</select>
                       <div class="small" style="width:70px;text-align:right">${t.rec? "armed":"off"}</div>`;
       const sel = ri.querySelector("select");
       sel.addEventListener("change", ()=>wsSend({type:"setRecInput", guid:t.guid, input: parseInt(sel.value,10)}));
@@ -8054,14 +8756,80 @@ modalBody.appendChild(wrap);
     // Accept '3-4' or '3/4'
     return String(s).replace("/", "-");
   }
+  function _chanPairLabel(v){
+    const start = Number(v);
+    if (!Number.isFinite(start)) return "1-2";
+    return `${start + 1}-${start + 2}`;
+  }
+  function _chanPairOptions(maxPairs=8){
+    const opts = [];
+    for (let i=0;i<maxPairs;i++){
+      const v = i * 2;
+      opts.push({value: v, label: _chanPairLabel(v)});
+    }
+    return opts;
+  }
+  function _chanPairValue(label){
+    if (!label) return 0;
+    const txt = String(label).trim();
+    const parts = txt.split(/[-/]/);
+    const start = parseInt(parts[0], 10);
+    if (!Number.isFinite(start)) return 0;
+    const zero = Math.max(0, start - 1);
+    return zero - (zero % 2);
+  }
 
   function renderSendsTab(t){
     const sends = (t.sendDetails || []);
     const names = (t.sendSlots || []);
-    if ((!sends || !sends.length) && (!names || !names.length)){
-      modalBody.innerHTML = `<div class="small">No sends.</div>`;
-      return;
-    }
+    const wrap = document.createElement("div");
+
+    const addRow = document.createElement("div");
+    addRow.className = "row";
+    const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+    const otherTracks = tracks.filter(tr => tr.guid && tr.guid !== t.guid);
+    const chanOptions = _chanPairOptions(8);
+    const opts = otherTracks.map(tr => `<option value="${tr.guid}">${escapeHtml(tr.name || ("Track " + tr.idx))}</option>`).join("");
+    const chanOpts = chanOptions.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
+    addRow.innerHTML = `<label>Add send</label>
+      <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
+        ${opts || `<option value="">No tracks</option>`}
+      </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
+      <button class="miniBtn" ${opts ? "" : "disabled"}>Add</button>`;
+    const [sel, srcSel, dstSel] = addRow.querySelectorAll("select");
+    const addBtn = addRow.querySelector("button");
+    addBtn.addEventListener("click", ()=>{
+      const destGuid = sel.value;
+      if (!destGuid) return;
+      const srcChan = parseInt(srcSel.value, 10);
+      const dstChan = parseInt(dstSel.value, 10);
+      wsSend({type:"addSend", guid:t.guid, destGuid, srcChan, dstChan});
+      const destTrack = otherTracks.find(tr => tr.guid === destGuid);
+      if (destTrack){
+        const next = (t.sendDetails || []).slice();
+        next.push({
+          index: next.length,
+          destName: destTrack.name || ("Track " + destTrack.idx),
+          vol: 1,
+          mute: false,
+          mode: 0,
+          srcCh: _chanPairLabel(srcChan),
+          dstCh: _chanPairLabel(dstChan)
+        });
+        t.sendDetails = next;
+        if (openModal && openModal.guid === t.guid && openModal.tab === "sends") renderModal();
+      }
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+      setTimeout(()=>wsSend({type:"reqState"}), 500);
+    });
+    wrap.appendChild(addRow);
+
     const list = document.createElement("div");
     list.className = "sendList";
 
@@ -8071,6 +8839,8 @@ modalBody.appendChild(wrap);
       const card = document.createElement("div");
       card.className = "sendCard";
       const modePre = (sd.mode && sd.mode!==0);
+      const srcVal = _chanPairValue(sd.srcCh);
+      const dstVal = _chanPairValue(sd.dstCh);
       card.innerHTML = `
         <div class="sendTop">
           <div class="sendName">${escapeHtml(sd.destName||("Send "+(sd.index+1)))}</div>
@@ -8081,6 +8851,16 @@ modalBody.appendChild(wrap);
             <button class="${modePre?'on':''}">Pre</button>
           </div>
         </div>
+        <div class="row" style="margin:6px 0 2px 0;">
+          <label class="small" style="width:40px;">Ch</label>
+          <select class="sendChan src" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
+          <div class="small">→</div>
+          <select class="sendChan dst" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
+        </div>
         <div class="sendFader">
           <label class="small" style="width:40px">Lvl</label>
           <input type="range" min="0" max="1" step="0.001" value="${normFromDb((sd.vol&&sd.vol>0)?(20*Math.log10(sd.vol)):-60)}">
@@ -8089,8 +8869,12 @@ modalBody.appendChild(wrap);
       `;
       const [bMute, bPost, bPre] = card.querySelectorAll(".sendTop button");
       const segBtns = card.querySelectorAll(".seg button");
+      const srcSelRow = card.querySelector("select.sendChan.src");
+      const dstSelRow = card.querySelector("select.sendChan.dst");
       const sl = card.querySelector("input[type=range]");
       const valEl = card.querySelectorAll(".sendFader .small")[1];
+      if (srcSelRow) srcSelRow.value = String(srcVal);
+      if (dstSelRow) dstSelRow.value = String(dstVal);
 
       bMute.addEventListener("click", ()=>{
         const v=!sd.mute; sd.mute=v; bMute.classList.toggle("on", v);
@@ -8114,29 +8898,113 @@ modalBody.appendChild(wrap);
         if (valEl) valEl.textContent = `${dbFromVol(vol)} dB`;
         wsSend({type:"setSendVol", guid:t.guid, index: sd.index, vol});
       });
+      sl.addEventListener("dblclick", (ev)=>{
+        ev.preventDefault();
+        sd.vol = 1;
+        if (valEl) valEl.textContent = `${dbFromVol(1)} dB`;
+        sl.value = String(normFromDb(0));
+        wsSend({type:"setSendVol", guid:t.guid, index: sd.index, vol: 1});
+      });
+      srcSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(srcSelRow.value, 10);
+        sd.srcCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(sd.srcCh)} → ${_chanLabel(sd.dstCh)}`;
+        wsSend({type:"setSendSrcChan", guid:t.guid, index: sd.index, chan: val});
+      });
+      dstSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(dstSelRow.value, 10);
+        sd.dstCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(sd.srcCh)} → ${_chanLabel(sd.dstCh)}`;
+        wsSend({type:"setSendDstChan", guid:t.guid, index: sd.index, chan: val});
+      });
       list.appendChild(card);
     });
-    modalBody.appendChild(list);
+    if (!rows.length){
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No sends.";
+      wrap.appendChild(empty);
+    } else {
+      wrap.appendChild(list);
+    }
+    modalBody.appendChild(wrap);
   }
 
   function renderReturnsTab(t){
     const recvs = (t.recvDetails || []);
     const names = (t.recvSlots || []);
-    if ((!recvs || !recvs.length) && (!names || !names.length)){
-      modalBody.innerHTML = `<div class="small">No returns.</div>`;
-      return;
-    }
+    const wrap = document.createElement("div");
+
+    const addRow = document.createElement("div");
+    addRow.className = "row";
+    const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+    const otherTracks = tracks.filter(tr => tr.guid && tr.guid !== t.guid);
+    const chanOptions = _chanPairOptions(8);
+    const opts = otherTracks.map(tr => `<option value="${tr.guid}">${escapeHtml(tr.name || ("Track " + tr.idx))}</option>`).join("");
+    const chanOpts = chanOptions.map(o => `<option value="${o.value}">${o.label}</option>`).join("");
+    addRow.innerHTML = `<label>Add return</label>
+      <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
+        ${opts || `<option value="">No tracks</option>`}
+      </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
+      <select style="width:82px;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+        ${chanOpts}
+      </select>
+      <button class="miniBtn" ${opts ? "" : "disabled"}>Add</button>`;
+    const [sel, srcSel, dstSel] = addRow.querySelectorAll("select");
+    const addBtn = addRow.querySelector("button");
+    addBtn.addEventListener("click", ()=>{
+      const sourceGuid = sel.value;
+      if (!sourceGuid) return;
+      const srcChan = parseInt(srcSel.value, 10);
+      const dstChan = parseInt(dstSel.value, 10);
+      wsSend({type:"addReturn", guid:t.guid, sourceGuid, srcChan, dstChan});
+      const sourceTrack = otherTracks.find(tr => tr.guid === sourceGuid);
+      if (sourceTrack){
+        const next = (t.recvDetails || []).slice();
+        next.push({
+          index: next.length,
+          srcName: sourceTrack.name || ("Track " + sourceTrack.idx),
+          vol: 1,
+          mute: false,
+          srcCh: _chanPairLabel(srcChan),
+          dstCh: _chanPairLabel(dstChan)
+        });
+        t.recvDetails = next;
+        if (openModal && openModal.guid === t.guid && openModal.tab === "returns") renderModal();
+      }
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+      setTimeout(()=>wsSend({type:"reqState"}), 500);
+    });
+    wrap.appendChild(addRow);
+
     const list = document.createElement("div");
     list.className = "sendList";
     const rows = recvs.length ? recvs : names.map((nm,i)=>({index:i, srcName:nm, vol:1, mute:false, srcCh:"1-2", dstCh:"3-4"}));
     rows.forEach(rd=>{
       const card = document.createElement("div");
       card.className = "sendCard";
+      const srcVal = _chanPairValue(rd.srcCh);
+      const dstVal = _chanPairValue(rd.dstCh);
       card.innerHTML = `
         <div class="sendTop">
           <div class="sendName">${escapeHtml(rd.srcName||("Return "+(rd.index+1)))}</div>
           <div class="sendMeta">${_chanLabel(rd.srcCh)} → ${_chanLabel(rd.dstCh)}</div>
           <button class="miniBtn ${rd.mute?'on':''}">Mute</button>
+        </div>
+        <div class="row" style="margin:6px 0 2px 0;">
+          <label class="small" style="width:40px;">Ch</label>
+          <select class="sendChan src" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
+          <div class="small">→</div>
+          <select class="sendChan dst" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
         </div>
         <div class="sendFader">
           <label class="small" style="width:40px">Lvl</label>
@@ -8145,8 +9013,12 @@ modalBody.appendChild(wrap);
         </div>
       `;
       const bMute = card.querySelector(".sendTop button");
+      const srcSelRow = card.querySelector("select.sendChan.src");
+      const dstSelRow = card.querySelector("select.sendChan.dst");
       const sl = card.querySelector("input[type=range]");
       const valEl = card.querySelectorAll(".sendFader .small")[1];
+      if (srcSelRow) srcSelRow.value = String(srcVal);
+      if (dstSelRow) dstSelRow.value = String(dstVal);
       bMute.addEventListener("click", ()=>{
         const v=!rd.mute; rd.mute=v; bMute.classList.toggle("on", v);
         wsSend({type:"setRecvMute", guid:t.guid, index: rd.index, mute:v});
@@ -8159,9 +9031,38 @@ modalBody.appendChild(wrap);
         if (valEl) valEl.textContent = `${dbFromVol(vol)} dB`;
         wsSend({type:"setRecvVol", guid:t.guid, index: rd.index, vol});
       });
+      sl.addEventListener("dblclick", (ev)=>{
+        ev.preventDefault();
+        rd.vol = 1;
+        if (valEl) valEl.textContent = `${dbFromVol(1)} dB`;
+        sl.value = String(normFromDb(0));
+        wsSend({type:"setRecvVol", guid:t.guid, index: rd.index, vol: 1});
+      });
+      srcSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(srcSelRow.value, 10);
+        rd.srcCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(rd.srcCh)} → ${_chanLabel(rd.dstCh)}`;
+        wsSend({type:"setRecvSrcChan", guid:t.guid, index: rd.index, chan: val});
+      });
+      dstSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(dstSelRow.value, 10);
+        rd.dstCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(rd.srcCh)} → ${_chanLabel(rd.dstCh)}`;
+        wsSend({type:"setRecvDstChan", guid:t.guid, index: rd.index, chan: val});
+      });
       list.appendChild(card);
     });
-    modalBody.appendChild(list);
+    if (!rows.length){
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No returns.";
+      wrap.appendChild(empty);
+    } else {
+      wrap.appendChild(list);
+    }
+    modalBody.appendChild(wrap);
   }
 
 
@@ -8173,11 +9074,13 @@ modalBody.appendChild(wrap);
     top.className = "row";
     top.innerHTML = `<label>FX</label>
       <button class="miniBtn">Refresh</button>
+      <button class="miniBtn">Add FX</button>
       <button class="miniBtn">All ON</button>
       <button class="miniBtn">All OFF</button>
     `;
-    const [bR,bOn,bOff] = top.querySelectorAll("button");
+    const [bR,bAdd,bOn,bOff] = top.querySelectorAll("button");
     bR.addEventListener("click", ()=>wsSend({type:"reqFxList", guid:t.guid}));
+    bAdd.addEventListener("click", (ev)=> openFxAddMenu(t.guid, ev.currentTarget));
     bOn.addEventListener("click", ()=>wsSend({type:"setFxAllEnabled", guid:t.guid, enabled:true}));
     bOff.addEventListener("click", ()=>wsSend({type:"setFxAllEnabled", guid:t.guid, enabled:false}));
     wrap.appendChild(top);
@@ -8196,11 +9099,12 @@ modalBody.appendChild(wrap);
           <div class="fxCtl">
             <button class="miniBtn ${f.enabled?'on':''}">${f.enabled?'ON':'OFF'}</button>
             <button class="miniBtn">Params</button>
+            <button class="miniBtn">Delete</button>
             <button class="miniBtn">↑</button>
             <button class="miniBtn">↓</button>
           </div>
         `;
-        const [bEn,bP,bUp,bDn] = item.querySelectorAll("button");
+        const [bEn,bP,bDel,bUp,bDn] = item.querySelectorAll("button");
         // Tap the row to open the plugin UI (one click flow)
         item.addEventListener("click", ()=>openPluginWin(t.guid, f.index));
 
@@ -8210,30 +9114,17 @@ modalBody.appendChild(wrap);
           // Prefer the plugin window UI.
           openPluginWin(t.guid, f.index);
         });
+        bDel.addEventListener("click", (ev)=>{
+          ev.stopPropagation();
+          wsSend({type:"deleteFx", guid:t.guid, index:f.index});
+          setTimeout(()=>wsSend({type:"reqFxList", guid:t.guid}), 60);
+        });
         bUp.addEventListener("click", (ev)=>{ ev.stopPropagation(); if (f.index>0) wsSend({type:"moveFx", guid:t.guid, from:f.index, to:f.index-1}); });
         bDn.addEventListener("click", (ev)=>{ ev.stopPropagation(); wsSend({type:"moveFx", guid:t.guid, from:f.index, to:f.index+1}); });
         list.appendChild(item);
       });
     }
     wrap.appendChild(list);
-
-    const add = document.createElement("div");
-    add.style.marginTop = "14px";
-    add.innerHTML = `<div class="small" style="margin-bottom:8px;">Add FX (catalog)</div>`;
-    const grid = document.createElement("div");
-    grid.style.display = "grid";
-    grid.style.gridTemplateColumns = "1fr 1fr";
-    grid.style.gap = "10px";
-    FX_ADD_CATALOG.forEach(x=>{
-      const b = document.createElement("button");
-      b.className = "miniBtn";
-      b.style.height = "34px";
-      b.textContent = x.name;
-      b.addEventListener("click", ()=>wsSend({type:"addFx", guid:t.guid, name:x.add}));
-      grid.appendChild(b);
-    });
-    add.appendChild(grid);
-    wrap.appendChild(add);
 
     modalBody.appendChild(wrap);
   }
@@ -8281,6 +9172,85 @@ modalBody.appendChild(wrap);
       grid.appendChild(card);
     });
     wrap.appendChild(grid);
+
+    modalBody.appendChild(wrap);
+  }
+
+  function renderScenesModal(){
+    modalTitle.textContent = "Scenes";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    const headerRow = document.createElement("div");
+    headerRow.className = "row";
+    const sceneOptions = sceneState.scenes.map(sc=>`<option value="${escapeHtml(sc.name)}">${escapeHtml(sc.name)}</option>`).join("");
+    headerRow.innerHTML = `<label>Scene</label>
+      <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
+        ${sceneOptions}
+      </select>
+      <button class="miniBtn">Add</button>
+      <button class="miniBtn">Delete</button>`;
+    const sel = headerRow.querySelector("select");
+    const [addBtn, delBtn] = headerRow.querySelectorAll("button");
+    sel.value = sceneState.current;
+    sel.addEventListener("change", ()=> setCurrentScene(sel.value));
+    addBtn.addEventListener("click", ()=>{
+      const name = prompt("New scene name", "");
+      if (!name) return;
+      const clean = String(name).trim();
+      if (!clean) return;
+      if (sceneState.scenes.find(sc=>sc.name.toLowerCase() === clean.toLowerCase())){
+        alert("Scene already exists.");
+        return;
+      }
+      sceneState.scenes.push({name: clean, all:false, guids: []});
+      setCurrentScene(clean);
+    });
+    delBtn.addEventListener("click", ()=>{
+      const cur = getCurrentScene();
+      if (cur.name === "main"){
+        alert("Main scene cannot be deleted.");
+        return;
+      }
+      if (!confirm(`Delete scene "${cur.name}"?`)) return;
+      sceneState.scenes = sceneState.scenes.filter(sc=>sc.name !== cur.name);
+      setCurrentScene("main");
+    });
+    wrap.appendChild(headerRow);
+
+    const cur = getCurrentScene();
+    const info = document.createElement("div");
+    info.className = "small";
+    info.style.margin = "6px 0 10px";
+    info.textContent = cur.all || cur.name === "main"
+      ? "Main scene shows all tracks."
+      : "Select tracks visible in this scene.";
+    wrap.appendChild(info);
+
+    if (!(cur.all || cur.name === "main")){
+      const list = document.createElement("div");
+      list.className = "fxList";
+      const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+      tracks.forEach(t=>{
+        const row = document.createElement("div");
+        row.className = "fxItem";
+        const shown = (cur.guids || []).includes(t.guid);
+        row.innerHTML = `<div class="nm">${escapeHtml(t.name||("Track " + t.idx))}</div>
+          <div class="fxCtl"><button class="miniBtn ${shown?'on':''}">${shown ? "Shown" : "Hidden"}</button></div>`;
+        const btn = row.querySelector("button");
+        btn.addEventListener("click", ()=>{
+          const next = new Set(cur.guids || []);
+          if (next.has(t.guid)) next.delete(t.guid); else next.add(t.guid);
+          cur.guids = Array.from(next);
+          saveScenes();
+          renderModal();
+          renderOrUpdate(true);
+        });
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+    }
 
     modalBody.appendChild(wrap);
   }
@@ -8341,8 +9311,8 @@ modalBody.appendChild(wrap);
     tm.appendChild(list);
 
     const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
-    let asMon1 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon1) ? projectInfo.assignments.mon1 : []);
-    let asMon2 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon2) ? projectInfo.assignments.mon2 : []);
+    const scene = getCurrentScene();
+    const sceneLocked = scene.all || scene.name === "main";
 
     const renderList = ()=>{
       const q = (tm.querySelector("#tmSearch").value||"").toLowerCase().trim();
@@ -8351,33 +9321,20 @@ modalBody.appendChild(wrap);
         if (q && !(String(t.name||"").toLowerCase().includes(q) || String(t.idx||"").includes(q))) return;
         const row = document.createElement("div");
         row.className = "fxItem";
-        const on = !cfg.hiddenTracks[t.guid];
+        const shown = sceneLocked ? true : (scene.guids || []).includes(t.guid);
         const dot = hexOrEmpty(t.color) ? `<span style="display:inline-block; width:10px; height:10px; border-radius:999px; background:${hexOrEmpty(t.color)}; margin-right:8px;"></span>` : `<span style="display:inline-block; width:10px; height:10px; border-radius:999px; background:#444; margin-right:8px;"></span>`;
         const fxWarn = (t.fxAllOff && (t.fxCount||0)>0) ? `<span class="pill" style="border-color:rgba(255,80,80,.6); background:rgba(120,30,30,.25);">FX OFF</span>` : ((t.fxCount||0)>0 ? `<span class="pill">FX ${t.fxCount||0}</span>` : ``);
         row.innerHTML = `<div class="nm">${dot}${t.idx} — ${escapeHtml(t.name||"")}</div>
-          <div class="fxCtl">${fxWarn}${(currentUser==="main" && t.kind!=="master")
-            ? ('<button class="miniBtn asBtn '+(asMon1.has(t.guid)?'on':'')+'" data-target="mon1">mon1</button>' +
-               '<button class="miniBtn asBtn '+(asMon2.has(t.guid)?'on':'')+'" data-target="mon2">mon2</button>')
-            : ''}<button class="miniBtn tmToggle ${on?'on':''}">${on?'Shown':'Hidden'}</button></div>`;
+          <div class="fxCtl">${fxWarn}<button class="miniBtn tmToggle ${shown?'on':''}" ${sceneLocked?'disabled':''}>${shown?'Shown':'Hidden'}</button></div>`;
         row.querySelector(".tmToggle").addEventListener("click", (e)=>{ e.stopPropagation();
-          const nowOn = !!cfg.hiddenTracks[t.guid];
-          if (nowOn) delete cfg.hiddenTracks[t.guid];
-          else cfg.hiddenTracks[t.guid]=true;
-          saveCfg();
+          if (sceneLocked) return;
+          const next = new Set(scene.guids || []);
+          if (next.has(t.guid)) next.delete(t.guid);
+          else next.add(t.guid);
+          scene.guids = Array.from(next);
+          saveScenes();
           renderOrUpdate(true);
           renderList();
-        });
-
-        row.querySelectorAll(".asBtn").forEach(btn=>{
-          btn.addEventListener("click", (e)=>{
-            e.stopPropagation();
-            const target = btn.dataset.target;
-            const set = (target==="mon1") ? asMon1 : asMon2;
-            if (set.has(t.guid)) set.delete(t.guid); else set.add(t.guid);
-            if (projectInfo && projectInfo.assignments) projectInfo.assignments[target] = Array.from(set);
-            wsSend({type:"adminSetAssignments", target, guids:Array.from(set)});
-            btn.classList.toggle("on", set.has(t.guid));
-          });
         });
 
         list.appendChild(row);
@@ -8386,14 +9343,16 @@ modalBody.appendChild(wrap);
 
     tm.querySelector("#tmSearch").addEventListener("input", renderList);
     tm.querySelector("#tmShowAll").addEventListener("click", ()=>{
-      cfg.hiddenTracks = {};
-      saveCfg();
+      if (sceneLocked) return;
+      scene.guids = tracks.map(t=>t.guid);
+      saveScenes();
       renderOrUpdate(true);
       renderList();
     });
     tm.querySelector("#tmHideAll").addEventListener("click", ()=>{
-      tracks.forEach(t=>{ cfg.hiddenTracks[t.guid]=true; });
-      saveCfg();
+      if (sceneLocked) return;
+      scene.guids = [];
+      saveScenes();
       renderOrUpdate(true);
       renderList();
     });
@@ -8431,14 +9390,6 @@ modalBody.appendChild(wrap);
     };
 
     if (openModal.tab === "main"){
-      const userRow = document.createElement("div");
-      userRow.className = "row";
-      const uName = currentUser || "(select)";
-      userRow.innerHTML = `<label>User</label><button class="miniBtn on">${uName}</button><button class="miniBtn">Change</button>`;
-      const userBtns = userRow.querySelectorAll("button");
-      userBtns[1].addEventListener("click", ()=>{ showUserPicker(); });
-      wrap.appendChild(userRow);
-
       wrap.appendChild(mkToggle("Master enabled", "masterEnabled", ()=>renderOrUpdate(true)));
 
       const side = document.createElement("div");
@@ -8522,11 +9473,15 @@ modalBody.appendChild(wrap);
     modalBody.appendChild(wrap);
   }
 
-  function openSettings(){
+  function openSettingsTab(tab="main"){
     overlay.style.display = "block";
     modal.style.display = "block";
-    openModal = {kind:"settings", tab:"main"};
+    openModal = {kind:"settings", tab};
     renderModal();
+  }
+
+  function openSettings(){
+    openSettingsTab("main");
   }
 
   function openTransportModal(){
