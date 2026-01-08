@@ -714,7 +714,18 @@ def get_regions_and_markers():
 
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers2" in globals():
-            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512, 0, 0)
+            r = None
+            for args in (
+                (0, i, 0, 0, 0, "", 512, 0, 0),
+                (0, i, 0, 0, 0, "", 512, 0),
+                (0, i, 0, 0, 0, "", 512),
+            ):
+                try:
+                    r = RPR_EnumProjectMarkers2(*args)
+                except Exception:
+                    r = None
+                if isinstance(r, tuple):
+                    break
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -724,7 +735,17 @@ def get_regions_and_markers():
                 idx = int(r[5]) if len(r) > 5 else i
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers" in globals():
-            r = RPR_EnumProjectMarkers(i, 0, 0, 0, "", 512)
+            r = None
+            for args in (
+                (i, 0, 0, 0, "", 512),
+                (i, 0, 0, 0, ""),
+            ):
+                try:
+                    r = RPR_EnumProjectMarkers(*args)
+                except Exception:
+                    r = None
+                if isinstance(r, tuple):
+                    break
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
