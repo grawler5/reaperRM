@@ -717,13 +717,9 @@ def get_regions_and_markers():
             try:
                 r = RPR_GetSetProjectMarkerByIndex2(0, i, isrgn, 0, 0, "", 512, 0)
                 if isinstance(r, tuple):
-                    if len(r) > 4:
-                        nm = _as_str(r[4])
-                        if nm:
-                            return nm
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            return _as_str(v)
+                    nm = _pick_human_string(r, "")
+                    if nm:
+                        return nm
             except Exception:
                 pass
         return ""
@@ -731,16 +727,10 @@ def get_regions_and_markers():
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers3" in globals():
             r = None
-            for args in (
-                (0, i, 0, 0, 0, "", 512, 0, 0),
-                (0, i, 0, 0, 0, "", 512, 0),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers3(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
+            try:
+                r = RPR_EnumProjectMarkers3(0, i, 0, 0, 0, "", 512)
+            except Exception:
+                r = None
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -749,10 +739,7 @@ def get_regions_and_markers():
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
                 if not name:
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            name = _as_str(v)
-                            break
+                    name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
                 if not name:
@@ -760,17 +747,10 @@ def get_regions_and_markers():
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers2" in globals():
             r = None
-            for args in (
-                (0, i, 0, 0, 0, "", 512, 0, 0),
-                (0, i, 0, 0, 0, "", 512, 0),
-                (0, i, 0, 0, 0, "", 512),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers2(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
+            try:
+                r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512)
+            except Exception:
+                r = None
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -779,10 +759,7 @@ def get_regions_and_markers():
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
                 if not name:
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            name = _as_str(v)
-                            break
+                    name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
                 if not name:
@@ -808,10 +785,7 @@ def get_regions_and_markers():
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
                 if not name:
-                    for v in r:
-                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
-                            name = _as_str(v)
-                            break
+                    name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
                 if not name:
