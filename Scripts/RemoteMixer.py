@@ -712,6 +712,18 @@ def get_regions_and_markers():
     except Exception:
         total = 0
 
+    def _fetch_marker_name(i, isrgn):
+        if "RPR_GetSetProjectMarkerByIndex2" in globals():
+            try:
+                r = RPR_GetSetProjectMarkerByIndex2(0, i, isrgn, 0, 0, "", 512, 0)
+                if isinstance(r, tuple) and len(r) > 5:
+                    nm = _as_str(r[5])
+                    if nm:
+                        return nm
+            except Exception:
+                pass
+        return ""
+
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers3" in globals():
             r = None
@@ -732,6 +744,15 @@ def get_regions_and_markers():
                 end = float(r[3]) if len(r) > 3 else 0.0
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
+                if not name:
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            name = _as_str(v)
+                            break
+                if not isrgn and end > start and end > 0:
+                    isrgn = 1
+                if not name:
+                    name = _fetch_marker_name(i, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers2" in globals():
             r = None
@@ -753,6 +774,15 @@ def get_regions_and_markers():
                 end = float(r[3]) if len(r) > 3 else 0.0
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
+                if not name:
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            name = _as_str(v)
+                            break
+                if not isrgn and end > start and end > 0:
+                    isrgn = 1
+                if not name:
+                    name = _fetch_marker_name(i, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers" in globals():
             r = None
@@ -773,6 +803,15 @@ def get_regions_and_markers():
                 end = float(r[3]) if len(r) > 3 else 0.0
                 name = _as_str(r[4]) if len(r) > 4 else ""
                 idx = int(r[5]) if len(r) > 5 else i
+                if not name:
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            name = _as_str(v)
+                            break
+                if not isrgn and end > start and end > 0:
+                    isrgn = 1
+                if not name:
+                    name = _fetch_marker_name(i, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         return None
 
@@ -860,6 +899,17 @@ def get_transport_state():
         for r in regions:
             if int(r.get("index", -1)) == region_index:
                 region_name = r.get("name", "")
+                break
+    if not region_name and regions:
+        for r in regions:
+            try:
+                rs = float(r.get("start", 0.0))
+                re = float(r.get("end", 0.0))
+            except Exception:
+                continue
+            if rs <= pos <= re:
+                region_name = r.get("name", "")
+                region_index = int(r.get("index", -1))
                 break
 
     return {
@@ -1085,17 +1135,20 @@ def handle_cmd(cmd, sock):
             idx = int(cmd.get("index", -1))
             if idx >= 0:
                 try:
-                    regions, _markers = get_regions_and_markers()
-                    start = None
-                    for r in regions:
-                        if int(r.get("index", -1)) == idx:
-                            start = r.get("start", None)
-                            break
-                    if start is not None:
-                        try:
-                            RPR_SetEditCurPos2(0, start, True, True)
-                        except Exception:
-                            RPR_SetEditCurPos(start, True, True)
+                    try:
+                        RPR_GotoMarker(0, idx, True)
+                    except Exception:
+                        regions, _markers = get_regions_and_markers()
+                        start = None
+                        for r in regions:
+                            if int(r.get("index", -1)) == idx:
+                                start = r.get("start", None)
+                                break
+                        if start is not None:
+                            try:
+                                RPR_SetEditCurPos2(0, start, True, True)
+                            except Exception:
+                                RPR_SetEditCurPos(start, True, True)
                 except Exception:
                     pass
             return
