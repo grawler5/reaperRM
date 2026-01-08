@@ -4022,6 +4022,7 @@ function buildRMEqProQPanelControl(win, ctrl){
 
   const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
   const clamp01 = (x)=>clamp(x,0,1);
+  let specSmooth = [];
 
   // ===== Graph wrapper =====
   const wrap = document.createElement("div");
@@ -4945,32 +4946,50 @@ function buildRMEqProQPanelControl(win, ctrl){
       const fMax = 20000;
       const y0 = gainToY(0,h);
       const dbMin = -90;
+      if (!specSmooth || specSmooth.length !== binCount){
+        specSmooth = new Array(binCount).fill(0);
+      }
       const bins = new Array(binCount);
       for (let i=0;i<binCount;i++){
         const pp = getP(idx.specBins[i]);
         bins[i] = pp ? clamp01(pp.value||0) : 0;
       }
-      const smoothed = bins.map((v,i)=>{
-        const v0 = bins[Math.max(0,i-1)];
-        const v1 = bins[Math.min(binCount-1,i+1)];
+      const smoothingBase = allowAddBands ? 0.18 : 0.24;
+      for (let i=0;i<binCount;i++){
+        const t = i / Math.max(1, binCount - 1);
+        const alpha = smoothingBase + (1 - smoothingBase) * (0.35 + 0.65 * t);
+        specSmooth[i] = specSmooth[i] + (bins[i] - specSmooth[i]) * alpha;
+      }
+      const spatial = specSmooth.map((v,i)=>{
+        const v0 = specSmooth[Math.max(0,i-1)];
+        const v1 = specSmooth[Math.min(binCount-1,i+1)];
         return (v0 + v*2 + v1) / 4;
       });
 
-      const stepsPerBin = allowAddBands ? 6 : 3;
+      const catmull = (p0,p1,p2,p3,t)=>{
+        const t2 = t*t;
+        const t3 = t2*t;
+        return 0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3);
+      };
+
+      const stepsPerBin = allowAddBands ? 8 : 5;
       const steps = (binCount - 1) * stepsPerBin;
       ctx.strokeStyle = "rgba(255,255,255,.35)";
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       for (let i=0;i<=steps;i++){
         const t = i / Math.max(1, steps);
-        const raw = t * (binCount - 1);
-        const idx0 = Math.floor(raw);
-        const idx1 = Math.min(binCount - 1, idx0 + 1);
-        const frac = raw - idx0;
-        const v = smoothed[idx0] + (smoothed[idx1] - smoothed[idx0]) * frac;
+        const tWarp = Math.pow(t, 0.72);
+        const raw = tWarp * (binCount - 1);
+        const idx1 = Math.floor(raw);
+        const frac = raw - idx1;
+        const idx0 = Math.max(0, idx1 - 1);
+        const idx2 = Math.min(binCount - 1, idx1 + 1);
+        const idx3 = Math.min(binCount - 1, idx1 + 2);
+        const v = catmull(spatial[idx0], spatial[idx1], spatial[idx2], spatial[idx3], frac);
         const f = fMin * Math.pow(fMax/fMin, raw / Math.max(1,(binCount - 1)));
         const x = freqToX(f, w);
-        const db = dbMin + v * (0 - dbMin);
+        const db = dbMin + clamp01(v) * (0 - dbMin);
         const y = y0 + ((-db)/(-dbMin)) * (h - y0);
         if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
