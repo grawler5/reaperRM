@@ -6434,6 +6434,59 @@ applyResponsiveMode();
   let sliderCurrent = new Map(); // guid -> currentY (0..1)
   let draggingGuid = null;
   let draggingTrackGuid = null;
+  let touchDrag = null;
+  let touchDropTarget = null;
+
+  function setTouchDropTarget(el){
+    if (touchDropTarget && touchDropTarget !== el){
+      touchDropTarget.classList.remove("dropTarget");
+    }
+    touchDropTarget = el;
+    if (touchDropTarget){
+      touchDropTarget.classList.add("dropTarget");
+    }
+  }
+
+  function updateTouchDropTarget(x, y){
+    const el = document.elementFromPoint(x, y);
+    const strip = el ? el.closest(".strip") : null;
+    if (!strip || !strip.dataset.guid || (touchDrag && strip.dataset.guid === touchDrag.guid)){
+      setTouchDropTarget(null);
+      return;
+    }
+    setTouchDropTarget(strip);
+  }
+
+  function startTouchDrag(guid, el, pointerId, x, y){
+    touchDrag = {guid, el, pointerId};
+    draggingTrackGuid = guid;
+    el.classList.add("dragging");
+    document.body.classList.add("draggingTrack");
+    updateTouchDropTarget(x, y);
+  }
+
+  function endTouchDrag(applyMove=true){
+    if (!touchDrag) return;
+    const {guid, el} = touchDrag;
+    if (applyMove && touchDropTarget){
+      const beforeGuid = touchDropTarget.dataset.guid;
+      if (beforeGuid && beforeGuid !== guid){
+        wsSend({type:"moveTrack", guid, beforeGuid});
+        setTimeout(()=>wsSend({type:"reqState"}), 120);
+      }
+    }
+    if (touchDropTarget) touchDropTarget.classList.remove("dropTarget");
+    if (el) el.classList.remove("dragging");
+    document.body.classList.remove("draggingTrack");
+    touchDropTarget = null;
+    touchDrag = null;
+    draggingTrackGuid = null;
+  }
+
+  function canStartTouchDrag(target){
+    if (!target) return false;
+    return !target.closest("input, button, .btn, .faderHit, .thumb, .panSlider, .slotbtn, .fxSlots, .fxSlotActions, .fxMoreBadge");
+  }
 
   // FX slots cache
   let fxCache = new Map(); // guid -> {fx:[], ts}
@@ -6858,6 +6911,48 @@ applyResponsiveMode();
       wsSend({type:"addTrack"});
       setTimeout(()=>wsSend({type:"reqState"}), 120);
     });
+    mixerWrap.addEventListener("contextmenu", (ev)=>{
+      if (ev.target.closest(".strip")) return;
+      ev.preventDefault();
+      openMixerContextMenu(ev.clientX, ev.clientY);
+    });
+    mixerWrap.addEventListener("pointerdown", (ev)=>{
+      if (ev.pointerType !== "touch") return;
+      if (ev.target.closest(".strip")) return;
+      const startX = ev.clientX;
+      const startY = ev.clientY;
+      let active = true;
+      const hold = setTimeout(()=>{
+        if (!active) return;
+        openMixerContextMenu(startX, startY);
+      }, 650);
+      const move = (e)=>{
+        if (!active) return;
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) > 12){
+          clearTimeout(hold);
+          cleanup();
+        }
+      };
+      const up = ()=>{
+        if (!active) return;
+        clearTimeout(hold);
+        cleanup();
+      };
+      const cancel = ()=>{
+        if (!active) return;
+        clearTimeout(hold);
+        cleanup();
+      };
+      const cleanup = ()=>{
+        active = false;
+        document.removeEventListener("pointermove", move, true);
+        document.removeEventListener("pointerup", up, true);
+        document.removeEventListener("pointercancel", cancel, true);
+      };
+      document.addEventListener("pointermove", move, true);
+      document.addEventListener("pointerup", up, true);
+      document.addEventListener("pointercancel", cancel, true);
+    });
   }
   window.addEventListener("resize", scheduleFolderFrames, {passive:true});
 
@@ -6919,7 +7014,118 @@ applyResponsiveMode();
     }
   }
 
+  function updateSpacerStrip(el, t){
+    if (!el) return;
+    el.classList.add("spacer");
+    el.setAttribute("data-guid", t.guid);
+    const label = el._spacerLabel;
+    if (label){
+      const name = String(t.name || "").trim();
+      label.textContent = name || "Spacer";
+    }
+  }
+
+  function attachTrackReorder(el, t){
+    if (!el || t.kind === "master") return;
+
+    // Drag reorder (mouse)
+    el.setAttribute("draggable", "true");
+    el.addEventListener("dragstart", (ev)=>{
+      draggingTrackGuid = t.guid;
+      ev.dataTransfer.effectAllowed = "move";
+      try{ ev.dataTransfer.setData("text/plain", t.guid); }catch(_){}
+    });
+    el.addEventListener("dragover", (ev)=>{
+      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+    });
+    el.addEventListener("drop", (ev)=>{
+      ev.preventDefault();
+      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
+      wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: t.guid});
+      draggingTrackGuid = null;
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    el.addEventListener("dragend", ()=>{ draggingTrackGuid = null; });
+
+    // Touch hold-to-drag
+    el.addEventListener("pointerdown", (ev)=>{
+      if (ev.pointerType !== "touch") return;
+      if (!canStartTouchDrag(ev.target)) return;
+      const startX = ev.clientX;
+      const startY = ev.clientY;
+      const pointerId = ev.pointerId;
+      let active = true;
+      const hold = setTimeout(()=>{
+        if (!active) return;
+        startTouchDrag(t.guid, el, pointerId, startX, startY);
+      }, 420);
+
+      const move = (e)=>{
+        if (!active) return;
+        const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+        if (!touchDrag && dist > 10){
+          clearTimeout(hold);
+          cleanup();
+          return;
+        }
+        if (touchDrag && touchDrag.pointerId === pointerId){
+          updateTouchDropTarget(e.clientX, e.clientY);
+        }
+      };
+      const up = (e)=>{
+        if (!active) return;
+        clearTimeout(hold);
+        cleanup();
+        if (touchDrag && touchDrag.pointerId === pointerId){
+          endTouchDrag(true);
+        }
+      };
+      const cancel = ()=>{
+        if (!active) return;
+        clearTimeout(hold);
+        cleanup();
+        if (touchDrag && touchDrag.pointerId === pointerId){
+          endTouchDrag(false);
+        }
+      };
+      const cleanup = ()=>{
+        active = false;
+        document.removeEventListener("pointermove", move, true);
+        document.removeEventListener("pointerup", up, true);
+        document.removeEventListener("pointercancel", cancel, true);
+      };
+      document.addEventListener("pointermove", move, true);
+      document.addEventListener("pointerup", up, true);
+      document.addEventListener("pointercancel", cancel, true);
+    });
+  }
+
+  function createSpacerStrip(t){
+    const el = document.createElement("div");
+    el.className = "strip spacer";
+    el.setAttribute("data-guid", t.guid);
+    const label = document.createElement("div");
+    label.className = "spacerLabel";
+    el.appendChild(label);
+    el._spacerLabel = label;
+
+    el.addEventListener("contextmenu", (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      openTrackContextMenu(t.guid, ev.clientX, ev.clientY);
+    });
+
+    attachTrackReorder(el, t);
+    updateSpacerStrip(el, t);
+    return el;
+  }
+
   function createStrip(t){
+    if (t.kind !== "master" && t.isSpacer){
+      return createSpacerStrip(t);
+    }
     const el = document.createElement("div");
     el.className = "strip" + (t.kind==="master" ? " master" : "");
     el.setAttribute("data-guid", t.guid);
@@ -7145,37 +7351,7 @@ slotbar.appendChild(folderBtn);
       ev.stopPropagation();
       openTrackContextMenu(t.guid, ev.clientX, ev.clientY);
     });
-    // Touch long-press to open menu
-    let touchHold = null;
-    el.addEventListener("pointerdown", (ev)=>{
-      if (ev.pointerType !== "touch") return;
-      touchHold = setTimeout(()=> openTrackContextMenu(t.guid, ev.clientX, ev.clientY), 650);
-    });
-    const clearTouchHold = ()=>{ if (touchHold) { clearTimeout(touchHold); touchHold = null; } };
-    el.addEventListener("pointerup", clearTouchHold);
-    el.addEventListener("pointerleave", clearTouchHold);
-    el.addEventListener("pointercancel", clearTouchHold);
-
-    // Drag reorder (mouse)
-    el.setAttribute("draggable", "true");
-    el.addEventListener("dragstart", (ev)=>{
-      draggingTrackGuid = t.guid;
-      ev.dataTransfer.effectAllowed = "move";
-      try{ ev.dataTransfer.setData("text/plain", t.guid); }catch(_){}
-    });
-    el.addEventListener("dragover", (ev)=>{
-      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
-      ev.preventDefault();
-      ev.dataTransfer.dropEffect = "move";
-    });
-    el.addEventListener("drop", (ev)=>{
-      ev.preventDefault();
-      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
-      wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: t.guid});
-      draggingTrackGuid = null;
-      setTimeout(()=>wsSend({type:"reqState"}), 120);
-    });
-    el.addEventListener("dragend", ()=>{ draggingTrackGuid = null; });
+    attachTrackReorder(el, t);
     fxBtn.addEventListener("click",(ev)=>{
       ev.stopPropagation();
       if (fxBtn._holdTriggered){ fxBtn._holdTriggered = false; return; }
@@ -7272,7 +7448,12 @@ slotbar.appendChild(folderBtn);
   }
 
   function updateStrip(el, t, first=false){
-    if (!el || !el._refs) return;
+    if (!el) return;
+    if (t.kind !== "master" && t.isSpacer){
+      updateSpacerStrip(el, t);
+      return;
+    }
+    if (!el._refs) return;
     const r = el._refs;
 
     // class master/child + soloed
@@ -7578,6 +7759,17 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     if (_trackMenuEl && !(_trackMenuEl.contains(e.target))) closeTrackMenu();
   }, true);
 
+  let _mixerMenuEl = null;
+  function closeMixerMenu(){
+    if (_mixerMenuEl){
+      try{ _mixerMenuEl.remove(); }catch(_){}
+      _mixerMenuEl = null;
+    }
+  }
+  document.addEventListener("click", (e)=>{
+    if (_mixerMenuEl && !(_mixerMenuEl.contains(e.target))) closeMixerMenu();
+  }, true);
+
   function openTrackContextMenu(guid, x, y){
     closeTrackMenu();
     const t = trackByGuid.get(guid);
@@ -7655,6 +7847,44 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     menu.style.left = left + "px";
     menu.style.top = top + "px";
     _trackMenuEl = menu;
+  }
+
+  function openMixerContextMenu(x, y){
+    closeMixerMenu();
+    const menu = document.createElement("div");
+    menu.className = "trackMenu";
+
+    const mkItem = (label, onClick)=>{
+      const mi = document.createElement("div");
+      mi.className = "mi";
+      mi.textContent = label;
+      mi.addEventListener("click", (ev)=>{ ev.stopPropagation(); onClick(); closeMixerMenu(); });
+      menu.appendChild(mi);
+    };
+
+    mkItem("Add track", ()=>{
+      wsSend({type:"addTrack"});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    mkItem("Add visual spacer", ()=>{
+      wsSend({type:"addSpacer"});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    mkItem("Mixer settings", ()=> openSettingsTab("ui"));
+    mkItem("Track manager", ()=> openSettingsTab("tracks"));
+    mkItem("Scene manager", openSceneManager);
+
+    document.body.appendChild(menu);
+    const pad = 8;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    if (left + mw > vw - pad) left = Math.max(pad, vw - pad - mw);
+    if (top + mh > vh - pad) top = Math.max(pad, vh - pad - mh);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    _mixerMenuEl = menu;
   }
 
   function showSlotActions(row, guid, fx){
@@ -9204,11 +9434,15 @@ modalBody.appendChild(wrap);
     modalBody.appendChild(wrap);
   }
 
-  function openSettings(){
+  function openSettingsTab(tab="main"){
     overlay.style.display = "block";
     modal.style.display = "block";
-    openModal = {kind:"settings", tab:"main"};
+    openModal = {kind:"settings", tab};
     renderModal();
+  }
+
+  function openSettings(){
+    openSettingsTab("main");
   }
 
   function openTransportModal(){

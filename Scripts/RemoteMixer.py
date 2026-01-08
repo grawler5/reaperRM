@@ -200,6 +200,32 @@ def _color_from_hex(s):
         return None
 
 
+def _track_layout(track, key):
+    try:
+        ret = RPR_GetSetMediaTrackInfo_String(track, key, "", False)
+        layout = _pick_human_string(ret, "")
+        return _as_str(layout)
+    except Exception:
+        return ""
+
+
+def _is_visual_spacer(track, name):
+    try:
+        layout = _track_layout(track, "P_MCP_LAYOUT")
+        layout_l = _as_str(layout).strip().lower()
+        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
+            return True
+    except Exception:
+        pass
+    try:
+        nm = _as_str(name).strip().lower()
+        if nm in ("spacer", "separator", "divider"):
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _safe_json(obj):
     try:
         return json.dumps(obj, ensure_ascii=False, separators=(",",":"))
@@ -577,12 +603,16 @@ def build_state():
         if not tr:
             continue
         depth, compact, indent = track_folder_info(tr)
+        name = get_track_name(tr)
+        is_spacer = _is_visual_spacer(tr, name)
+        if is_spacer and (not name or name == "Track"):
+            name = "Spacer"
         t = {
             "kind":"track",
             "guid": track_guid(tr),
             "id": str(i+1),
             "idx": i+1,
-            "name": get_track_name(tr),
+            "name": name,
             "vol": get_track_vol(tr),
             "pan": get_track_pan(tr),
             "mute": get_track_mute(tr),
@@ -599,6 +629,7 @@ def build_state():
             "folderCompact": int(compact),
             "indent": int(indent),
             "color": track_color_hex(tr),
+            "isSpacer": bool(is_spacer),
         }
         tracks.append(t)
 
@@ -789,7 +820,7 @@ def get_regions_and_markers():
                 if _is_numeric_name(name):
                     name = ""
                 if not name:
-                    name = _fetch_marker_name(i, bool(isrgn))
+                    name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers2" in globals():
             r = None
@@ -817,7 +848,7 @@ def get_regions_and_markers():
                 if _is_numeric_name(name):
                     name = ""
                 if not name:
-                    name = _fetch_marker_name(i, bool(isrgn))
+                    name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers" in globals():
             r = None
@@ -845,7 +876,7 @@ def get_regions_and_markers():
                 if _is_numeric_name(name):
                     name = ""
                 if not name:
-                    name = _fetch_marker_name(i, bool(isrgn))
+                    name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         return None
 
@@ -1293,6 +1324,28 @@ def handle_cmd(cmd, sock):
                 cnt = RPR_CountTracks(0)
                 if isinstance(cnt, tuple): cnt = cnt[0]
                 RPR_InsertTrackAtIndex(int(cnt), True)
+                RPR_TrackList_AdjustWindows(False)
+                RPR_UpdateArrange()
+            except Exception:
+                pass
+            return
+        if typ == "addSpacer":
+            try:
+                cnt = RPR_CountTracks(0)
+                if isinstance(cnt, tuple): cnt = cnt[0]
+                idx = int(cnt)
+                RPR_InsertTrackAtIndex(idx, True)
+                tr = RPR_GetTrack(0, idx)
+                if isinstance(tr, tuple): tr = tr[0]
+                if tr:
+                    try:
+                        RPR_GetSetMediaTrackInfo_String(tr, "P_NAME", "Spacer", True)
+                    except Exception:
+                        pass
+                    try:
+                        RPR_GetSetMediaTrackInfo_String(tr, "P_MCP_LAYOUT", "Spacer", True)
+                    except Exception:
+                        pass
                 RPR_TrackList_AdjustWindows(False)
                 RPR_UpdateArrange()
             except Exception:

@@ -202,6 +202,44 @@
     position:relative;
     overflow:visible;
   }
+  .strip.spacer{
+    width:48px;
+    min-width:36px;
+    border:1px dashed rgba(255,255,255,0.2);
+    background:linear-gradient(#2a2e33,#1f2227 60%, #191b20 100%);
+    box-shadow:none;
+    outline:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .strip.spacer::before{
+    background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,0) 40%, rgba(0,0,0,.25));
+  }
+  .strip.spacer .spacerLabel{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:rgba(255,255,255,0.55);
+    writing-mode:vertical-rl;
+    transform:rotate(180deg);
+    text-align:center;
+  }
+  body.light .strip.spacer{
+    border:1px dashed rgba(0,0,0,0.2);
+    background:linear-gradient(#f1f4f9,#e4e9f0 60%, #d8dee7 100%);
+  }
+  body.light .strip.spacer .spacerLabel{
+    color:rgba(0,0,0,0.5);
+  }
+  .strip.dragging{
+    opacity:0.6;
+    filter:grayscale(0.4);
+  }
+  .strip.dropTarget{
+    outline:3px solid rgba(94, 203, 255, 0.75);
+    outline-offset:-3px;
+  }
   .strip::before{
     content:"";
     position:absolute; inset:0;
