@@ -6929,7 +6929,7 @@ applyResponsiveMode();
           moveSpacerWidth(guid, spacerTarget);
           renderOrUpdate(true);
           setTimeout(()=>wsSend({type:"reqState"}), 10);
-        } else if (info.folderGuid){
+        } else if (info.folderGuid && info.guid === info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid, folderGuid: info.folderGuid});
           setTimeout(()=>wsSend({type:"reqState"}), 10);
         } else {
@@ -7705,7 +7705,7 @@ applyResponsiveMode();
       }
       if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
       const info = getDropTargetInfo(el);
-      if (info && info.folderGuid){
+      if (info && info.folderGuid && info.guid === info.folderGuid){
         wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
       } else {
         const beforeGuid = (dragDropState && dragDropState.after)
@@ -7780,7 +7780,7 @@ applyResponsiveMode();
       }
       if (draggingTrackGuid && t.targetGuid){
         const info = getDropTargetInfo(el);
-        if (info && info.folderGuid){
+        if (info && info.folderGuid && info.guid === info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
         } else {
           const beforeGuid = (dragDropState && dragDropState.after)
