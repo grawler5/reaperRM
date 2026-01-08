@@ -6488,6 +6488,56 @@ applyResponsiveMode();
     return !target.closest("input, button, .btn, .faderHit, .thumb, .panSlider, .slotbtn, .fxSlots, .fxSlotActions, .fxMoreBadge");
   }
 
+  function startHoldDrag(t, el, ev, holdMs){
+    if (!canStartTouchDrag(ev.target)) return;
+    const startX = ev.clientX;
+    const startY = ev.clientY;
+    const pointerId = ev.pointerId;
+    let active = true;
+    const hold = setTimeout(()=>{
+      if (!active) return;
+      startTouchDrag(t.guid, el, pointerId, startX, startY);
+    }, holdMs);
+
+    const move = (e)=>{
+      if (!active) return;
+      const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
+      if (!touchDrag && dist > 10){
+        clearTimeout(hold);
+        cleanup();
+        return;
+      }
+      if (touchDrag && touchDrag.pointerId === pointerId){
+        updateTouchDropTarget(e.clientX, e.clientY);
+      }
+    };
+    const up = ()=>{
+      if (!active) return;
+      clearTimeout(hold);
+      cleanup();
+      if (touchDrag && touchDrag.pointerId === pointerId){
+        endTouchDrag(true);
+      }
+    };
+    const cancel = ()=>{
+      if (!active) return;
+      clearTimeout(hold);
+      cleanup();
+      if (touchDrag && touchDrag.pointerId === pointerId){
+        endTouchDrag(false);
+      }
+    };
+    const cleanup = ()=>{
+      active = false;
+      document.removeEventListener("pointermove", move, true);
+      document.removeEventListener("pointerup", up, true);
+      document.removeEventListener("pointercancel", cancel, true);
+    };
+    document.addEventListener("pointermove", move, true);
+    document.addEventListener("pointerup", up, true);
+    document.addEventListener("pointercancel", cancel, true);
+  }
+
   // FX slots cache
   let fxCache = new Map(); // guid -> {fx:[], ts}
   let fxReqInFlight = new Set();
@@ -7052,53 +7102,14 @@ applyResponsiveMode();
     // Touch hold-to-drag
     el.addEventListener("pointerdown", (ev)=>{
       if (ev.pointerType !== "touch") return;
-      if (!canStartTouchDrag(ev.target)) return;
-      const startX = ev.clientX;
-      const startY = ev.clientY;
-      const pointerId = ev.pointerId;
-      let active = true;
-      const hold = setTimeout(()=>{
-        if (!active) return;
-        startTouchDrag(t.guid, el, pointerId, startX, startY);
-      }, 420);
+      startHoldDrag(t, el, ev, 420);
+    });
 
-      const move = (e)=>{
-        if (!active) return;
-        const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
-        if (!touchDrag && dist > 10){
-          clearTimeout(hold);
-          cleanup();
-          return;
-        }
-        if (touchDrag && touchDrag.pointerId === pointerId){
-          updateTouchDropTarget(e.clientX, e.clientY);
-        }
-      };
-      const up = (e)=>{
-        if (!active) return;
-        clearTimeout(hold);
-        cleanup();
-        if (touchDrag && touchDrag.pointerId === pointerId){
-          endTouchDrag(true);
-        }
-      };
-      const cancel = ()=>{
-        if (!active) return;
-        clearTimeout(hold);
-        cleanup();
-        if (touchDrag && touchDrag.pointerId === pointerId){
-          endTouchDrag(false);
-        }
-      };
-      const cleanup = ()=>{
-        active = false;
-        document.removeEventListener("pointermove", move, true);
-        document.removeEventListener("pointerup", up, true);
-        document.removeEventListener("pointercancel", cancel, true);
-      };
-      document.addEventListener("pointermove", move, true);
-      document.addEventListener("pointerup", up, true);
-      document.addEventListener("pointercancel", cancel, true);
+    // Desktop hold-to-drag
+    el.addEventListener("pointerdown", (ev)=>{
+      if (ev.pointerType !== "mouse") return;
+      if (ev.button !== 0) return;
+      startHoldDrag(t, el, ev, 320);
     });
   }
 
@@ -7787,6 +7798,26 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       menu.appendChild(mi);
     };
 
+    const mkPalette = (colors)=>{
+      const palette = document.createElement("div");
+      palette.className = "trackColorPalette";
+      colors.forEach((hex)=> {
+        const swatch = document.createElement("button");
+        swatch.type = "button";
+        swatch.className = "swatch";
+        swatch.style.background = hex;
+        swatch.title = hex;
+        swatch.addEventListener("click", (ev)=>{
+          ev.stopPropagation();
+          wsSend({type:"setTrackColor", guid: t.guid, color: hex});
+          setTimeout(()=>wsSend({type:"reqState"}), 80);
+          closeTrackMenu();
+        });
+        palette.appendChild(swatch);
+      });
+      return palette;
+    };
+
     mkItem("Rename", ()=>{
       const current = t.name || "";
       const next = prompt("Rename track", current);
@@ -7796,14 +7827,22 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       wsSend({type:"renameTrack", guid: t.guid, name});
       setTimeout(()=>wsSend({type:"reqState"}), 80);
     });
-    mkItem("Set color", ()=>{
-      const next = prompt("Track color (#RRGGBB)", "");
-      if (next === null) return;
-      const color = String(next).trim();
-      if (!color) return;
-      wsSend({type:"setTrackColor", guid: t.guid, color});
-      setTimeout(()=>wsSend({type:"reqState"}), 80);
-    });
+    const colorLabel = document.createElement("div");
+    colorLabel.className = "mi label";
+    colorLabel.textContent = "Track color";
+    menu.appendChild(colorLabel);
+    menu.appendChild(mkPalette([
+      "#ff0080",
+      "#008000",
+      "#00ff80",
+      "#ff80c0",
+      "#80ffff",
+      "#004080",
+      "#80ff80",
+      "#ff80ff",
+      "#800080",
+      "#ffc6ff",
+    ]));
     const compactOn = !!cfg.compactTracks[t.guid];
     mkItem(compactOn ? "Disable compact view" : "Enable compact view", ()=>{
       if (compactOn) delete cfg.compactTracks[t.guid];

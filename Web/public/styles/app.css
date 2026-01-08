@@ -822,13 +822,38 @@ body.phoneLandscape .strip.fxExpanded .fxSlots{ display:flex !important; }
   cursor:pointer;
   border:1px solid transparent;
 }
+.trackMenu .mi.label{
+  cursor:default;
+  opacity:0.7;
+}
 .trackMenu .mi:hover{
   background:rgba(255,255,255,.08);
   border-color:rgba(255,255,255,.10);
 }
+.trackMenu .mi.label:hover{
+  background:transparent;
+  border-color:transparent;
+}
 .trackMenu .mi.disabled{
   opacity:.5;
   cursor:default;
+}
+.trackMenu .trackColorPalette{
+  display:grid;
+  grid-template-columns:repeat(5, 22px);
+  gap:8px;
+  padding:8px 10px 10px;
+}
+.trackMenu .trackColorPalette .swatch{
+  width:22px;
+  height:22px;
+  border-radius:6px;
+  border:1px solid rgba(0,0,0,0.6);
+  cursor:pointer;
+}
+.trackMenu .trackColorPalette .swatch:focus{
+  outline:2px solid rgba(94, 203, 255, 0.75);
+  outline-offset:2px;
 }
 
 

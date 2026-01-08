@@ -209,7 +209,7 @@ def _track_layout(track, key):
         return ""
 
 
-def _is_visual_spacer(track, name):
+def _is_visual_spacer(track):
     try:
         layout = _track_layout(track, "P_MCP_LAYOUT")
         layout_l = _as_str(layout).strip().lower()
@@ -218,8 +218,9 @@ def _is_visual_spacer(track, name):
     except Exception:
         pass
     try:
-        nm = _as_str(name).strip().lower()
-        if nm in ("spacer", "separator", "divider"):
+        layout = _track_layout(track, "P_TCP_LAYOUT")
+        layout_l = _as_str(layout).strip().lower()
+        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
             return True
     except Exception:
         pass
@@ -604,8 +605,8 @@ def build_state():
             continue
         depth, compact, indent = track_folder_info(tr)
         name = get_track_name(tr)
-        is_spacer = _is_visual_spacer(tr, name)
-        if is_spacer and (not name or name == "Track"):
+        is_spacer = _is_visual_spacer(tr)
+        if is_spacer and (not name or name == "Track" or name == "Spacer"):
             name = "Spacer"
         t = {
             "kind":"track",
@@ -1344,6 +1345,7 @@ def handle_cmd(cmd, sock):
                         pass
                     try:
                         RPR_GetSetMediaTrackInfo_String(tr, "P_MCP_LAYOUT", "Spacer", True)
+                        RPR_GetSetMediaTrackInfo_String(tr, "P_TCP_LAYOUT", "Spacer", True)
                     except Exception:
                         pass
                 RPR_TrackList_AdjustWindows(False)
