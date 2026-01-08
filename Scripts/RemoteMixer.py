@@ -200,31 +200,13 @@ def _color_from_hex(s):
         return None
 
 
-def _track_layout(track, key):
+def _has_visual_spacer(track):
     try:
-        ret = RPR_GetSetMediaTrackInfo_String(track, key, "", False)
-        layout = _pick_human_string(ret, "")
-        return _as_str(layout)
+        val = RPR_GetMediaTrackInfo_Value(track, "I_SPACER")
+        if isinstance(val, tuple): val = val[0]
+        return int(val) == 1
     except Exception:
-        return ""
-
-
-def _is_visual_spacer(track):
-    try:
-        layout = _track_layout(track, "P_MCP_LAYOUT")
-        layout_l = _as_str(layout).strip().lower()
-        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
-            return True
-    except Exception:
-        pass
-    try:
-        layout = _track_layout(track, "P_TCP_LAYOUT")
-        layout_l = _as_str(layout).strip().lower()
-        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
-            return True
-    except Exception:
-        pass
-    return False
+        return False
 
 
 def _safe_json(obj):
@@ -605,9 +587,7 @@ def build_state():
             continue
         depth, compact, indent = track_folder_info(tr)
         name = get_track_name(tr)
-        is_spacer = _is_visual_spacer(tr)
-        if is_spacer and (not name or name == "Track" or name == "Spacer"):
-            name = "Spacer"
+        has_spacer = _has_visual_spacer(tr)
         t = {
             "kind":"track",
             "guid": track_guid(tr),
@@ -630,7 +610,7 @@ def build_state():
             "folderCompact": int(compact),
             "indent": int(indent),
             "color": track_color_hex(tr),
-            "isSpacer": bool(is_spacer),
+            "spacerAbove": bool(has_spacer),
         }
         tracks.append(t)
 
@@ -756,155 +736,7 @@ def get_project_bpm():
 
 
 def get_regions_and_markers():
-    regions = []
-    markers = []
-    try:
-        res = RPR_CountProjectMarkers(0, 0, 0)
-        if isinstance(res, tuple):
-            total = int(res[0]) if len(res) > 0 else 0
-            mk = int(res[1]) if len(res) > 1 else 0
-            rg = int(res[2]) if len(res) > 2 else 0
-            if total <= 0:
-                total = mk + rg
-        else:
-            total = int(res)
-    except Exception:
-        total = 0
-
-    def _fetch_marker_name(i, isrgn):
-        if "RPR_GetSetProjectMarkerByIndex2" in globals():
-            try:
-                r = RPR_GetSetProjectMarkerByIndex2(0, i, isrgn, 0, 0, "", 512, 0)
-                if isinstance(r, tuple):
-                    nm = _pick_human_string(r, "")
-                    if nm:
-                        return nm
-            except Exception:
-                pass
-        return ""
-
-    def _is_numeric_name(s):
-        try:
-            t = _as_str(s).strip()
-            if not t:
-                return False
-            # Reject numeric-only strings like "12.34"
-            float(t)
-            return True
-        except Exception:
-            return False
-
-    def _enum_marker(i):
-        if "RPR_EnumProjectMarkers3" in globals():
-            r = None
-            for args in (
-                (0, i, 0, 0, 0, "", 0, 0),
-                (0, i, 0, 0, 0, "", 0),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers3(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
-            if isinstance(r, tuple):
-                ret = int(r[0]) if len(r) > 0 else 0
-                isrgn = int(r[1]) if len(r) > 1 else 0
-                start = float(r[2]) if len(r) > 2 else 0.0
-                end = float(r[3]) if len(r) > 3 else 0.0
-                name = _as_str(r[4]) if len(r) > 4 else ""
-                idx = int(r[5]) if len(r) > 5 else i
-                if not name:
-                    name = _pick_human_string(r, "")
-                if not isrgn and end > start and end > 0:
-                    isrgn = 1
-                if _is_numeric_name(name):
-                    name = ""
-                if not name:
-                    name = _fetch_marker_name(idx, bool(isrgn))
-                return ret, isrgn, start, end, name, idx
-        if "RPR_EnumProjectMarkers2" in globals():
-            r = None
-            for args in (
-                (0, i, 0, 0, 0, "", 0),
-                (0, i, 0, 0, 0, ""),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers2(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
-            if isinstance(r, tuple):
-                ret = int(r[0]) if len(r) > 0 else 0
-                isrgn = int(r[1]) if len(r) > 1 else 0
-                start = float(r[2]) if len(r) > 2 else 0.0
-                end = float(r[3]) if len(r) > 3 else 0.0
-                name = _as_str(r[4]) if len(r) > 4 else ""
-                idx = int(r[5]) if len(r) > 5 else i
-                if not name:
-                    name = _pick_human_string(r, "")
-                if not isrgn and end > start and end > 0:
-                    isrgn = 1
-                if _is_numeric_name(name):
-                    name = ""
-                if not name:
-                    name = _fetch_marker_name(idx, bool(isrgn))
-                return ret, isrgn, start, end, name, idx
-        if "RPR_EnumProjectMarkers" in globals():
-            r = None
-            for args in (
-                (i, 0, 0, 0, "", 512),
-                (i, 0, 0, 0, ""),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
-            if isinstance(r, tuple):
-                ret = int(r[0]) if len(r) > 0 else 0
-                isrgn = int(r[1]) if len(r) > 1 else 0
-                start = float(r[2]) if len(r) > 2 else 0.0
-                end = float(r[3]) if len(r) > 3 else 0.0
-                name = _as_str(r[4]) if len(r) > 4 else ""
-                idx = int(r[5]) if len(r) > 5 else i
-                if not name:
-                    name = _pick_human_string(r, "")
-                if not isrgn and end > start and end > 0:
-                    isrgn = 1
-                if _is_numeric_name(name):
-                    name = ""
-                if not name:
-                    name = _fetch_marker_name(idx, bool(isrgn))
-                return ret, isrgn, start, end, name, idx
-        return None
-
-    max_iter = total if total > 0 else 2048
-    for i in range(max_iter):
-        try:
-            res = _enum_marker(i)
-            if not res:
-                if total <= 0:
-                    break
-                continue
-            ret, isrgn, start, end, name, idx = res
-            if ret == 0:
-                if total <= 0:
-                    break
-                continue
-            if isrgn:
-                regions.append({"index": idx, "name": name, "start": start, "end": end})
-            else:
-                markers.append({"index": idx, "name": name, "position": start})
-        except Exception:
-            continue
-    return regions, markers
-
-
-def get_regions():
-    return get_regions_and_markers()[0]
+    return [], []
 
 
 def get_transport_state():
@@ -950,34 +782,6 @@ def get_transport_state():
         beat = 1
         beat_frac = 0.0
 
-    regions, markers = get_regions_and_markers()
-    region_name = ""
-    region_index = None
-    try:
-        rinfo = RPR_GetLastMarkerAndCurRegion(0, pos, 0, 0)
-        if isinstance(rinfo, tuple) and len(rinfo) > 2:
-            region_index = int(rinfo[2])
-            if region_index < 0:
-                region_index = None
-    except Exception:
-        region_index = None
-    if region_index is not None:
-        for r in regions:
-            if int(r.get("index", -1)) == region_index:
-                region_name = r.get("name", "")
-                break
-    if not region_name and regions:
-        for r in regions:
-            try:
-                rs = float(r.get("start", 0.0))
-                re = float(r.get("end", 0.0))
-            except Exception:
-                continue
-            if rs <= pos <= re:
-                region_name = r.get("name", "")
-                region_index = int(r.get("index", -1))
-                break
-
     return {
         "playState": play_state,
         "playing": playing,
@@ -987,11 +791,7 @@ def get_transport_state():
         "bpm": bpm,
         "bar": bar,
         "beat": beat,
-        "beatFrac": beat_frac,
-        "regionName": region_name,
-        "regionIndex": region_index,
-        "regions": regions,
-        "markers": markers
+        "beatFrac": beat_frac
     }
 
 
@@ -1184,107 +984,6 @@ def handle_cmd(cmd, sock):
             except Exception:
                 pass
             return
-        if typ == "reqRegions":
-            try:
-                transport = get_transport_state()
-                _send(sock, {
-                    "type": "regions",
-                    "regions": transport.get("regions", []),
-                    "markers": transport.get("markers", []),
-                    "regionName": transport.get("regionName", ""),
-                    "regionIndex": transport.get("regionIndex", None),
-                })
-            except Exception:
-                pass
-            return
-        if typ == "gotoRegion":
-            idx = int(cmd.get("index", -1))
-            start_pos = None
-            end_pos = None
-            try:
-                if cmd.get("start", None) is not None:
-                    start_pos = float(cmd.get("start"))
-                if cmd.get("end", None) is not None:
-                    end_pos = float(cmd.get("end"))
-            except Exception:
-                start_pos = None
-                end_pos = None
-            if idx >= 0:
-                try:
-                    try:
-                        RPR_GotoMarker(0, idx, True)
-                    except Exception:
-                        pass
-                    if start_pos is None:
-                        regions, _markers = get_regions_and_markers()
-                        for r in regions:
-                            if int(r.get("index", -1)) == idx:
-                                start_pos = r.get("start", None)
-                                end_pos = r.get("end", None)
-                                break
-                    if start_pos is not None:
-                        try:
-                            RPR_SetEditCurPos2(0, start_pos, True, True)
-                        except Exception:
-                            RPR_SetEditCurPos(start_pos, True, True)
-                except Exception:
-                    pass
-            return
-        if typ == "loopRegion":
-            idx = int(cmd.get("index", -1))
-            start_pos = None
-            end_pos = None
-            try:
-                if cmd.get("start", None) is not None:
-                    start_pos = float(cmd.get("start"))
-                if cmd.get("end", None) is not None:
-                    end_pos = float(cmd.get("end"))
-            except Exception:
-                start_pos = None
-                end_pos = None
-
-            if (start_pos is None or end_pos is None) and idx >= 0:
-                try:
-                    regions, _markers = get_regions_and_markers()
-                    for r in regions:
-                        if int(r.get("index", -1)) == idx:
-                            start_pos = r.get("start", None)
-                            end_pos = r.get("end", None)
-                            break
-                except Exception:
-                    pass
-
-            if start_pos is not None and end_pos is not None:
-                try:
-                    if "RPR_GetSet_LoopTimeRange2" in globals():
-                        RPR_GetSet_LoopTimeRange2(0, True, True, start_pos, end_pos, False)
-                    else:
-                        RPR_GetSet_LoopTimeRange(True, True, start_pos, end_pos, False)
-                except Exception:
-                    pass
-            return
-        if typ == "gotoMarker":
-            idx = int(cmd.get("index", -1))
-            if idx >= 0:
-                try:
-                    try:
-                        RPR_GotoMarker(0, idx, False)
-                    except Exception:
-                        RPR_GotoMarker(0, idx, 0)
-                    _regions, markers = get_regions_and_markers()
-                    pos = None
-                    for m in markers:
-                        if int(m.get("index", -1)) == idx:
-                            pos = m.get("position", None)
-                            break
-                    if pos is not None:
-                        try:
-                            RPR_SetEditCurPos2(0, pos, True, True)
-                        except Exception:
-                            RPR_SetEditCurPos(pos, True, True)
-                except Exception:
-                    pass
-            return
         if typ == "setVol":
             guid = cmd.get("guid","")
             vol = float(cmd.get("vol", 1.0))
@@ -1332,26 +1031,46 @@ def handle_cmd(cmd, sock):
             return
         if typ == "addSpacer":
             try:
-                cnt = RPR_CountTracks(0)
-                if isinstance(cnt, tuple): cnt = cnt[0]
-                idx = int(cnt)
-                RPR_InsertTrackAtIndex(idx, True)
-                tr = RPR_GetTrack(0, idx)
-                if isinstance(tr, tuple): tr = tr[0]
+                guid = cmd.get("guid", "")
+                tr = find_track_by_guid(guid) if guid else None
+                if not tr:
+                    cnt = RPR_CountTracks(0)
+                    if isinstance(cnt, tuple): cnt = cnt[0]
+                    idx = max(0, int(cnt) - 1)
+                    tr = RPR_GetTrack(0, idx) if cnt else None
+                    if isinstance(tr, tuple): tr = tr[0]
                 if tr:
                     try:
-                        RPR_GetSetMediaTrackInfo_String(tr, "P_NAME", "Spacer", True)
-                    except Exception:
-                        pass
-                    try:
-                        RPR_GetSetMediaTrackInfo_String(tr, "P_MCP_LAYOUT", "Spacer", True)
-                        RPR_GetSetMediaTrackInfo_String(tr, "P_TCP_LAYOUT", "Spacer", True)
+                        RPR_SetMediaTrackInfo_Value(tr, "I_SPACER", 1.0)
                     except Exception:
                         pass
                 RPR_TrackList_AdjustWindows(False)
                 RPR_UpdateArrange()
             except Exception:
                 pass
+            return
+        if typ == "setSpacer":
+            guid = cmd.get("guid", "")
+            enabled = bool(cmd.get("enabled", False))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try:
+                    RPR_SetMediaTrackInfo_Value(tr, "I_SPACER", 1.0 if enabled else 0.0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
+            return
+        if typ == "deleteTrack":
+            guid = cmd.get("guid", "")
+            tr = find_track_by_guid(guid)
+            if tr:
+                try:
+                    RPR_DeleteTrack(tr)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
             return
         if typ == "moveTrack":
             guid = cmd.get("guid","")

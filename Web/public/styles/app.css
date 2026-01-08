@@ -201,6 +201,7 @@
     box-shadow:0 10px 20px rgba(0,0,0,.35);
     position:relative;
     overflow:visible;
+    transition: transform 0.18s ease;
   }
   .strip.spacer{
     width:48px;
@@ -212,6 +213,14 @@
     display:flex;
     align-items:center;
     justify-content:center;
+  }
+  .strip.spacer.narrow{
+    width:28px;
+    min-width:24px;
+  }
+  .strip.spacer.wide{
+    width:72px;
+    min-width:64px;
   }
   .strip.spacer::before{
     background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(0,0,0,0) 40%, rgba(0,0,0,.25));
@@ -236,10 +245,23 @@
     opacity:0.6;
     filter:grayscale(0.4);
   }
-  .strip.dropTarget{
-    outline:3px solid rgba(94, 203, 255, 0.75);
-    outline-offset:-3px;
-  }
+.strip.dropTarget{
+  outline:3px solid rgba(94, 203, 255, 0.75);
+  outline-offset:-3px;
+}
+.strip.dropBefore::after,
+.strip.dropAfter::after{
+  content:"";
+  position:absolute;
+  top:6px;
+  bottom:6px;
+  width:4px;
+  border-radius:4px;
+  background: rgba(94, 203, 255, 0.95);
+  box-shadow: 0 0 10px rgba(94, 203, 255, 0.8);
+}
+.strip.dropBefore::after{ left:-6px; }
+.strip.dropAfter::after{ right:-6px; }
   .strip::before{
     content:"";
     position:absolute; inset:0;
@@ -838,6 +860,32 @@ body.phoneLandscape .strip.fxExpanded .fxSlots{ display:flex !important; }
   opacity:.5;
   cursor:default;
 }
+.trackMenu .mi.hasSubmenu{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:relative;
+}
+.trackMenu .mi.hasSubmenu .submenuCaret{
+  opacity:.7;
+}
+.trackMenu .mi.hasSubmenu .submenu{
+  position:absolute;
+  left:100%;
+  top:-6px;
+  background:rgba(24,26,29,0.98);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  box-shadow:0 12px 28px rgba(0,0,0,.45);
+  display:none;
+  padding:4px 0;
+  min-width:140px;
+  z-index:10;
+}
+.trackMenu .mi.hasSubmenu.open .submenu,
+.trackMenu .mi.hasSubmenu:hover .submenu{
+  display:block;
+}
 .trackMenu .trackColorPalette{
   display:grid;
   grid-template-columns:repeat(5, 22px);
@@ -1299,8 +1347,11 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   border:1px solid rgba(255,255,255,.10);
   border-radius:14px;
   box-shadow:0 18px 60px rgba(0,0,0,.55);
-  overflow:visible;
+  overflow:hidden;
   pointer-events:auto;
+  resize: both;
+  min-width: 360px;
+  min-height: 320px;
 }
 .pluginWin.fullscreen{
   position:fixed;
@@ -1309,21 +1360,29 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   height:auto;
   border-radius:0;
   overflow-x:hidden;
+  resize:none;
 }
 
 /* Size presets for specific plugin layouts (desktop) */
 .pluginWin.layout_reacomp:not(.fullscreen){ width:min(960px, 92vw); height:min(640px, 90vh); }
-.pluginWin.layout_la1a:not(.fullscreen){ width:min(860px, 92vw); height:min(520px, 85vh); }
-.pluginWin.layout_rm_la1a:not(.fullscreen){ width:min(860px, 92vw); height:min(520px, 85vh); }
-	.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(620px, 96vw); height:min(480px, 92vh); }
-	.pluginWin.layout_rm_kicker50hz:not(.fullscreen){ width:min(680px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_kicker50:not(.fullscreen){ width:min(680px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_deesser:not(.fullscreen){ width:min(720px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_delaymachine:not(.fullscreen){ width:min(760px, 92vw); height:min(560px, 90vh); }
-	.pluginWin.layout_rm_eqt1a:not(.fullscreen){ width:min(700px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_lexikan2:not(.fullscreen){ width:min(760px, 92vw); height:min(560px, 90vh); }
+.pluginWin.layout_ns1:not(.fullscreen),
+.pluginWin.layout_rm_ns:not(.fullscreen){ width:min(300px, 90vw); height:min(420px, 90vh); }
+.pluginWin.layout_la1a:not(.fullscreen){ width:min(840px, 92vw); height:min(320px, 85vh); }
+.pluginWin.layout_rm_la1a:not(.fullscreen){ width:min(840px, 92vw); height:min(320px, 85vh); }
+	.pluginWin.layout_rm_1175:not(.fullscreen){ width:min(940px, 94vw); height:min(300px, 80vh); }
+	.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(600px, 92vw); height:min(440px, 86vh); }
+	.pluginWin.layout_rm_kicker50hz:not(.fullscreen){ width:min(720px, 92vw); height:min(440px, 86vh); }
+	.pluginWin.layout_rm_kicker50:not(.fullscreen){ width:min(720px, 92vw); height:min(440px, 86vh); }
+	.pluginWin.layout_rm_deesser:not(.fullscreen){ width:min(680px, 92vw); height:min(420px, 86vh); }
+	.pluginWin.layout_rm_delaymachine:not(.fullscreen){ width:min(1080px, 94vw); height:min(560px, 90vh); }
+	.pluginWin.layout_rm_eqt1a:not(.fullscreen){ width:min(800px, 92vw); height:min(500px, 90vh); }
+	.pluginWin.layout_rm_lexikan2:not(.fullscreen){ width:min(800px, 92vw); height:min(500px, 90vh); }
+	.pluginWin.layout_rm_eq4:not(.fullscreen),
+	.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(700px, 90vh); }
+.pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
+.pluginWin.layout_rm_comp2:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
 /* Keep RM_Gate window snug to its UI */
-.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(520px, 92vw); height:min(520px, 88vh); }
+.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(460px, 92vw); height:min(560px, 90vh); }
 .pluginWin.layout_rm_gate:not(.fullscreen) .pluginWinBody{ overflow:hidden; }
 .pluginWin.layout_rm_gate .plugSection{ margin-bottom:0; }
 
@@ -1343,6 +1402,18 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginHdrBtns .miniBtn{ height:28px; }
 
 .pluginWinBody{ height:calc(100% - 42px); overflow:auto; padding:10px; }
+.pluginParamList.layoutScaled{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+}
+.plugLayoutStage{
+  transform-origin: 0 0;
+  will-change: transform;
+}
 
 /* Phone landscape: make header overlay (almost transparent) so layouts get more vertical room.
    Use max-height, not max-width (some phones report >920px in landscape). */
@@ -2016,15 +2087,18 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 }
 
 /* Size presets for image-based Tukan panels (desktop) */
-.pluginWin.layout_nc76:not(.fullscreen){ width:min(980px, 92vw); height:min(520px, 85vh); }
+.pluginWin.layout_nc76:not(.fullscreen){ width:min(940px, 94vw); height:min(300px, 80vh); }
 .pluginWin.layout_preamp:not(.fullscreen),
-.pluginWin.layout_rm_preamp:not(.fullscreen){ width:min(520px, 92vw); height:min(720px, 90vh); }
-.pluginWin.layout_rm_1175:not(.fullscreen){ width:min(980px, 92vw); height:min(520px, 85vh); }
+.pluginWin.layout_rm_preamp:not(.fullscreen){ width:min(420px, 92vw); height:min(500px, 85vh); }
+.pluginWin.layout_rm_1175:not(.fullscreen){ width:min(940px, 94vw); height:min(300px, 80vh); }
 /* Size presets for RM layouts */
-.pluginWin.layout_ns1:not(.fullscreen){ width:min(520px, 92vw); height:min(520px, 85vh); }
-.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(520px, 92vw); height:min(760px, 90vh); }
+.pluginWin.layout_ns1:not(.fullscreen),
+.pluginWin.layout_rm_ns:not(.fullscreen){ width:min(300px, 90vw); height:min(420px, 90vh); }
+.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(460px, 92vw); height:min(560px, 90vh); }
 .pluginWin.layout_rm_eq4:not(.fullscreen),
-.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(980px, 92vw); height:min(760px, 90vh); }
+.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(700px, 90vh); }
+.pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
+.pluginWin.layout_rm_comp2:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
 
 /* ---- ReaComp (dark, minimal) ---- */
 .reacompPanel{
@@ -2082,6 +2156,166 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .rcChecks{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
 .rcChecks label{ display:flex; gap:10px; align-items:center; font-size:12px; opacity:.9; }
 .rcChecks input[type=checkbox]{ width:16px; height:16px; accent-color: rgba(255,255,255,.75); }
+
+/* ---- RM_Compressor (custom) ---- */
+.rmCompPanel{
+  border-radius: 18px;
+  padding: 14px;
+  background: linear-gradient(rgba(18,20,26,.96), rgba(11,12,16,.96));
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
+  color: rgba(255,255,255,.92);
+  display:grid;
+  grid-template-columns: minmax(260px, 1.3fr) minmax(320px, 2fr) minmax(180px, 0.8fr);
+  gap:14px;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+.rmCompCol{ display:flex; flex-direction:column; gap:12px; }
+.rmCompRight .rmCompCard{
+  max-width: 220px;
+  align-self:center;
+}
+.rmCompCard{
+  background: rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  padding: 10px 10px;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+}
+.rmCompMiniBtn{
+  margin-top:10px;
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  color: rgba(255,255,255,.9);
+  font-size:12px;
+  font-weight:600;
+}
+.rmCompCardTitle{
+  font-size:12px;
+  font-weight:800;
+  opacity:.9;
+  letter-spacing:.08em;
+  margin: 2px 0 10px 2px;
+}
+.rmCompThresholdRow{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  justify-content:center;
+}
+.rmCompVTrack{
+  position:relative;
+  width:56px;
+  height:240px;
+  border-radius:14px;
+  background: rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.4);
+  overflow:hidden;
+}
+.rmCompVUMeter{
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:0%;
+  background: linear-gradient(#3aff6f,#e2ff3a 55%, #ff6a3a 82%, #ff2a2a);
+  opacity:.65;
+  transition: height 0.04s linear;
+}
+.rmCompVThumb{
+  position:absolute;
+  left:50%;
+  width:72px;
+  height:16px;
+  transform:translate(-50%,-50%);
+  border-radius:10px;
+  background:rgba(255,255,255,.22);
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 6px 14px rgba(0,0,0,.45);
+  touch-action:none;
+}
+.rmCompVal{
+  font-size:12px;
+  font-variant-numeric: tabular-nums;
+  text-align:center;
+  margin-top:8px;
+  background: rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.rmCompGrMeter{
+  position:relative;
+  width:18px;
+  height:220px;
+  border-radius:10px;
+  background: rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.08);
+  overflow:hidden;
+}
+.rmCompGrFill{
+  position:absolute;
+  left:0; right:0; top:0;
+  height:0%;
+  background: linear-gradient(#ff2a2a, #ff5a3a 50%, #ff9460);
+  transition: height 0.04s linear;
+}
+.rmCompHRow{
+  display:grid;
+  grid-template-columns: 70px 1fr 80px;
+  gap:10px;
+  align-items:center;
+  margin: 8px 0;
+}
+.rmCompLabel{ font-size:12px; opacity:.85; }
+.rmCompHRow input[type=range]{ width:100%; }
+.rmCompHRow .rmCompVal{ margin-top:0; text-align:right; }
+.rmCompButtonRow{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.rmCompButtonRow button{
+  flex:1 1 auto;
+  min-width:90px;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.35);
+  color: rgba(255,255,255,.9);
+  font-weight:600;
+}
+.rmCompButtonRow button.on{
+  background: rgba(60,120,255,.35);
+  border-color: rgba(100,160,255,.55);
+  box-shadow: 0 0 0 1px rgba(100,160,255,.35) inset;
+}
+.rmCompBottomRow{ margin-top:6px; }
+.rmCompSelectRow{
+  display:grid;
+  grid-template-columns: 90px 1fr;
+  gap:10px;
+  align-items:center;
+}
+.rmCompSelect{
+  appearance:none;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  color: rgba(255,255,255,.9);
+  padding:8px 12px;
+}
+
+@media (max-width: 720px){
+  .rmCompPanel{ grid-template-columns: 1fr; }
+  .rmCompVTrack{ height:200px; }
+  .rmCompGrMeter{ height:180px; }
+}
 
 .rcThreshold{
   display:flex;
@@ -2335,7 +2569,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 }
 
 .tukanSkin .tkBtn{
-  background-image: url(tukan/76/1176buttonB.png);
+  background-image: url("/tukan/76/1176buttonB.png");
   background-repeat: no-repeat;
   background-size: 100% 200%;
   background-position: 0 0;
@@ -2615,7 +2849,7 @@ background: linear-gradient(180deg,
 }
 
 /* Default window sizing so the full L2 UI is visible (still scales down if needed) */
-.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(620px, 96vw); height:min(480px, 92vh); }
+.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(600px, 92vw); height:min(440px, 86vh); }
 .pluginWin.layout_rm_limiter2 .plugLayoutHdr{ display:none; }
 .pluginWin.layout_rm_limiter2 .pluginWinBody{ overflow:hidden; }
 

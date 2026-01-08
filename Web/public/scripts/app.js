@@ -63,7 +63,7 @@
     match: (name)=> /\bRM[\s_-]*NS\b/i.test(name),
     title: "RM-NS",
     sections: [
-      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:0, faderFind:[/^Reduction\b/i], brand:"RM-NS" }} ] }
+      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:0, faderFind:[/^Reduction\b/i], brand:"" }} ] }
     ]
   },
   {
@@ -142,15 +142,53 @@
     title: "RM_Compressor2",
     sections: [
       { title: "", controls: [
-        {type:"knob", label:"Thresh", find:[/thresh/i] },
-        {type:"knob", label:"Knee", find:[/knee/i] },
-        {type:"knob", label:"Ratio", find:[/ratio/i] },
-        {type:"knob", label:"Attack", find:[/attack/i] },
-        {type:"knob", label:"Release", find:[/release/i] },
-        {type:"knob", label:"Output", find:[/output/i] },
-        {type:"paramMeter", label:"In", find:[/telemetry.*in\s*peak/i] },
-        {type:"paramMeter", label:"SC", find:[/telemetry.*sidechain\s*peak/i] },
-        {type:"paramMeter", label:"Out", find:[/telemetry.*out\s*peak/i] }
+        {type:"rmCompressorPanel", extra:{
+          thresholdFind:[/threshold|\bthresh\b/i],
+          attackFind:[/\battack\b/i],
+          releaseFind:[/\brelease\b/i],
+          kneeFind:[/\bknee\b/i],
+          ratioFind:[/\bratio\b/i],
+          detectFind:[/detect|detector|side\s*chain\s*source|side\s*chain|sidechain|source/i],
+          lpFind:[/\blp\b|low\s*pass|lowpass|detector\s*lp/i],
+          hpFind:[/\bhp\b|high\s*pass|highpass|detector\s*hp/i],
+          bpmSyncFind:[/bpm\s*sync|tempo\s*sync|sync/i],
+          autoMakeupFind:[/auto\s*makeup|makeup\b/i],
+          limitOutFind:[/limit\s*out|output\s*limit/i],
+          outGainFind:[/output\s*gain|\bout\s*gain\b|\boutput\b/i],
+          inPeakFind:[/telemetry.*(in|input).*peak/i],
+          outPeakFind:[/telemetry.*out.*peak/i],
+          grFind:[/telemetry.*\bgr\b|gain\s*reduction/i],
+        } }
+      ] }
+    ]
+  },
+  {
+    id: "rm_compressor",
+    match: (name)=>{
+      const n = normName(name);
+      if (/\bRM[\s_]*Compressor\s*2\b/i.test(n)) return false;
+      return /\bRM[\s_]*Compressor\b/i.test(n);
+    },
+    title: "RM_Compressor",
+    sections: [
+      { title: "", controls: [
+        {type:"rmCompressorPanel", extra:{
+          thresholdFind:[/threshold|\bthresh\b/i],
+          attackFind:[/\battack\b/i],
+          releaseFind:[/\brelease\b/i],
+          kneeFind:[/\bknee\b/i],
+          ratioFind:[/\bratio\b/i],
+          detectFind:[/detect|detector|side\s*chain\s*source|side\s*chain|sidechain|source/i],
+          lpFind:[/\blp\b|low\s*pass|lowpass|detector\s*lp/i],
+          hpFind:[/\bhp\b|high\s*pass|highpass|detector\s*hp/i],
+          bpmSyncFind:[/bpm\s*sync|tempo\s*sync|sync/i],
+          autoMakeupFind:[/auto\s*makeup|makeup\b/i],
+          limitOutFind:[/limit\s*out|output\s*limit/i],
+          outGainFind:[/output\s*gain|\bout\s*gain\b|\boutput\b/i],
+          inPeakFind:[/telemetry.*(in|input).*peak/i],
+          outPeakFind:[/telemetry.*out.*peak/i],
+          grFind:[/telemetry.*\bgr\b|gain\s*reduction/i],
+        } }
       ] }
     ]
   },
@@ -597,8 +635,13 @@ function formatParam(p){
     faderCol.appendChild(readout);
 
     const extra = ctrl.extra||{};
-    const brand = document.createElement("div"); brand.className="ns1Brand"; brand.textContent = extra.brand || "NS1";
-    root.appendChild(brand);
+    const brandText = (extra.brand != null) ? String(extra.brand) : "NS1";
+    if (brandText.trim()){
+      const brand = document.createElement("div");
+      brand.className = "ns1Brand";
+      brand.textContent = brandText;
+      root.appendChild(brand);
+    }
     root.appendChild(faderCol);
 
     const clamp01 = (x)=>Math.max(0, Math.min(1, x));
@@ -847,6 +890,325 @@ function formatParam(p){
 
     update();
     return {el: root, update, updateTrackMeter, ctrl};
+  }
+
+
+  function buildRMCompressorPanelControl(win, ctrl){
+    const ex = ctrl.extra || {};
+    const root = document.createElement("div");
+    root.className = "rmCompPanel";
+
+    const clamp01 = (v)=> Math.max(0, Math.min(1, v));
+    const getP = (patterns)=> findParamByPatterns(win.params, patterns||[]);
+    const normFromParam = (p, fallbackMin=0, fallbackMax=1)=>{
+      if (!p) return 0;
+      if (p.raw != null && Number.isFinite(p.min) && Number.isFinite(p.max) && p.max !== p.min){
+        return clamp01((p.raw - p.min) / (p.max - p.min));
+      }
+      if (p.raw != null && Number.isFinite(fallbackMin) && Number.isFinite(fallbackMax) && fallbackMax !== fallbackMin){
+        return clamp01((p.raw - fallbackMin) / (fallbackMax - fallbackMin));
+      }
+      return clamp01(p.value || 0);
+    };
+    const setParamValue = (p, value)=>{
+      if (!p) return;
+      suppressPoll(win, 700);
+      setParamNormalized(win, p.index, value);
+    };
+    const setParamRaw = (p, rawTarget, fallbackMin=0, fallbackMax=1)=>{
+      if (!p) return;
+      const mn = (p.min!=null && Number.isFinite(p.min)) ? p.min : fallbackMin;
+      const mx = (p.max!=null && Number.isFinite(p.max)) ? p.max : fallbackMax;
+      const rt = Math.max(mn, Math.min(mx, rawTarget));
+      const next = (mx===mn) ? 0 : ((rt-mn)/(mx-mn));
+      setParamValue(p, next);
+    };
+
+    const left = document.createElement("div");
+    left.className = "rmCompCol rmCompLeft";
+    const mid = document.createElement("div");
+    mid.className = "rmCompCol rmCompMid";
+    const right = document.createElement("div");
+    right.className = "rmCompCol rmCompRight";
+    root.appendChild(left);
+    root.appendChild(mid);
+    root.appendChild(right);
+
+    const threshCard = document.createElement("div");
+    threshCard.className = "rmCompCard rmCompThreshold";
+    threshCard.innerHTML = `
+      <div class="rmCompCardTitle">THRESHOLD</div>
+      <div class="rmCompThresholdRow">
+        <div class="rmCompVTrack rmCompThreshTrack">
+          <div class="rmCompVUMeter"></div>
+          <div class="rmCompVThumb"></div>
+        </div>
+        <div class="rmCompGrMeter"><div class="rmCompGrFill"></div></div>
+      </div>
+      <div class="rmCompVal">—</div>
+    `;
+    left.appendChild(threshCard);
+
+    const threshTrack = threshCard.querySelector(".rmCompThreshTrack");
+    const threshThumb = threshCard.querySelector(".rmCompVThumb");
+    const threshVu = threshCard.querySelector(".rmCompVUMeter");
+    const grFill = threshCard.querySelector(".rmCompGrFill");
+    const threshVal = threshCard.querySelector(".rmCompVal");
+
+    let threshDrag = null;
+    let threshLastSent = 0;
+    const setThreshUI = (n, fmt)=>{
+      const cl = clamp01(n);
+      threshThumb.style.top = ((1 - cl) * 100) + "%";
+      if (threshVal) threshVal.textContent = fmt || "—";
+    };
+    threshThumb.addEventListener("pointerdown", (ev)=>{
+      const p = getP(ex.thresholdFind);
+      if (!p || ev.button !== 0) return;
+      bringPluginToFront(win);
+      suppressPoll(win, 700);
+      threshDrag = {id: ev.pointerId};
+      threshThumb.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+    });
+    threshThumb.addEventListener("pointermove", (ev)=>{
+      if (!threshDrag || threshDrag.id !== ev.pointerId) return;
+      const p = getP(ex.thresholdFind);
+      if (!p) return;
+      const r = threshTrack.getBoundingClientRect();
+      const y = Math.max(r.top, Math.min(r.bottom, ev.clientY));
+      const n = 1 - ((y - r.top) / Math.max(1, r.height));
+      const v = clamp01(n);
+      setThreshUI(v, formatParam(p));
+      const now = performance.now();
+      if (now - threshLastSent > 35){
+        threshLastSent = now;
+        setParamValue(p, v);
+      }
+    });
+    const endThresh = (ev)=>{ if (threshDrag && ev.pointerId === threshDrag.id) threshDrag = null; };
+    threshThumb.addEventListener("pointerup", endThresh);
+    threshThumb.addEventListener("pointercancel", endThresh);
+
+    const outCard = document.createElement("div");
+    outCard.className = "rmCompCard rmCompOutput";
+    outCard.innerHTML = `
+      <div class="rmCompCardTitle">OUTPUT</div>
+      <div class="rmCompVTrack rmCompOutTrack">
+        <div class="rmCompVUMeter"></div>
+        <div class="rmCompVThumb"></div>
+      </div>
+      <div class="rmCompVal">—</div>
+    `;
+    right.appendChild(outCard);
+    const outTrack = outCard.querySelector(".rmCompOutTrack");
+    const outThumb = outCard.querySelector(".rmCompVThumb");
+    const outVu = outCard.querySelector(".rmCompVUMeter");
+    const outVal = outCard.querySelector(".rmCompVal");
+
+    let outDrag = null;
+    let outLastSent = 0;
+    const setOutUI = (n, fmt)=>{
+      const cl = clamp01(n);
+      outThumb.style.top = ((1 - cl) * 100) + "%";
+      if (outVal) outVal.textContent = fmt || "—";
+    };
+    outThumb.addEventListener("pointerdown", (ev)=>{
+      const p = getP(ex.outGainFind);
+      if (!p || ev.button !== 0) return;
+      bringPluginToFront(win);
+      suppressPoll(win, 700);
+      outDrag = {id: ev.pointerId};
+      outThumb.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+    });
+    outThumb.addEventListener("pointermove", (ev)=>{
+      if (!outDrag || outDrag.id !== ev.pointerId) return;
+      const p = getP(ex.outGainFind);
+      if (!p) return;
+      const r = outTrack.getBoundingClientRect();
+      const y = Math.max(r.top, Math.min(r.bottom, ev.clientY));
+      const n = 1 - ((y - r.top) / Math.max(1, r.height));
+      const v = clamp01(n);
+      setOutUI(v, formatParam(p));
+      const now = performance.now();
+      if (now - outLastSent > 35){
+        outLastSent = now;
+        setParamValue(p, v);
+      }
+    });
+    const endOut = (ev)=>{ if (outDrag && ev.pointerId === outDrag.id) outDrag = null; };
+    outThumb.addEventListener("pointerup", endOut);
+    outThumb.addEventListener("pointercancel", endOut);
+
+    const mkHSlider = (label, patterns)=>{
+      const row = document.createElement("div");
+      row.className = "rmCompHRow";
+      row.innerHTML = `
+        <div class="rmCompLabel">${escapeHtml(label)}</div>
+        <input type="range" min="0" max="1" step="0.001" value="0">
+        <div class="rmCompVal">—</div>
+      `;
+      const sl = row.querySelector("input");
+      const val = row.querySelector(".rmCompVal");
+      let lastSent = 0;
+      sl.addEventListener("input", ()=>{
+        const p = getP(patterns);
+        if (!p) return;
+        const v = parseFloat(sl.value);
+        if (val) val.textContent = formatParam(p);
+        p.value = v;
+        const now = performance.now();
+        if (now - lastSent > 25){
+          lastSent = now;
+          setParamValue(p, v);
+        }
+      });
+      return {row, sl, val, patterns};
+    };
+
+    const envCard = document.createElement("div");
+    envCard.className = "rmCompCard";
+    envCard.innerHTML = `<div class="rmCompCardTitle">ENVELOPE</div>`;
+    const rowAttack = mkHSlider("Attack", ex.attackFind);
+    const rowRelease = mkHSlider("Release", ex.releaseFind);
+    const rowRatio = mkHSlider("Ratio", ex.ratioFind);
+    const rowKnee = mkHSlider("Knee", ex.kneeFind);
+    envCard.appendChild(rowAttack.row);
+    envCard.appendChild(rowRelease.row);
+    envCard.appendChild(rowRatio.row);
+    envCard.appendChild(rowKnee.row);
+    mid.appendChild(envCard);
+
+    const detectCard = document.createElement("div");
+    detectCard.className = "rmCompCard";
+    detectCard.innerHTML = `<div class="rmCompCardTitle">DETECTOR INPUT</div>`;
+    const detectRow = document.createElement("div");
+    detectRow.className = "rmCompSelectRow";
+    const detectLabel = document.createElement("div");
+    detectLabel.className = "rmCompLabel";
+    detectLabel.textContent = "Source";
+    const detectSelect = document.createElement("select");
+    detectSelect.className = "rmCompSelect";
+    const optMain = document.createElement("option");
+    optMain.value = "main";
+    optMain.textContent = "Main Inputs";
+    const optSc = document.createElement("option");
+    optSc.value = "sc";
+    optSc.textContent = "Sidechain";
+    detectSelect.appendChild(optMain);
+    detectSelect.appendChild(optSc);
+    detectRow.appendChild(detectLabel);
+    detectRow.appendChild(detectSelect);
+    detectCard.appendChild(detectRow);
+
+    const returnsBtn = document.createElement("button");
+    returnsBtn.type = "button";
+    returnsBtn.className = "rmCompMiniBtn";
+    returnsBtn.textContent = "Returns";
+    returnsBtn.addEventListener("click", ()=>{
+      openTrackMenu(win.guid, "sends");
+    });
+    detectCard.appendChild(returnsBtn);
+    left.appendChild(detectCard);
+
+    const filterCard = document.createElement("div");
+    filterCard.className = "rmCompCard";
+    filterCard.innerHTML = `<div class="rmCompCardTitle">FILTER</div>`;
+    const rowLP = mkHSlider("LP", ex.lpFind);
+    const rowHP = mkHSlider("HP", ex.hpFind);
+    filterCard.appendChild(rowLP.row);
+    filterCard.appendChild(rowHP.row);
+    mid.appendChild(filterCard);
+
+    const options = document.createElement("div");
+    options.className = "rmCompButtonRow rmCompBottomRow";
+    const mkToggleBtn = (label, patterns)=>{
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = label;
+      btn.addEventListener("click", ()=>{
+        const p = getP(patterns);
+        if (!p) return;
+        const next = (p.value||0) >= 0.5 ? 0 : 1;
+        setParamValue(p, next);
+      });
+      return btn;
+    };
+    const btnSync = mkToggleBtn("BPM Sync", ex.bpmSyncFind);
+    const btnMakeup = mkToggleBtn("Auto Makeup", ex.autoMakeupFind);
+    const btnLimit = mkToggleBtn("Limit Out", ex.limitOutFind);
+    options.appendChild(btnSync);
+    options.appendChild(btnMakeup);
+    options.appendChild(btnLimit);
+    mid.appendChild(options);
+
+    const update = ()=>{
+      const pThresh = getP(ex.thresholdFind);
+      if (pThresh) setThreshUI(pThresh.value||0, formatParam(pThresh));
+      else setThreshUI(0, "—");
+
+      const pOut = getP(ex.outGainFind);
+      if (pOut) setOutUI(pOut.value||0, formatParam(pOut));
+      else setOutUI(0, "—");
+
+      const pInPk = getP(ex.inPeakFind);
+      if (threshVu) threshVu.style.height = (clamp01(pInPk ? pInPk.value : 0) * 100) + "%";
+
+      const pOutPk = getP(ex.outPeakFind);
+      if (outVu) outVu.style.height = (clamp01(pOutPk ? pOutPk.value : 0) * 100) + "%";
+
+      const pGr = getP(ex.grFind);
+      if (grFill) grFill.style.height = (normFromParam(pGr, 0, 24) * 100) + "%";
+
+      const updateRow = (row)=>{
+        const p = getP(row.patterns);
+        if (!p){
+          row.sl.disabled = true;
+          row.val.textContent = "—";
+          row.sl.value = "0";
+          return;
+        }
+        row.sl.disabled = false;
+        if (document.activeElement !== row.sl) row.sl.value = String(p.value||0);
+        row.val.textContent = formatParam(p);
+      };
+      [rowAttack, rowRelease, rowRatio, rowKnee, rowLP, rowHP].forEach(updateRow);
+
+      const pDetect = getP(ex.detectFind);
+      if (pDetect){
+        const raw = (pDetect.raw != null) ? pDetect.raw : (pDetect.min != null && pDetect.max != null ? pDetect.min + (pDetect.value||0) * (pDetect.max - pDetect.min) : pDetect.value||0);
+        const midVal = (pDetect.min != null && pDetect.max != null) ? (pDetect.min + pDetect.max) / 2 : 0.5;
+        const isSc = raw > midVal;
+        detectSelect.value = isSc ? "sc" : "main";
+        detectSelect.disabled = false;
+      } else {
+        detectSelect.value = "main";
+        detectSelect.disabled = true;
+      }
+
+      const toggleState = (btn, patterns)=>{
+        const p = getP(patterns);
+        const on = p ? ((p.value||0) >= 0.5) : false;
+        btn.classList.toggle("on", on);
+        btn.disabled = !p;
+      };
+      toggleState(btnSync, ex.bpmSyncFind);
+      toggleState(btnMakeup, ex.autoMakeupFind);
+      toggleState(btnLimit, ex.limitOutFind);
+    };
+
+    detectSelect.addEventListener("change", ()=>{
+      const p = getP(ex.detectFind);
+      if (!p) return;
+      const target = (detectSelect.value === "sc")
+        ? ((p.min != null && p.max != null) ? p.max : 1)
+        : ((p.min != null && p.max != null) ? p.min : 0);
+      setParamRaw(p, target, 0, 1);
+    });
+
+    update();
+    return {el: root, update, ctrl};
   }
 
 
@@ -5712,7 +6074,7 @@ function buildReaCompPanelControl(win, ctrl){
     return {el: card, update, updateTrackMeter, ctrl};
   }
 
-function buildToggleControl(win, ctrl){
+  function buildToggleControl(win, ctrl){
     const card = document.createElement("div");
     card.className = "plugCtrl";
     const btn = document.createElement("button");
@@ -5746,7 +6108,57 @@ function buildToggleControl(win, ctrl){
     return {el: card, update, ctrl};
   }
 
+  const LAYOUT_SCALE_IDS = new Set(["ns1", "rm_ns", "rm_gate", "rm_delaymachine"]);
+
+  function clearLayoutScale(win){
+    if (!win || !win._layoutUI) return;
+    const ui = win._layoutUI;
+    if (ui.scaleObserver){
+      try{ ui.scaleObserver.disconnect(); }catch(_){}
+      ui.scaleObserver = null;
+    }
+  }
+
+  function setupLayoutScale(win, container){
+    if (!win || !win._layoutUI || !win._layoutUI.stage) return;
+    const ui = win._layoutUI;
+    if (ui.scaleObserver) return;
+    const stage = ui.stage;
+    const scope = stage.closest(".pluginWinBody") || container;
+    if (!scope) return;
+
+    const fit = ()=>{
+      if (!ui.baseW || !ui.baseH){
+        stage.style.transform = "scale(1)";
+        stage.style.width = "auto";
+        stage.style.height = "auto";
+        const rect = stage.getBoundingClientRect();
+        ui.baseW = rect.width || stage.offsetWidth || 1;
+        ui.baseH = rect.height || stage.offsetHeight || 1;
+      }
+      const pad = 20;
+      const availW = Math.max(10, scope.clientWidth - pad);
+      const availH = Math.max(10, scope.clientHeight - pad);
+      let sc = Math.min(availW / ui.baseW, availH / ui.baseH);
+      const maxScale = (scope.closest(".pluginWin") && scope.closest(".pluginWin").classList.contains("fullscreen")) ? 1.6 : 1.2;
+      sc = Math.max(0.5, Math.min(maxScale, sc));
+      stage.style.transform = `scale(${sc})`;
+      stage.style.width = ui.baseW + "px";
+      stage.style.height = ui.baseH + "px";
+      stage.style.margin = "0 auto";
+    };
+
+    ui.scaleFit = fit;
+    try{
+      const ro = new ResizeObserver(()=>fit());
+      ro.observe(scope);
+      ui.scaleObserver = ro;
+    }catch(_){}
+    requestAnimationFrame(fit);
+  }
+
   function renderLayoutInto(win, layout, container){
+    const useScale = !!(layout && layout.id && LAYOUT_SCALE_IDS.has(layout.id));
     // If we built the UI before params arrived, rebuild once we have params
     // so pattern-based mapping works and we don't get a permanent "Couldn't match..." banner.
     if (win._layoutUI && win._layoutUI.layoutId === layout.id && win._layoutUI.builtWithEmptyParams){
@@ -5759,13 +6171,31 @@ function buildToggleControl(win, ctrl){
 
     // build once; update on subsequent polls
     if (!win._layoutUI || win._layoutUI.layoutId !== layout.id){
+      clearLayoutScale(win);
       win._layoutUI = {
         layoutId: layout.id,
         controls: [],
         builtWithEmptyParams: !(Array.isArray(win.params) && win.params.length > 0),
+        stage: null,
+        baseW: null,
+        baseH: null,
+        scaleObserver: null,
+        scaleFit: null,
+        useScale,
       };
       container.innerHTML = "";
 let foundAny = false;
+      let target = container;
+      if (useScale){
+        const stage = document.createElement("div");
+        stage.className = "plugLayoutStage";
+        win._layoutUI.stage = stage;
+        container.classList.add("layoutScaled");
+        container.appendChild(stage);
+        target = stage;
+      } else {
+        container.classList.remove("layoutScaled");
+      }
       // If the layout contains a custom panel, we don't require param-name matching.
       // (Those panels can use known indices or do their own mapping.)
       const layoutHasCustomPanel = (layout.sections||[]).some(sec =>
@@ -5809,6 +6239,7 @@ for (const c of (sec.controls||[])){
           else if (c.type === "la1aPanel") ui = buildLA1APanelControl(win, ctrl);
           else if (c.type === "nc76Panel") ui = buildNC76PanelControl(win, ctrl);
           else if (c.type === "preampPanel") ui = buildPreAmpPanelControl(win, ctrl);
+          else if (c.type === "rmCompressorPanel") ui = buildRMCompressorPanelControl(win, ctrl);
           else if (c.type === "rmEqProQPanel") ui = buildRMEqProQPanelControl(win, ctrl);
           else if (c.type === "rmL2Panel") ui = buildRML2PanelControl(win, ctrl);
           else if (c.type === "rmKickerL2Panel") ui = buildRMKickerL2PanelControl(win, ctrl);
@@ -5825,7 +6256,7 @@ for (const c of (sec.controls||[])){
           grid.appendChild(ui.el);
         }
         secEl.appendChild(grid);
-        container.appendChild(secEl);
+        target.appendChild(secEl);
       }
 
       const haveParams = Array.isArray(win.params) && win.params.length > 0;
@@ -5833,8 +6264,9 @@ for (const c of (sec.controls||[])){
         const note = document.createElement("div");
         note.className = "plugNote";
         note.innerHTML = `Couldn't match known parameters for this plugin build.<br><br>Use <b>Inspector</b> to view raw params and we can map them.`;
-        container.appendChild(note);
+        target.appendChild(note);
       }
+      if (useScale) setupLayoutScale(win, container);
     }
 
     // update: rebind params (in case indices changed) and refresh values
@@ -5939,6 +6371,8 @@ for (const c of (sec.controls||[])){
       renderLayoutInto(win, layout, listEl);
       return;
     }
+    clearLayoutScale(win);
+    listEl.classList.remove("layoutScaled");
     const q = (win.search||"").trim().toLowerCase();
     const params = Array.isArray(win.params) ? win.params : [];
     const view = q ? params.filter(p=>String(p.name||"").toLowerCase().includes(q) || String(p.index).includes(q)) : params;
@@ -6155,7 +6589,7 @@ else if (mqPhoneLandscape.addListener) mqPhoneLandscape.addListener(scheduleResp
 applyResponsiveMode();
 
   // ---------- Config ----------
-  const DEFAULT_CFG = {
+    const DEFAULT_CFG = {
     theme: "dark",
     masterEnabled: true,
     masterSide: "left",           // left / right
@@ -6169,6 +6603,7 @@ applyResponsiveMode();
     folderView: {},               // guid -> "expanded"|"compact"|"hidden"
     hiddenTracks: {},             // guid -> true (UI only)
     compactTracks: {},            // guid -> true
+    spacerWidths: {},             // guid -> "standard"|"narrow"|"wide"
   };
 
   function loadCfg(){
@@ -6190,6 +6625,7 @@ applyResponsiveMode();
   if (cfg.showColorFooter === undefined) cfg.showColorFooter = true;
   if (cfg.footerIntensity === undefined) cfg.footerIntensity = 0.35;
   if (!cfg.theme) cfg.theme = "dark";
+  if (!cfg.spacerWidths) cfg.spacerWidths = {};
 
   function applyTheme(){
     document.body.classList.toggle("light", cfg.theme === "light");
@@ -6294,12 +6730,6 @@ applyResponsiveMode();
       const next = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
       if (refs.bars.textContent !== next) refs.bars.textContent = next;
     }
-    if (refs.region){
-      const name = String(transport.regionName || "").trim();
-      const idx = Number.isFinite(transport.regionIndex) ? transport.regionIndex : null;
-      const label = name || (idx !== null ? `#${idx}` : "—");
-      refs.region.textContent = `Region: ${label}`;
-    }
     if (refs.bpm){
       const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
       refs.bpm.textContent = bpm === null ? "—" : `${bpm} BPM`;
@@ -6324,16 +6754,9 @@ applyResponsiveMode();
     if (!transport) return;
     transportLive.data = Object.assign({}, transport);
     transportLive.ts = performance.now();
-    if (Array.isArray(transport.regions) || Array.isArray(transport.markers)){
-      lastRegionsPayload = {
-        regions: Array.isArray(transport.regions) ? transport.regions : [],
-        markers: Array.isArray(transport.markers) ? transport.markers : []
-      };
-    }
     applyTransportRefs(transport, {
       time: transportTime,
       bars: transportBars,
-      region: transportRegion,
       bpm: transportBpm,
       play: transportPlay,
       pause: transportPause,
@@ -6342,9 +6765,6 @@ applyResponsiveMode();
     });
     if (openModal && openModal.kind === "transport" && openModal.transportRefs){
       applyTransportRefs(transport, openModal.transportRefs);
-    }
-    if (openModal && openModal.kind === "regions"){
-      renderModal();
     }
   };
 
@@ -6358,7 +6778,6 @@ applyResponsiveMode();
   let meterAnimRaf = 0;
   let meterAnimLastT = 0;
   const transportLive = {data: null, ts: 0};
-  let lastRegionsPayload = null;
 
   function ensureMeterAnim(){
     if (meterAnimRaf) return;
@@ -6434,8 +6853,27 @@ applyResponsiveMode();
   let sliderCurrent = new Map(); // guid -> currentY (0..1)
   let draggingGuid = null;
   let draggingTrackGuid = null;
+  let draggingSpacerGuid = null;
   let touchDrag = null;
   let touchDropTarget = null;
+  let dragDropState = null;
+  let dragDropEl = null;
+  let dragDropTargetEl = null;
+
+  function applyOptimisticMove(guid, beforeGuid){
+    if (!lastState || !Array.isArray(lastState.tracks)) return;
+    if (!guid || !beforeGuid || guid === beforeGuid) return;
+    const tracks = lastState.tracks.slice();
+    const fromIdx = tracks.findIndex(t=>t.guid === guid);
+    const toIdx = tracks.findIndex(t=>t.guid === beforeGuid);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const [moved] = tracks.splice(fromIdx, 1);
+    let insertIdx = toIdx;
+    if (fromIdx < toIdx) insertIdx -= 1;
+    insertIdx = Math.max(0, Math.min(tracks.length, insertIdx));
+    tracks.splice(insertIdx, 0, moved);
+    lastState = Object.assign({}, lastState, {tracks});
+  }
 
   function setTouchDropTarget(el){
     if (touchDropTarget && touchDropTarget !== el){
@@ -6447,19 +6885,52 @@ applyResponsiveMode();
     }
   }
 
+  function getDropTargetInfo(strip){
+    if (!strip) return null;
+    const guid = strip.dataset.targetGuid || strip.dataset.guid || "";
+    if (!guid) return null;
+    const track = trackByGuid.get(guid) || null;
+    const folderGuid = strip.dataset.folderGroup || (track && track.folderDepth > 0 ? guid : "");
+    return {guid, track, folderGuid, isSpacer: strip.classList.contains("spacer")};
+  }
+
   function updateTouchDropTarget(x, y){
     const el = document.elementFromPoint(x, y);
     const strip = el ? el.closest(".strip") : null;
-    if (!strip || !strip.dataset.guid || (touchDrag && strip.dataset.guid === touchDrag.guid)){
+    const info = getDropTargetInfo(strip);
+    if (!strip || !info || (touchDrag && info.guid === touchDrag.guid)){
       setTouchDropTarget(null);
+      clearDropHighlight();
       return;
     }
     setTouchDropTarget(strip);
+    try{
+      const rect = strip.getBoundingClientRect();
+      const after = (x - rect.left) > rect.width / 2;
+      setDropHighlight(strip, after);
+    }catch(_){ }
+    if (touchDrag){
+      touchDrag.lastX = x;
+      touchDrag.lastY = y;
+    }
   }
 
-  function startTouchDrag(guid, el, pointerId, x, y){
-    touchDrag = {guid, el, pointerId};
-    draggingTrackGuid = guid;
+  function clearDropHighlight(){
+    if (dragDropEl){
+      dragDropEl.classList.remove("dropBefore", "dropAfter");
+      dragDropEl = null;
+    }
+    if (dragDropTargetEl){
+      dragDropTargetEl.classList.remove("dropTarget");
+      dragDropTargetEl = null;
+    }
+    dragDropState = null;
+  }
+
+  function startTouchDrag(kind, guid, el, pointerId, x, y){
+    touchDrag = {kind, guid, el, pointerId};
+    if (kind === "spacer") draggingSpacerGuid = guid;
+    else draggingTrackGuid = guid;
     el.classList.add("dragging");
     document.body.classList.add("draggingTrack");
     updateTouchDropTarget(x, y);
@@ -6467,20 +6938,49 @@ applyResponsiveMode();
 
   function endTouchDrag(applyMove=true){
     if (!touchDrag) return;
-    const {guid, el} = touchDrag;
+    const {guid, el, kind} = touchDrag;
     if (applyMove && touchDropTarget){
-      const beforeGuid = touchDropTarget.dataset.guid;
-      if (beforeGuid && beforeGuid !== guid){
-        wsSend({type:"moveTrack", guid, beforeGuid});
-        setTimeout(()=>wsSend({type:"reqState"}), 120);
+      const info = getDropTargetInfo(touchDropTarget);
+      if (info && info.guid && info.guid !== guid){
+        const baseGuid = (dragDropState && dragDropState.guid) ? dragDropState.guid : info.guid;
+        let beforeGuid = baseGuid;
+        try{
+          const rect = touchDropTarget.getBoundingClientRect();
+          const after = touchDrag.lastX != null ? (touchDrag.lastX > rect.left + rect.width / 2) : false;
+          if (after){
+            const nextGuid = getNextStripGuid(baseGuid);
+            if (nextGuid) beforeGuid = nextGuid;
+          }
+        }catch(_){ }
+        if (kind === "spacer"){
+          const spacerTarget = beforeGuid || getNextTrackGuid(baseGuid) || baseGuid;
+          wsSend({type:"setSpacer", guid, enabled:false});
+          wsSend({type:"setSpacer", guid: spacerTarget, enabled:true});
+          moveSpacerWidth(guid, spacerTarget);
+          renderOrUpdate(true);
+          setTimeout(()=>wsSend({type:"reqState"}), 10);
+        } else if (info.folderGuid && info.guid === info.folderGuid && info.guid === baseGuid){
+          wsSend({type:"moveTrackToFolder", guid, folderGuid: info.folderGuid});
+          setTimeout(()=>wsSend({type:"reqState"}), 10);
+        } else {
+          const targetBefore = dragDropState && dragDropState.after
+            ? (getNextTrackGuidAfter(baseGuid, guid) || baseGuid)
+            : baseGuid;
+          wsSend({type:"moveTrack", guid, beforeGuid: targetBefore});
+          applyOptimisticMove(guid, targetBefore);
+          renderOrUpdate(true);
+          setTimeout(()=>wsSend({type:"reqState"}), 10);
+        }
       }
     }
     if (touchDropTarget) touchDropTarget.classList.remove("dropTarget");
     if (el) el.classList.remove("dragging");
     document.body.classList.remove("draggingTrack");
+    clearDropHighlight();
     touchDropTarget = null;
     touchDrag = null;
     draggingTrackGuid = null;
+    draggingSpacerGuid = null;
   }
 
   function canStartTouchDrag(target){
@@ -6496,7 +6996,9 @@ applyResponsiveMode();
     let active = true;
     const hold = setTimeout(()=>{
       if (!active) return;
-      startTouchDrag(t.guid, el, pointerId, startX, startY);
+      const kind = t.kind === "spacer" ? "spacer" : "track";
+      const guid = t.kind === "spacer" ? t.targetGuid : t.guid;
+      startTouchDrag(kind, guid, el, pointerId, startX, startY);
     }, holdMs);
 
     const move = (e)=>{
@@ -6656,23 +7158,6 @@ applyResponsiveMode();
           openModal.fxParams = msg.params || [];
           renderModal();
         }
-        return;
-      }
-      if (msg.type === "regions"){
-        const baseTransport = transportLive.data || (lastState && lastState.transport) || {};
-        const nextTransport = Object.assign({}, baseTransport, {
-          regions: Array.isArray(msg.regions) ? msg.regions : [],
-          markers: Array.isArray(msg.markers) ? msg.markers : [],
-          regionName: msg.regionName || baseTransport.regionName || "",
-          regionIndex: Number.isFinite(msg.regionIndex) ? msg.regionIndex : baseTransport.regionIndex,
-        });
-        if (!lastState) lastState = {master: null, tracks: [], transport: nextTransport};
-        else lastState.transport = nextTransport;
-        lastRegionsPayload = {
-          regions: Array.isArray(msg.regions) ? msg.regions : [],
-          markers: Array.isArray(msg.markers) ? msg.markers : []
-        };
-        updateTransportUI(nextTransport);
         return;
       }
     };
@@ -6843,11 +7328,17 @@ applyResponsiveMode();
 
     const isVisible = !hiddenByParent;
     if (isVisible){
-      let groupId = null;
-      if (stack.length > 0){
-        groupId = stack[0].guid;
-      } else if (t.folderDepth > 0){
-        groupId = t.guid;
+      const groupId = (stack.length > 0) ? stack[0].guid : (t.folderDepth > 0 ? t.guid : null);
+      if (t.spacerAbove){
+        const spacerGroupId = (stack.length > 0 || t.folderDepth <= 0) ? groupId : null;
+        out.push({
+          kind: "spacer",
+          guid: `spacer:${t.guid}`,
+          targetGuid: t.guid,
+          width: (cfg.spacerWidths && cfg.spacerWidths[t.guid]) ? cfg.spacerWidths[t.guid] : "standard",
+          _compact: compactByParent || !!cfg.compactTracks[t.guid],
+          _folderGroupId: spacerGroupId,
+        });
       }
       if (t.folderDepth > 0 && stack.length === 0){
         groupColors.set(t.guid, t.color || "");
@@ -6956,6 +7447,17 @@ applyResponsiveMode();
 
   if (mixerWrap){
     mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
+    mixerWrap.addEventListener("dragover", (ev)=>{
+      if (!draggingTrackGuid && !draggingSpacerGuid) return;
+      ev.preventDefault();
+      updateMouseDropTarget(ev.clientX, ev.clientY);
+      ev.dataTransfer.dropEffect = "move";
+    });
+    mixerWrap.addEventListener("dragleave", (ev)=>{
+      if (!draggingTrackGuid && !draggingSpacerGuid) return;
+      if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest(".strip")) return;
+      clearDropHighlight();
+    });
     mixerWrap.addEventListener("dblclick", (ev)=>{
       if (ev.target.closest(".strip")) return;
       wsSend({type:"addTrack"});
@@ -7034,7 +7536,8 @@ applyResponsiveMode();
       const items = orderedItems();
       const wantOrder = items.map(x=>x.guid).join("|");
       const haveOrder = mixer.getAttribute("data-order") || "";
-      const mustRebuild = forceRebuild || haveOrder !== wantOrder || stripEls.size === 0;
+      const orderChanged = haveOrder !== wantOrder;
+      const mustRebuild = forceRebuild || stripEls.size === 0;
 
       // SOLO dim logic
       const anySolo = (lastState.tracks||[]).some(t=>t.solo);
@@ -7047,6 +7550,46 @@ applyResponsiveMode();
           const el = createStrip(it);
           mixer.appendChild(el);
           stripEls.set(it.guid, el);
+        }
+      } else if (orderChanged){
+        const firstRects = new Map();
+        for (const [guid, el] of stripEls){
+          if (!el || !el.getBoundingClientRect) continue;
+          firstRects.set(guid, el.getBoundingClientRect());
+        }
+        const wanted = new Set(items.map(it=>it.guid));
+        for (const [guid, el] of stripEls){
+          if (wanted.has(guid)) continue;
+          try{ el.remove(); }catch(_){ }
+          stripEls.delete(guid);
+        }
+        for (const it of items){
+          let el = stripEls.get(it.guid);
+          if (!el){
+            el = createStrip(it);
+            stripEls.set(it.guid, el);
+          }
+          mixer.appendChild(el);
+        }
+        mixer.setAttribute("data-order", wantOrder);
+        for (const it of items){
+          const el = stripEls.get(it.guid);
+          if (!el) continue;
+          updateStrip(el, it);
+          const first = firstRects.get(it.guid);
+          if (!first) continue;
+          const last = el.getBoundingClientRect();
+          const dx = first.left - last.left;
+          const dy = first.top - last.top;
+          if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5){
+            el.style.transition = "none";
+            el.style.transform = `translate(${dx}px, ${dy}px)`;
+            el.getBoundingClientRect();
+            requestAnimationFrame(()=>{
+              el.style.transition = "transform 180ms ease";
+              el.style.transform = "";
+            });
+          }
         }
       } else {
         for (const it of items){
@@ -7070,9 +7613,106 @@ applyResponsiveMode();
     el.setAttribute("data-guid", t.guid);
     const label = el._spacerLabel;
     if (label){
-      const name = String(t.name || "").trim();
-      label.textContent = name || "Spacer";
+      label.textContent = "";
     }
+    el.classList.toggle("narrow", !!t._compact || t.width === "narrow");
+    el.classList.toggle("wide", !t._compact && t.width === "wide");
+    el.dataset.targetGuid = t.targetGuid || "";
+    if (t._folderGroupId){
+      el.dataset.folderGroup = t._folderGroupId;
+    } else {
+      delete el.dataset.folderGroup;
+    }
+  }
+
+  function getNextStripGuid(guid){
+    if (!guid) return "";
+    const items = orderedItems();
+    const idx = items.findIndex(it => it.guid === guid);
+    if (idx < 0) return "";
+    for (let i = idx + 1; i < items.length; i += 1){
+      const next = items[i];
+      if (next && next.guid) return next.guid;
+    }
+    return "";
+  }
+
+  function getNextTrackGuid(guid){
+    if (!guid) return "";
+    const items = orderedItems();
+    const idx = items.findIndex(it => it.guid === guid);
+    if (idx < 0) return "";
+    for (let i = idx + 1; i < items.length; i += 1){
+      const next = items[i];
+      if (!next) continue;
+      if (next.kind === "spacer") continue;
+      if (next.kind === "master") continue;
+      return next.guid;
+    }
+    return "";
+  }
+
+  function getNextTrackGuidAfter(guid, skipGuid){
+    if (!guid) return "";
+    const items = orderedItems();
+    const idx = items.findIndex(it => it.guid === guid);
+    if (idx < 0) return "";
+    for (let i = idx + 1; i < items.length; i += 1){
+      const next = items[i];
+      if (!next || !next.guid) continue;
+      if (next.guid === skipGuid) continue;
+      if (next.kind === "spacer") continue;
+      if (next.kind === "master") continue;
+      return next.guid;
+    }
+    return "";
+  }
+
+  function moveSpacerWidth(oldGuid, newGuid){
+    if (!oldGuid || !newGuid || oldGuid === newGuid) return;
+    const widths = cfg.spacerWidths || {};
+    if (!Object.prototype.hasOwnProperty.call(widths, oldGuid)) return;
+    widths[newGuid] = widths[oldGuid];
+    delete widths[oldGuid];
+    cfg.spacerWidths = widths;
+    saveCfg();
+  }
+
+  function setDropHighlight(el, after){
+    if (!el) return;
+    if (dragDropEl && dragDropEl !== el){
+      dragDropEl.classList.remove("dropBefore", "dropAfter");
+    }
+    dragDropEl = el;
+    el.classList.toggle("dropAfter", !!after);
+    el.classList.toggle("dropBefore", !after);
+    dragDropState = {guid: el.dataset.targetGuid || el.dataset.guid || "", after: !!after};
+  }
+
+  function setDragDropTarget(el){
+    if (dragDropTargetEl && dragDropTargetEl !== el){
+      dragDropTargetEl.classList.remove("dropTarget");
+    }
+    dragDropTargetEl = el;
+    if (dragDropTargetEl){
+      dragDropTargetEl.classList.add("dropTarget");
+    }
+  }
+
+  function updateMouseDropTarget(x, y){
+    const el = document.elementFromPoint(x, y);
+    const strip = el ? el.closest(".strip") : null;
+    const info = getDropTargetInfo(strip);
+    if (!strip || !info || info.guid === draggingTrackGuid || info.guid === draggingSpacerGuid){
+      clearDropHighlight();
+      return;
+    }
+    setDragDropTarget(strip);
+    try{
+      const rect = strip.getBoundingClientRect();
+      const after = (x - rect.left) > rect.width / 2;
+      setDropHighlight(strip, after);
+    }catch(_){ }
   }
 
   function attachTrackReorder(el, t){
@@ -7082,22 +7722,70 @@ applyResponsiveMode();
     el.setAttribute("draggable", "true");
     el.addEventListener("dragstart", (ev)=>{
       draggingTrackGuid = t.guid;
+      el.classList.add("dragging");
+      document.body.classList.add("draggingTrack");
       ev.dataTransfer.effectAllowed = "move";
       try{ ev.dataTransfer.setData("text/plain", t.guid); }catch(_){}
     });
+    el.addEventListener("dragenter", (ev)=>{
+      if (draggingTrackGuid && draggingTrackGuid !== t.guid) el.classList.add("dropTarget");
+      if (draggingSpacerGuid && draggingSpacerGuid !== t.guid) el.classList.add("dropTarget");
+    });
+    el.addEventListener("dragleave", ()=>{
+      el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      if (dragDropEl === el) clearDropHighlight();
+    });
     el.addEventListener("dragover", (ev)=>{
-      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
+      if (!draggingTrackGuid && !draggingSpacerGuid) return;
+      if (draggingTrackGuid === t.guid || draggingSpacerGuid === t.guid) return;
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "move";
+      const rect = el.getBoundingClientRect();
+      const after = (ev.clientX - rect.left) > rect.width / 2;
+      setDropHighlight(el, after);
     });
     el.addEventListener("drop", (ev)=>{
       ev.preventDefault();
-      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
-      wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: t.guid});
+      el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      clearDropHighlight();
+      const dropGuid = (dragDropState && dragDropState.guid) ? dragDropState.guid : t.guid;
+      if (draggingSpacerGuid && draggingSpacerGuid !== dropGuid){
+        const beforeGuid = (dragDropState && dragDropState.after)
+          ? (getNextTrackGuidAfter(dropGuid, draggingSpacerGuid) || dropGuid)
+          : dropGuid;
+        wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
+        wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
+        moveSpacerWidth(draggingSpacerGuid, beforeGuid);
+        renderOrUpdate(true);
+        draggingSpacerGuid = null;
+        setTimeout(()=>wsSend({type:"reqState"}), 10);
+        return;
+      }
+      if (!draggingTrackGuid || draggingTrackGuid === dropGuid) return;
+      const info = getDropTargetInfo(el);
+      if (info && info.folderGuid && info.guid === info.folderGuid && info.guid === dropGuid){
+        wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
+      } else {
+        const beforeGuid = (dragDropState && dragDropState.after)
+          ? (getNextTrackGuidAfter(dropGuid, draggingTrackGuid) || dropGuid)
+          : dropGuid;
+        wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
+        applyOptimisticMove(draggingTrackGuid, beforeGuid);
+        renderOrUpdate(true);
+      }
       draggingTrackGuid = null;
-      setTimeout(()=>wsSend({type:"reqState"}), 120);
+      setTimeout(()=>wsSend({type:"reqState"}), 10);
     });
-    el.addEventListener("dragend", ()=>{ draggingTrackGuid = null; });
+    el.addEventListener("dragend", ()=>{
+      draggingTrackGuid = null;
+      el.classList.remove("dragging");
+      el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      clearDropHighlight();
+      document.body.classList.remove("draggingTrack");
+    });
 
     // Touch hold-to-drag
     el.addEventListener("pointerdown", (ev)=>{
@@ -7105,11 +7793,82 @@ applyResponsiveMode();
       startHoldDrag(t, el, ev, 420);
     });
 
-    // Desktop hold-to-drag
+  }
+
+  function attachSpacerReorder(el, t){
+    if (!el || !t) return;
+    el.setAttribute("draggable", "true");
+    el.addEventListener("dragstart", (ev)=>{
+      if (!t.targetGuid) return;
+      draggingSpacerGuid = t.targetGuid;
+      el.classList.add("dragging");
+      document.body.classList.add("draggingTrack");
+      ev.dataTransfer.effectAllowed = "move";
+      try{ ev.dataTransfer.setData("text/plain", t.targetGuid); }catch(_){}
+    });
+    el.addEventListener("dragenter", (ev)=>{
+      if (draggingSpacerGuid && draggingSpacerGuid !== t.targetGuid) el.classList.add("dropTarget");
+      if (draggingTrackGuid && draggingTrackGuid !== t.targetGuid) el.classList.add("dropTarget");
+    });
+    el.addEventListener("dragleave", ()=>{
+      el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      if (dragDropEl === el) clearDropHighlight();
+    });
+    el.addEventListener("dragover", (ev)=>{
+      if (!draggingSpacerGuid && !draggingTrackGuid) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+      const rect = el.getBoundingClientRect();
+      const after = (ev.clientX - rect.left) > rect.width / 2;
+      setDropHighlight(el, after);
+    });
+    el.addEventListener("drop", (ev)=>{
+      ev.preventDefault();
+      el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      clearDropHighlight();
+      const dropGuid = (dragDropState && dragDropState.guid) ? dragDropState.guid : t.targetGuid;
+      if (draggingSpacerGuid && dropGuid && draggingSpacerGuid !== dropGuid){
+        const beforeGuid = (dragDropState && dragDropState.after)
+          ? (getNextTrackGuidAfter(dropGuid, draggingSpacerGuid) || dropGuid)
+          : dropGuid;
+        wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
+        wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
+        moveSpacerWidth(draggingSpacerGuid, beforeGuid);
+        renderOrUpdate(true);
+        draggingSpacerGuid = null;
+        setTimeout(()=>wsSend({type:"reqState"}), 10);
+        return;
+      }
+      if (draggingTrackGuid && dropGuid){
+        const info = getDropTargetInfo(el);
+        if (info && info.folderGuid && info.guid === info.folderGuid && info.guid === dropGuid){
+          wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
+        } else {
+          const beforeGuid = (dragDropState && dragDropState.after)
+            ? (getNextTrackGuidAfter(dropGuid, draggingTrackGuid) || dropGuid)
+            : dropGuid;
+          wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
+          applyOptimisticMove(draggingTrackGuid, beforeGuid);
+          renderOrUpdate(true);
+        }
+        draggingTrackGuid = null;
+        setTimeout(()=>wsSend({type:"reqState"}), 10);
+      }
+    });
+    el.addEventListener("dragend", ()=>{
+      draggingSpacerGuid = null;
+      el.classList.remove("dragging");
+      el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      clearDropHighlight();
+      document.body.classList.remove("draggingTrack");
+    });
+
     el.addEventListener("pointerdown", (ev)=>{
-      if (ev.pointerType !== "mouse") return;
-      if (ev.button !== 0) return;
-      startHoldDrag(t, el, ev, 320);
+      if (ev.pointerType !== "touch") return;
+      startHoldDrag(t, el, ev, 420);
     });
   }
 
@@ -7117,6 +7876,7 @@ applyResponsiveMode();
     const el = document.createElement("div");
     el.className = "strip spacer";
     el.setAttribute("data-guid", t.guid);
+    el.dataset.targetGuid = t.targetGuid || "";
     const label = document.createElement("div");
     label.className = "spacerLabel";
     el.appendChild(label);
@@ -7125,16 +7885,16 @@ applyResponsiveMode();
     el.addEventListener("contextmenu", (ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
-      openTrackContextMenu(t.guid, ev.clientX, ev.clientY);
+      openSpacerContextMenu(t, ev.clientX, ev.clientY);
     });
 
-    attachTrackReorder(el, t);
+    attachSpacerReorder(el, t);
     updateSpacerStrip(el, t);
     return el;
   }
 
   function createStrip(t){
-    if (t.kind !== "master" && t.isSpacer){
+    if (t.kind === "spacer"){
       return createSpacerStrip(t);
     }
     const el = document.createElement("div");
@@ -7460,7 +8220,7 @@ slotbar.appendChild(folderBtn);
 
   function updateStrip(el, t, first=false){
     if (!el) return;
-    if (t.kind !== "master" && t.isSpacer){
+    if (t.kind === "spacer"){
       updateSpacerStrip(el, t);
       return;
     }
@@ -7686,7 +8446,6 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         applyTransportRefs(derived, {
           time: transportTime,
           bars: transportBars,
-          region: transportRegion,
           bpm: transportBpm,
           play: transportPlay,
           pause: transportPause,
@@ -7798,6 +8557,24 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       menu.appendChild(mi);
     };
 
+    const mkSubmenu = (label, contentEl)=>{
+      const wrap = document.createElement("div");
+      wrap.className = "mi hasSubmenu";
+      wrap.innerHTML = `<span>${escapeHtml(label)}</span><span class="submenuCaret">›</span>`;
+      const sub = document.createElement("div");
+      sub.className = "submenu";
+      sub.appendChild(contentEl);
+      wrap.appendChild(sub);
+      wrap.addEventListener("click", (ev)=>{
+        ev.stopPropagation();
+        wrap.classList.toggle("open");
+      });
+      wrap.addEventListener("pointerdown", (ev)=>{
+        if (ev.pointerType === "touch") ev.stopPropagation();
+      });
+      menu.appendChild(wrap);
+    };
+
     const mkPalette = (colors)=>{
       const palette = document.createElement("div");
       palette.className = "trackColorPalette";
@@ -7827,11 +8604,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       wsSend({type:"renameTrack", guid: t.guid, name});
       setTimeout(()=>wsSend({type:"reqState"}), 80);
     });
-    const colorLabel = document.createElement("div");
-    colorLabel.className = "mi label";
-    colorLabel.textContent = "Track color";
-    menu.appendChild(colorLabel);
-    menu.appendChild(mkPalette([
+    mkSubmenu("Track color", mkPalette([
       "#ff0080",
       "#008000",
       "#00ff80",
@@ -7874,6 +8647,59 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       wsSend({type:"moveTrack", guid: t.guid, toIndex: idx-1});
       setTimeout(()=>wsSend({type:"reqState"}), 120);
     });
+    mkItem("Delete track", ()=>{
+      if (!confirm(`Delete track "${t.name || ("Track " + t.idx)}"?`)) return;
+      wsSend({type:"deleteTrack", guid: t.guid});
+      setTimeout(()=>wsSend({type:"reqState"}), 160);
+    }, t.kind === "master");
+
+    document.body.appendChild(menu);
+    const pad = 8;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    if (left + mw > vw - pad) left = Math.max(pad, vw - pad - mw);
+    if (top + mh > vh - pad) top = Math.max(pad, vh - pad - mh);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    _trackMenuEl = menu;
+  }
+
+  function openSpacerContextMenu(t, x, y){
+    closeTrackMenu();
+    const menu = document.createElement("div");
+    menu.className = "trackMenu";
+
+    const mkItem = (label, onClick, disabled=false)=>{
+      const mi = document.createElement("div");
+      mi.className = "mi" + (disabled ? " disabled" : "");
+      mi.textContent = label;
+      if (!disabled){
+        mi.addEventListener("click", (ev)=>{ ev.stopPropagation(); onClick(); closeTrackMenu(); });
+      }
+      menu.appendChild(mi);
+    };
+
+    const widthGroup = (label, value)=>{
+      const active = t._compact ? value === "narrow" : value === (t.width || "standard");
+      mkItem(active ? `✓ ${label}` : label, ()=>{
+        if (!t.targetGuid) return;
+        if (!cfg.spacerWidths) cfg.spacerWidths = {};
+        cfg.spacerWidths[t.targetGuid] = value;
+        saveCfg();
+        renderOrUpdate(true);
+      }, t._compact && value !== "narrow");
+    };
+
+    mkItem("Delete spacer", ()=>{
+      if (!t.targetGuid) return;
+      wsSend({type:"setSpacer", guid: t.targetGuid, enabled:false});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    widthGroup("Standard width", "standard");
+    widthGroup("Narrow width", "narrow");
+    widthGroup("Wide width", "wide");
 
     document.body.appendChild(menu);
     const pad = 8;
@@ -8316,15 +9142,11 @@ const FX_ADD_CATALOG = [
     const barsBtn = document.createElement("button");
     barsBtn.className = "transportValue";
     barsBtn.title = "Bars/Beats";
-    const regionBtn = document.createElement("button");
-    regionBtn.className = "transportValue";
-    regionBtn.title = "Region";
-    regionBtn.addEventListener("click", openRegionsModal);
     const bpmBtn = document.createElement("button");
     bpmBtn.className = "transportValue";
     bpmBtn.title = "BPM";
     bpmBtn.addEventListener("click", openBpmModal);
-    info.append(timeBtn, barsBtn, regionBtn);
+    info.append(timeBtn, barsBtn);
     if (!isPhone) info.appendChild(bpmBtn);
 
     wrap.appendChild(controls);
@@ -8389,7 +9211,6 @@ const FX_ADD_CATALOG = [
     openModal.transportRefs = {
       time: timeBtn,
       bars: barsBtn,
-      region: regionBtn,
       bpm: bpmBtn,
       bpmInput,
       play: playBtn,
@@ -8400,99 +9221,6 @@ const FX_ADD_CATALOG = [
     if (lastState && lastState.transport) updateTransportUI(lastState.transport);
   }
 
-  function renderRegionsModal(){
-    modalTitle.textContent = "Regions";
-    tabsEl.innerHTML = "";
-    modalBody.innerHTML = "";
-    const wrap = document.createElement("div");
-    const transport = transportLive.data || ((lastState && lastState.transport) ? lastState.transport : {});
-    const regions = (lastRegionsPayload && Array.isArray(lastRegionsPayload.regions))
-      ? lastRegionsPayload.regions
-      : (Array.isArray(transport.regions) ? transport.regions : []);
-    const markers = (lastRegionsPayload && Array.isArray(lastRegionsPayload.markers))
-      ? lastRegionsPayload.markers
-      : (Array.isArray(transport.markers) ? transport.markers : []);
-    if (!regions.length && !markers.length){
-      wrap.innerHTML = `<div class="small">No regions or markers in project.</div>`;
-      modalBody.appendChild(wrap);
-      return;
-    }
-    const list = document.createElement("div");
-    list.className = "fxList";
-    const isNumericLabel = (val)=>{
-      const s = String(val || "").trim();
-      return !!(s && /^-?\d+(\.\d+)?$/.test(s));
-    };
-    const fmtRegionName = (r)=>{
-      const name = String(r.name || "").trim();
-      if (name && !isNumericLabel(name)) return name;
-      const idx = Number.isFinite(r.index) ? `#${r.index}` : "";
-      return idx ? `Region ${idx}` : "Region";
-    };
-    const fmtMarkerName = (m)=>{
-      const name = String(m.name || "").trim();
-      if (name && !isNumericLabel(name)) return name;
-      const idx = Number.isFinite(m.index) ? `#${m.index}` : "";
-      return idx ? `Marker ${idx}` : "Marker";
-    };
-    if (regions.length){
-      const hdr = document.createElement("div");
-      hdr.className = "small";
-      hdr.style.margin = "6px 0";
-      hdr.textContent = "Regions";
-      list.appendChild(hdr);
-    }
-    regions.forEach((r)=>{
-      const row = document.createElement("div");
-      row.className = "fxItem";
-      const start = Number.isFinite(r.start) ? formatTimecode(r.start) : "—";
-      const end = Number.isFinite(r.end) ? formatTimecode(r.end) : "—";
-      const startVal = Number.isFinite(r.start) ? r.start : null;
-      const endVal = Number.isFinite(r.end) ? r.end : null;
-      row.innerHTML = `<div class="nm">Region: ${escapeHtml(fmtRegionName(r))}</div>
-        <div class="small">${start} → ${end}</div>
-        <div class="fxCtl">
-          <button class="miniBtn">Go</button>
-          <button class="miniBtn">Loop</button>
-        </div>`;
-      const [goBtn, loopBtn] = row.querySelectorAll("button");
-      goBtn.addEventListener("click", ()=>{
-        const idx = Number.isFinite(r.index) ? r.index : -1;
-        wsSend({type:"gotoRegion", index: idx, start: startVal, end: endVal});
-        closeModal();
-      });
-      loopBtn.addEventListener("click", ()=>{
-        const idx = Number.isFinite(r.index) ? r.index : -1;
-        wsSend({type:"loopRegion", index: idx, start: startVal, end: endVal});
-        closeModal();
-      });
-      list.appendChild(row);
-    });
-    if (markers.length){
-      const hdr = document.createElement("div");
-      hdr.className = "small";
-      hdr.style.margin = "10px 0 6px";
-      hdr.textContent = "Markers";
-      list.appendChild(hdr);
-    }
-    markers.forEach((m)=>{
-      const row = document.createElement("div");
-      row.className = "fxItem";
-      const pos = Number.isFinite(m.position) ? formatTimecode(m.position) : "—";
-      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(fmtMarkerName(m))}</div>
-        <div class="small">${pos}</div>
-        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
-      row.querySelector("button").addEventListener("click", ()=>{
-        const idx = Number.isFinite(m.index) ? m.index : -1;
-        wsSend({type:"gotoMarker", index: idx});
-        closeModal();
-      });
-      list.appendChild(row);
-    });
-    wrap.appendChild(list);
-    modalBody.appendChild(wrap);
-    return;
-  }
 
   function renderBpmModal(){
     modalTitle.textContent = "BPM";
@@ -8583,10 +9311,6 @@ const FX_ADD_CATALOG = [
     }
     if (openModal.kind === "transport"){
       renderTransportModal();
-      return;
-    }
-    if (openModal.kind === "regions"){
-      renderRegionsModal();
       return;
     }
     if (openModal.kind === "bpm"){
@@ -9265,7 +9989,6 @@ modalBody.appendChild(wrap);
   const transportRec = document.getElementById("transportRec");
   const transportTime = document.getElementById("transportTime");
   const transportBars = document.getElementById("transportBars");
-  const transportRegion = document.getElementById("transportRegion");
   const transportBpm = document.getElementById("transportBpm");
   transportRec?.classList.add("rec");
 
@@ -9491,14 +10214,6 @@ modalBody.appendChild(wrap);
     renderModal();
   }
 
-  function openRegionsModal(){
-    overlay.style.display = "block";
-    modal.style.display = "block";
-    openModal = {kind:"regions"};
-    wsSend({type:"reqRegions"});
-    wsSend({type:"reqState"});
-    renderModal();
-  }
 
   function openBpmModal(){
     const current = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
@@ -9523,7 +10238,6 @@ modalBody.appendChild(wrap);
   transportPlay?.addEventListener("click", ()=>wsSend({type:"transport", action:"play"}));
   transportPause?.addEventListener("click", ()=>wsSend({type:"transport", action:"pause"}));
   transportRec?.addEventListener("click", ()=>wsSend({type:"transport", action:"record"}));
-  transportRegion?.addEventListener("click", openRegionsModal);
   transportBpm?.addEventListener("click", openBpmModal);
 
   // ---------- Init ----------

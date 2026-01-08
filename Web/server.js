@@ -238,22 +238,6 @@ wss.on("connection", (ws) => {
       ws.user = "main";
       return;
     }
-    if (msg.type === "reqRegions"){
-      if (lastState && lastState.transport){
-        const t = lastState.transport;
-        sendTo(ws, {
-          type: "regions",
-          regions: Array.isArray(t.regions) ? t.regions : [],
-          markers: Array.isArray(t.markers) ? t.markers : [],
-          regionName: t.regionName || "",
-          regionIndex: Number.isFinite(t.regionIndex) ? t.regionIndex : null
-        });
-      }
-      if (reaperSock){
-        try{ reaperSock.write(JSON.stringify(msg) + "\n"); }catch{}
-      }
-      return;
-    }
     if (msg.type === "reqState"){
       if (lastState) sendTo(ws, filterStateFor(ws, lastState));
       return;
@@ -304,7 +288,8 @@ wss.on("connection", (ws) => {
       "reqFxList","reqFxParams",
       "setSendVol","setSendMute","setSendMode","setSendSrcChan","setSendDstChan","addSend",
       "setRecvVol","setRecvMute","setRecvSrcChan","setRecvDstChan","addReturn",
-      "renameTrack","setTrackColor","moveTrack","createFolderWithTrack","moveTrackToFolder"
+      "renameTrack","setTrackColor","moveTrack","createFolderWithTrack","moveTrackToFolder",
+      "deleteTrack","setSpacer"
     ]);
     if (needsGuid.has(msg.type)){
       const guid = String(msg.guid||"");
