@@ -186,6 +186,12 @@
     outline: 3px solid var(--trackColor, transparent);
     outline-offset: -3px;
   }
+  .strip.folderStart,
+  .strip.folderChild{
+    border:none;
+    outline:none;
+    box-shadow:none;
+  }
   .strip.master{width:140px; background:linear-gradient(#3b3f45,#2a2d31 35%, #1f2126 100%);}
   .strip.child{background:linear-gradient(#353a40,#2a2d31 40%, #1f2126 100%);}
   .strip.child .header{background:linear-gradient(#2e3137,#25282d);}
@@ -193,6 +199,12 @@
     background: linear-gradient(#f7f9fd,#e6ebf2 42%, #d9e0ea 100%);
     border-color: rgba(0,0,0,.12);
     box-shadow: 0 10px 18px rgba(0,0,0,.12);
+  }
+  body.light .strip.folderStart,
+  body.light .strip.folderChild{
+    border:none;
+    outline:none;
+    box-shadow:none;
   }
   body.light .strip.master{background:linear-gradient(#f7f9fd,#e1e7ef 35%, #d5dde8 100%);}
   body.light .strip.child{background:linear-gradient(#f3f6fb,#e3e8f0 40%, #d6dde8 100%);}
@@ -202,6 +214,7 @@
     padding:7px 8px 6px 8px;
     border-bottom:1px solid rgba(0,0,0,.55);
     background:linear-gradient(#2f3339,#25282d);
+    border-radius:12px 12px 0 0;
     display:flex; flex-direction:column; gap:6px;
   }
   body.light .header{
@@ -399,9 +412,13 @@
   #modalHeader{height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 10px; border-bottom:1px solid rgba(0,0,0,.7);}
   body.light #modalHeader{border-bottom:1px solid rgba(0,0,0,.15);}
   #modalTitle{font-weight:700; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  #renameBtn,
   #closeBtn{width:34px; height:30px; border-radius:9px; border:1px solid rgba(0,0,0,.75); background:#22252a; color:#ddd; cursor:pointer;}
+  body.light #renameBtn,
   body.light #closeBtn{background:#f4f6fa; color:#1b1f26; border-color:rgba(0,0,0,.2);}
+  #renameBtn:active,
   #closeBtn:active{transform:translateY(1px)}
+  #renameBtn{margin-right:6px;}
   #tabs{display:flex; gap:8px; padding:10px; border-bottom:1px solid rgba(0,0,0,.7);}
   body.light #tabs{border-bottom:1px solid rgba(0,0,0,.15);}
   .tab{padding:6px 10px; border-radius:10px; border:1px solid rgba(0,0,0,.75); background:#22252a; color:#ddd; cursor:pointer; font-size:12px;}

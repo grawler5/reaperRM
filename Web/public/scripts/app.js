@@ -7087,10 +7087,33 @@ slotbar.appendChild(folderBtn);
       }
     };
 
+    const wireFxHold = (btn)=>{
+      if (!btn) return;
+      let holdT = null;
+      btn._holdTriggered = false;
+      const clearHold = ()=>{
+        if (holdT) clearTimeout(holdT);
+        holdT = null;
+      };
+      btn.addEventListener("pointerdown", (ev)=>{
+        if (ev.button !== 0) return;
+        btn._holdTriggered = false;
+        clearHold();
+        holdT = setTimeout(()=>{
+          btn._holdTriggered = true;
+          wsSend({type:"setFxAllEnabled", guid:t.guid, enabled:false});
+        }, 650);
+      });
+      btn.addEventListener("pointerup", clearHold);
+      btn.addEventListener("pointercancel", clearHold);
+      btn.addEventListener("pointerleave", clearHold);
+    };
+
     // Events
     title.addEventListener("click", (ev)=>{ ev.stopPropagation(); openTrackMenu(t.guid, "general"); });
     fxBtn.addEventListener("click",(ev)=>{
       ev.stopPropagation();
+      if (fxBtn._holdTriggered){ fxBtn._holdTriggered = false; return; }
       openTrackMenu(t.guid,"fx");
     });
     sendsBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); openTrackMenu(t.guid,"sends"); });
@@ -7101,6 +7124,7 @@ slotbar.appendChild(folderBtn);
     recBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); if(t.kind==="master") return; wsSend({type:"setRec", guid:t.guid, rec: !(!!trackByGuid.get(t.guid)?.rec)}); });
     fxBtn2.addEventListener("click",(ev)=>{
       ev.stopPropagation();
+      if (fxBtn2._holdTriggered){ fxBtn2._holdTriggered = false; return; }
       const guid = t.guid;
       const was = fxExpanded.has(guid);
       if (was) fxExpanded.delete(guid);
@@ -7121,6 +7145,8 @@ slotbar.appendChild(folderBtn);
       // apply class + rerender slots
       updateStrip(el, cur, true);
     });
+    wireFxHold(fxBtn);
+    wireFxHold(fxBtn2);
 
     if (el._refs.footerFolderBtn) el._refs.footerFolderBtn.addEventListener("click",(ev)=>{ ev.stopPropagation(); if (t.kind!=="master" && t.folderDepth>0) cycleFolderMode(t.guid); });
 
@@ -7751,6 +7777,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
   const tabsEl = document.getElementById("tabs");
   const modalBody = document.getElementById("modalBody");
   const closeBtn = document.getElementById("closeBtn");
+  const renameBtn = document.getElementById("renameBtn");
 
   let openModal = null; // {guid, tab, fxList, fxParams, fxIndex}
 
@@ -7782,6 +7809,20 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
   }
   overlay.addEventListener("click", closeModal);
   closeBtn.addEventListener("click", closeModal);
+  if (renameBtn){
+    renameBtn.addEventListener("click", ()=>{
+      if (!openModal || !openModal.guid) return;
+      const t = trackByGuid.get(openModal.guid);
+      if (!t) return;
+      const current = t.name || "";
+      const next = prompt("Rename track", current);
+      if (next === null) return;
+      const name = String(next).trim();
+      if (!name) return;
+      wsSend({type:"renameTrack", guid: t.guid, name});
+      closeModal();
+    });
+  }
 
   function setTab(tab){
     if (!openModal) return;
@@ -7978,12 +8019,23 @@ const FX_ADD_CATALOG = [
       row.className = "fxItem";
       const start = Number.isFinite(r.start) ? formatTimecode(r.start) : "—";
       const end = Number.isFinite(r.end) ? formatTimecode(r.end) : "—";
+      const startVal = Number.isFinite(r.start) ? r.start : null;
+      const endVal = Number.isFinite(r.end) ? r.end : null;
       row.innerHTML = `<div class="nm">Region: ${escapeHtml(fmtRegionName(r))}</div>
         <div class="small">${start} → ${end}</div>
-        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
-      row.querySelector("button").addEventListener("click", ()=>{
+        <div class="fxCtl">
+          <button class="miniBtn">Go</button>
+          <button class="miniBtn">Loop</button>
+        </div>`;
+      const [goBtn, loopBtn] = row.querySelectorAll("button");
+      goBtn.addEventListener("click", ()=>{
         const idx = Number.isFinite(r.index) ? r.index : -1;
-        wsSend({type:"gotoRegion", index: idx});
+        wsSend({type:"gotoRegion", index: idx, start: startVal, end: endVal});
+        closeModal();
+      });
+      loopBtn.addEventListener("click", ()=>{
+        const idx = Number.isFinite(r.index) ? r.index : -1;
+        wsSend({type:"loopRegion", index: idx, start: startVal, end: endVal});
         closeModal();
       });
       list.appendChild(row);
@@ -8088,6 +8140,10 @@ const FX_ADD_CATALOG = [
 
   function renderModal(){
     if (!openModal) return;
+    if (renameBtn){
+      const showRename = !openModal.kind && !!openModal.guid;
+      renameBtn.style.display = showRename ? "inline-flex" : "none";
+    }
     if (openModal.kind === "settings"){
       renderSettingsModal();
       return;
@@ -8217,9 +8273,8 @@ const FX_ADD_CATALOG = [
       <button class="miniBtn ${t.mute?'on':''}">Mute</button>
       <button class="miniBtn ${t.solo?'on':''}" ${t.kind==="master"?'disabled':''}>Solo</button>
       <button class="miniBtn ${t.rec?'on':''}" ${t.kind==="master"?'disabled':''}>Rec</button>
-      <button class="miniBtn">FX Chain</button>
     `;
-    const [bM,bS,bR,bFX] = bRow.querySelectorAll("button");
+    const [bM,bS,bR] = bRow.querySelectorAll("button");
     bM.addEventListener("click", ()=>{
       const v=!t.mute; t.mute=v; bM.classList.toggle('on',v);
       wsSend({type:"setMute", guid:t.guid, mute:v});
@@ -8235,20 +8290,16 @@ const FX_ADD_CATALOG = [
       wsSend({type:"setRec", guid:t.guid, rec:v});
       renderOrUpdate();
     });
-    bFX.addEventListener("click", ()=> {
-      openFxUIOrMenu(t.guid);
-    });
     wrap.appendChild(bRow);
 
     // Rec input selection when rec armed (and not master)
     if (t.kind !== "master"){
       const ri = document.createElement("div");
       ri.className = "row";
-      const disabled = !t.rec;
       const cur = (typeof t.recInput === "number") ? (t.recInput + 1) : 1;
       let opts = "";
       for (let i=1;i<=16;i++) opts += `<option value="${i}" ${i===cur?'selected':''}>Input ${i}</option>`;
-      ri.innerHTML = `<label>Rec input</label><select ${disabled?'disabled':''} style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">${opts}</select>
+      ri.innerHTML = `<label>Rec input</label><select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">${opts}</select>
                       <div class="small" style="width:70px;text-align:right">${t.rec? "armed":"off"}</div>`;
       const sel = ri.querySelector("select");
       sel.addEventListener("change", ()=>wsSend({type:"setRecInput", guid:t.guid, input: parseInt(sel.value,10)}));
@@ -8276,10 +8327,28 @@ modalBody.appendChild(wrap);
   function renderSendsTab(t){
     const sends = (t.sendDetails || []);
     const names = (t.sendSlots || []);
-    if ((!sends || !sends.length) && (!names || !names.length)){
-      modalBody.innerHTML = `<div class="small">No sends.</div>`;
-      return;
-    }
+    const wrap = document.createElement("div");
+
+    const addRow = document.createElement("div");
+    addRow.className = "row";
+    const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+    const otherTracks = tracks.filter(tr => tr.guid && tr.guid !== t.guid);
+    const opts = otherTracks.map(tr => `<option value="${tr.guid}">${escapeHtml(tr.name || ("Track " + tr.idx))}</option>`).join("");
+    addRow.innerHTML = `<label>Add send</label>
+      <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
+        ${opts || `<option value="">No tracks</option>`}
+      </select>
+      <button class="miniBtn" ${opts ? "" : "disabled"}>Add</button>`;
+    const sel = addRow.querySelector("select");
+    const addBtn = addRow.querySelector("button");
+    addBtn.addEventListener("click", ()=>{
+      const destGuid = sel.value;
+      if (!destGuid) return;
+      wsSend({type:"addSend", guid:t.guid, destGuid});
+      setTimeout(()=>wsSend({type:"reqState"}), 80);
+    });
+    wrap.appendChild(addRow);
+
     const list = document.createElement("div");
     list.className = "sendList";
 
@@ -8334,16 +8403,42 @@ modalBody.appendChild(wrap);
       });
       list.appendChild(card);
     });
-    modalBody.appendChild(list);
+    if (!rows.length){
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No sends.";
+      wrap.appendChild(empty);
+    } else {
+      wrap.appendChild(list);
+    }
+    modalBody.appendChild(wrap);
   }
 
   function renderReturnsTab(t){
     const recvs = (t.recvDetails || []);
     const names = (t.recvSlots || []);
-    if ((!recvs || !recvs.length) && (!names || !names.length)){
-      modalBody.innerHTML = `<div class="small">No returns.</div>`;
-      return;
-    }
+    const wrap = document.createElement("div");
+
+    const addRow = document.createElement("div");
+    addRow.className = "row";
+    const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+    const otherTracks = tracks.filter(tr => tr.guid && tr.guid !== t.guid);
+    const opts = otherTracks.map(tr => `<option value="${tr.guid}">${escapeHtml(tr.name || ("Track " + tr.idx))}</option>`).join("");
+    addRow.innerHTML = `<label>Add return</label>
+      <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
+        ${opts || `<option value="">No tracks</option>`}
+      </select>
+      <button class="miniBtn" ${opts ? "" : "disabled"}>Add</button>`;
+    const sel = addRow.querySelector("select");
+    const addBtn = addRow.querySelector("button");
+    addBtn.addEventListener("click", ()=>{
+      const sourceGuid = sel.value;
+      if (!sourceGuid) return;
+      wsSend({type:"addReturn", guid:t.guid, sourceGuid});
+      setTimeout(()=>wsSend({type:"reqState"}), 80);
+    });
+    wrap.appendChild(addRow);
+
     const list = document.createElement("div");
     list.className = "sendList";
     const rows = recvs.length ? recvs : names.map((nm,i)=>({index:i, srcName:nm, vol:1, mute:false, srcCh:"1-2", dstCh:"3-4"}));
@@ -8379,7 +8474,15 @@ modalBody.appendChild(wrap);
       });
       list.appendChild(card);
     });
-    modalBody.appendChild(list);
+    if (!rows.length){
+      const empty = document.createElement("div");
+      empty.className = "small";
+      empty.textContent = "No returns.";
+      wrap.appendChild(empty);
+    } else {
+      wrap.appendChild(list);
+    }
+    modalBody.appendChild(wrap);
   }
 
 
@@ -8414,11 +8517,12 @@ modalBody.appendChild(wrap);
           <div class="fxCtl">
             <button class="miniBtn ${f.enabled?'on':''}">${f.enabled?'ON':'OFF'}</button>
             <button class="miniBtn">Params</button>
+            <button class="miniBtn">Delete</button>
             <button class="miniBtn">↑</button>
             <button class="miniBtn">↓</button>
           </div>
         `;
-        const [bEn,bP,bUp,bDn] = item.querySelectorAll("button");
+        const [bEn,bP,bDel,bUp,bDn] = item.querySelectorAll("button");
         // Tap the row to open the plugin UI (one click flow)
         item.addEventListener("click", ()=>openPluginWin(t.guid, f.index));
 
@@ -8427,6 +8531,11 @@ modalBody.appendChild(wrap);
           ev.stopPropagation();
           // Prefer the plugin window UI.
           openPluginWin(t.guid, f.index);
+        });
+        bDel.addEventListener("click", (ev)=>{
+          ev.stopPropagation();
+          wsSend({type:"deleteFx", guid:t.guid, index:f.index});
+          setTimeout(()=>wsSend({type:"reqFxList", guid:t.guid}), 60);
         });
         bUp.addEventListener("click", (ev)=>{ ev.stopPropagation(); if (f.index>0) wsSend({type:"moveFx", guid:t.guid, from:f.index, to:f.index-1}); });
         bDn.addEventListener("click", (ev)=>{ ev.stopPropagation(); wsSend({type:"moveFx", guid:t.guid, from:f.index, to:f.index+1}); });
@@ -8437,20 +8546,13 @@ modalBody.appendChild(wrap);
 
     const add = document.createElement("div");
     add.style.marginTop = "14px";
-    add.innerHTML = `<div class="small" style="margin-bottom:8px;">Add FX (catalog)</div>`;
-    const grid = document.createElement("div");
-    grid.style.display = "grid";
-    grid.style.gridTemplateColumns = "1fr 1fr";
-    grid.style.gap = "10px";
-    FX_ADD_CATALOG.forEach(x=>{
-      const b = document.createElement("button");
-      b.className = "miniBtn";
-      b.style.height = "34px";
-      b.textContent = x.name;
-      b.addEventListener("click", ()=>wsSend({type:"addFx", guid:t.guid, name:x.add}));
-      grid.appendChild(b);
-    });
-    add.appendChild(grid);
+    add.innerHTML = `<div class="small" style="margin-bottom:8px;">Add FX</div>`;
+    const addRow = document.createElement("div");
+    addRow.className = "row";
+    addRow.innerHTML = `<label></label><button class="miniBtn">Add from catalog…</button>`;
+    const addBtn = addRow.querySelector("button");
+    addBtn.addEventListener("click", (ev)=> openFxAddMenu(t.guid, ev.currentTarget));
+    add.appendChild(addRow);
     wrap.appendChild(add);
 
     modalBody.appendChild(wrap);

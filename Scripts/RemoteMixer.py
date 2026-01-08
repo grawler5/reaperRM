@@ -1137,23 +1137,67 @@ def handle_cmd(cmd, sock):
             return
         if typ == "gotoRegion":
             idx = int(cmd.get("index", -1))
+            start_pos = None
+            end_pos = None
+            try:
+                if cmd.get("start", None) is not None:
+                    start_pos = float(cmd.get("start"))
+                if cmd.get("end", None) is not None:
+                    end_pos = float(cmd.get("end"))
+            except Exception:
+                start_pos = None
+                end_pos = None
             if idx >= 0:
                 try:
                     try:
                         RPR_GotoMarker(0, idx, True)
                     except Exception:
                         pass
+                    if start_pos is None:
+                        regions, _markers = get_regions_and_markers()
+                        for r in regions:
+                            if int(r.get("index", -1)) == idx:
+                                start_pos = r.get("start", None)
+                                end_pos = r.get("end", None)
+                                break
+                    if start_pos is not None:
+                        try:
+                            RPR_SetEditCurPos2(0, start_pos, True, True)
+                        except Exception:
+                            RPR_SetEditCurPos(start_pos, True, True)
+                except Exception:
+                    pass
+            return
+        if typ == "loopRegion":
+            idx = int(cmd.get("index", -1))
+            start_pos = None
+            end_pos = None
+            try:
+                if cmd.get("start", None) is not None:
+                    start_pos = float(cmd.get("start"))
+                if cmd.get("end", None) is not None:
+                    end_pos = float(cmd.get("end"))
+            except Exception:
+                start_pos = None
+                end_pos = None
+
+            if (start_pos is None or end_pos is None) and idx >= 0:
+                try:
                     regions, _markers = get_regions_and_markers()
-                    start = None
                     for r in regions:
                         if int(r.get("index", -1)) == idx:
-                            start = r.get("start", None)
+                            start_pos = r.get("start", None)
+                            end_pos = r.get("end", None)
                             break
-                    if start is not None:
-                        try:
-                            RPR_SetEditCurPos2(0, start, True, True)
-                        except Exception:
-                            RPR_SetEditCurPos(start, True, True)
+                except Exception:
+                    pass
+
+            if start_pos is not None and end_pos is not None:
+                try:
+                    if "RPR_GetSet_LoopTimeRange2" in globals():
+                        RPR_GetSet_LoopTimeRange2(0, True, True, start_pos, end_pos, False)
+                    else:
+                        RPR_GetSet_LoopTimeRange(True, True, start_pos, end_pos, False)
                 except Exception:
                     pass
             return
@@ -1214,6 +1258,16 @@ def handle_cmd(cmd, sock):
             if tr:
                 RPR_SetMediaTrackInfo_Value(tr, "I_RECARM", 1.0 if rec else 0.0)
             return
+        if typ == "renameTrack":
+            guid = cmd.get("guid","")
+            name = _as_str(cmd.get("name",""))
+            tr = find_track_by_guid(guid)
+            if tr and name:
+                try:
+                    RPR_GetSetMediaTrackInfo_String(tr, "P_NAME", name, True)
+                except Exception:
+                    pass
+            return
         if typ == "setSendVol":
             guid = cmd.get("guid","")
             idx = int(cmd.get("index", 0))
@@ -1243,6 +1297,15 @@ def handle_cmd(cmd, sock):
                 try: RPR_SetTrackSendInfo_Value(tr, 0, idx, "I_SENDMODE", mode)
                 except Exception: pass
             return
+        if typ == "addSend":
+            guid = cmd.get("guid","")
+            dest_guid = cmd.get("destGuid","")
+            tr = find_track_by_guid(guid)
+            dest = find_track_by_guid(dest_guid)
+            if tr and dest:
+                try: RPR_CreateTrackSend(tr, dest)
+                except Exception: pass
+            return
         if typ == "setRecvVol":
             guid = cmd.get("guid","")
             idx = int(cmd.get("index", 0))
@@ -1259,6 +1322,15 @@ def handle_cmd(cmd, sock):
             tr = find_track_by_guid(guid)
             if tr:
                 try: RPR_SetTrackSendInfo_Value(tr, -1, idx, "B_MUTE", 1.0 if mute else 0.0)
+                except Exception: pass
+            return
+        if typ == "addReturn":
+            guid = cmd.get("guid","")
+            source_guid = cmd.get("sourceGuid","")
+            tr = find_track_by_guid(guid)
+            source = find_track_by_guid(source_guid)
+            if tr and source:
+                try: RPR_CreateTrackSend(source, tr)
                 except Exception: pass
             return
         if typ == "setRecInput":
