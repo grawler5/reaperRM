@@ -6087,6 +6087,12 @@ applyResponsiveMode();
     if (!transport) return;
     transportLive.data = Object.assign({}, transport);
     transportLive.ts = performance.now();
+    if (Array.isArray(transport.regions) || Array.isArray(transport.markers)){
+      lastRegionsPayload = {
+        regions: Array.isArray(transport.regions) ? transport.regions : [],
+        markers: Array.isArray(transport.markers) ? transport.markers : []
+      };
+    }
     applyTransportRefs(transport, {
       time: transportTime,
       bars: transportBars,
@@ -6115,6 +6121,7 @@ applyResponsiveMode();
   let meterAnimRaf = 0;
   let meterAnimLastT = 0;
   const transportLive = {data: null, ts: 0};
+  let lastRegionsPayload = null;
 
   function ensureMeterAnim(){
     if (meterAnimRaf) return;
@@ -6374,6 +6381,10 @@ function hideUserPicker(){
         });
         if (!lastState) lastState = {master: null, tracks: [], transport: nextTransport};
         else lastState.transport = nextTransport;
+        lastRegionsPayload = {
+          regions: Array.isArray(msg.regions) ? msg.regions : [],
+          markers: Array.isArray(msg.markers) ? msg.markers : []
+        };
         updateTransportUI(nextTransport);
         return;
       }
@@ -7745,8 +7756,12 @@ const FX_ADD_CATALOG = [
     modalBody.innerHTML = "";
     const wrap = document.createElement("div");
     const transport = transportLive.data || ((lastState && lastState.transport) ? lastState.transport : {});
-    const regions = Array.isArray(transport.regions) ? transport.regions : [];
-    const markers = Array.isArray(transport.markers) ? transport.markers : [];
+    const regions = (lastRegionsPayload && Array.isArray(lastRegionsPayload.regions))
+      ? lastRegionsPayload.regions
+      : (Array.isArray(transport.regions) ? transport.regions : []);
+    const markers = (lastRegionsPayload && Array.isArray(lastRegionsPayload.markers))
+      ? lastRegionsPayload.markers
+      : (Array.isArray(transport.markers) ? transport.markers : []);
     if (!regions.length && !markers.length){
       wrap.innerHTML = `<div class="small">No regions or markers in project.</div>`;
       modalBody.appendChild(wrap);
