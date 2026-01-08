@@ -55,7 +55,15 @@
     title: "NS1",
     sections: [
       // Waves NS1 exposes the main reduction control as parameter index 2 (NS1 #2)
-      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:2, faderFind:[/^NS1\b/i] }} ] }
+      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:2, faderFind:[/^NS1\b/i], brand:"NS1" }} ] }
+    ]
+  },
+  {
+    id: "rm_ns",
+    match: (name)=> /\bRM[\s_-]*NS\b/i.test(name),
+    title: "RM-NS",
+    sections: [
+      { title: "", controls: [ {type:"ns1Panel", extra:{ paramIndex:0, faderFind:[/^Reduction\b/i], brand:"RM-NS" }} ] }
     ]
   },
   {
@@ -588,14 +596,14 @@ function formatParam(p){
     const readout = document.createElement("div"); readout.className="ns1Readout"; readout.textContent="—";
     faderCol.appendChild(readout);
 
-    const brand = document.createElement("div"); brand.className="ns1Brand"; brand.textContent="NS1";
+    const extra = ctrl.extra||{};
+    const brand = document.createElement("div"); brand.className="ns1Brand"; brand.textContent = extra.brand || "NS1";
     root.appendChild(brand);
     root.appendChild(faderCol);
 
     const clamp01 = (x)=>Math.max(0, Math.min(1, x));
 
     const getFaderParam = ()=>{
-      const extra = ctrl.extra||{};
       let p = null;
       if (Number.isFinite(extra.paramIndex)){
         p = (win.params||[]).find(x=>x.index===extra.paramIndex) || null;
