@@ -6365,12 +6365,6 @@ applyResponsiveMode();
       const next = `${bar}.${beat}.${String(sub).padStart(2, "0")}`;
       if (refs.bars.textContent !== next) refs.bars.textContent = next;
     }
-    if (refs.region){
-      const name = String(transport.regionName || "").trim();
-      const idx = Number.isFinite(transport.regionIndex) ? transport.regionIndex : null;
-      const label = name || (idx !== null ? `#${idx}` : "—");
-      refs.region.textContent = `Region: ${label}`;
-    }
     if (refs.bpm){
       const bpm = Number.isFinite(transport.bpm) ? Math.round(transport.bpm) : null;
       refs.bpm.textContent = bpm === null ? "—" : `${bpm} BPM`;
@@ -6395,16 +6389,9 @@ applyResponsiveMode();
     if (!transport) return;
     transportLive.data = Object.assign({}, transport);
     transportLive.ts = performance.now();
-    if (Array.isArray(transport.regions) || Array.isArray(transport.markers)){
-      lastRegionsPayload = {
-        regions: Array.isArray(transport.regions) ? transport.regions : [],
-        markers: Array.isArray(transport.markers) ? transport.markers : []
-      };
-    }
     applyTransportRefs(transport, {
       time: transportTime,
       bars: transportBars,
-      region: transportRegion,
       bpm: transportBpm,
       play: transportPlay,
       pause: transportPause,
@@ -6413,9 +6400,6 @@ applyResponsiveMode();
     });
     if (openModal && openModal.kind === "transport" && openModal.transportRefs){
       applyTransportRefs(transport, openModal.transportRefs);
-    }
-    if (openModal && openModal.kind === "regions"){
-      renderModal();
     }
   };
 
@@ -6429,7 +6413,6 @@ applyResponsiveMode();
   let meterAnimRaf = 0;
   let meterAnimLastT = 0;
   const transportLive = {data: null, ts: 0};
-  let lastRegionsPayload = null;
 
   function ensureMeterAnim(){
     if (meterAnimRaf) return;
@@ -6729,23 +6712,6 @@ applyResponsiveMode();
         }
         return;
       }
-      if (msg.type === "regions"){
-        const baseTransport = transportLive.data || (lastState && lastState.transport) || {};
-        const nextTransport = Object.assign({}, baseTransport, {
-          regions: Array.isArray(msg.regions) ? msg.regions : [],
-          markers: Array.isArray(msg.markers) ? msg.markers : [],
-          regionName: msg.regionName || baseTransport.regionName || "",
-          regionIndex: Number.isFinite(msg.regionIndex) ? msg.regionIndex : baseTransport.regionIndex,
-        });
-        if (!lastState) lastState = {master: null, tracks: [], transport: nextTransport};
-        else lastState.transport = nextTransport;
-        lastRegionsPayload = {
-          regions: Array.isArray(msg.regions) ? msg.regions : [],
-          markers: Array.isArray(msg.markers) ? msg.markers : []
-        };
-        updateTransportUI(nextTransport);
-        return;
-      }
     };
   }
 
@@ -6914,6 +6880,13 @@ applyResponsiveMode();
 
     const isVisible = !hiddenByParent;
     if (isVisible){
+      if (t.spacerAbove){
+        out.push({
+          kind: "spacer",
+          guid: `spacer:${t.guid}`,
+          label: "Spacer"
+        });
+      }
       let groupId = null;
       if (stack.length > 0){
         groupId = stack[0].guid;
@@ -7153,6 +7126,7 @@ applyResponsiveMode();
           if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5){
             el.style.transition = "none";
             el.style.transform = `translate(${dx}px, ${dy}px)`;
+            el.getBoundingClientRect();
             requestAnimationFrame(()=>{
               el.style.transition = "transform 180ms ease";
               el.style.transform = "";
@@ -7181,7 +7155,7 @@ applyResponsiveMode();
     el.setAttribute("data-guid", t.guid);
     const label = el._spacerLabel;
     if (label){
-      const name = String(t.name || "").trim();
+      const name = String(t.label || t.name || "").trim();
       label.textContent = name || "Spacer";
     }
   }
@@ -7236,16 +7210,14 @@ applyResponsiveMode();
     el.addEventListener("contextmenu", (ev)=>{
       ev.preventDefault();
       ev.stopPropagation();
-      openTrackContextMenu(t.guid, ev.clientX, ev.clientY);
     });
 
-    attachTrackReorder(el, t);
     updateSpacerStrip(el, t);
     return el;
   }
 
   function createStrip(t){
-    if (t.kind !== "master" && t.isSpacer){
+    if (t.kind === "spacer"){
       return createSpacerStrip(t);
     }
     const el = document.createElement("div");
@@ -7571,7 +7543,7 @@ slotbar.appendChild(folderBtn);
 
   function updateStrip(el, t, first=false){
     if (!el) return;
-    if (t.kind !== "master" && t.isSpacer){
+    if (t.kind === "spacer"){
       updateSpacerStrip(el, t);
       return;
     }
@@ -7797,7 +7769,6 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         applyTransportRefs(derived, {
           time: transportTime,
           bars: transportBars,
-          region: transportRegion,
           bpm: transportBpm,
           play: transportPlay,
           pause: transportPause,
@@ -8446,15 +8417,11 @@ const FX_ADD_CATALOG = [
     const barsBtn = document.createElement("button");
     barsBtn.className = "transportValue";
     barsBtn.title = "Bars/Beats";
-    const regionBtn = document.createElement("button");
-    regionBtn.className = "transportValue";
-    regionBtn.title = "Region";
-    regionBtn.addEventListener("click", openRegionsModal);
     const bpmBtn = document.createElement("button");
     bpmBtn.className = "transportValue";
     bpmBtn.title = "BPM";
     bpmBtn.addEventListener("click", openBpmModal);
-    info.append(timeBtn, barsBtn, regionBtn);
+    info.append(timeBtn, barsBtn);
     if (!isPhone) info.appendChild(bpmBtn);
 
     wrap.appendChild(controls);
@@ -8519,7 +8486,6 @@ const FX_ADD_CATALOG = [
     openModal.transportRefs = {
       time: timeBtn,
       bars: barsBtn,
-      region: regionBtn,
       bpm: bpmBtn,
       bpmInput,
       play: playBtn,
@@ -8530,99 +8496,6 @@ const FX_ADD_CATALOG = [
     if (lastState && lastState.transport) updateTransportUI(lastState.transport);
   }
 
-  function renderRegionsModal(){
-    modalTitle.textContent = "Regions";
-    tabsEl.innerHTML = "";
-    modalBody.innerHTML = "";
-    const wrap = document.createElement("div");
-    const transport = transportLive.data || ((lastState && lastState.transport) ? lastState.transport : {});
-    const regions = (lastRegionsPayload && Array.isArray(lastRegionsPayload.regions))
-      ? lastRegionsPayload.regions
-      : (Array.isArray(transport.regions) ? transport.regions : []);
-    const markers = (lastRegionsPayload && Array.isArray(lastRegionsPayload.markers))
-      ? lastRegionsPayload.markers
-      : (Array.isArray(transport.markers) ? transport.markers : []);
-    if (!regions.length && !markers.length){
-      wrap.innerHTML = `<div class="small">No regions or markers in project.</div>`;
-      modalBody.appendChild(wrap);
-      return;
-    }
-    const list = document.createElement("div");
-    list.className = "fxList";
-    const isNumericLabel = (val)=>{
-      const s = String(val || "").trim();
-      return !!(s && /^-?\d+(\.\d+)?$/.test(s));
-    };
-    const fmtRegionName = (r)=>{
-      const name = String(r.name || "").trim();
-      if (name && !isNumericLabel(name)) return name;
-      const idx = Number.isFinite(r.index) ? `#${r.index}` : "";
-      return idx ? `Region ${idx}` : "Region";
-    };
-    const fmtMarkerName = (m)=>{
-      const name = String(m.name || "").trim();
-      if (name && !isNumericLabel(name)) return name;
-      const idx = Number.isFinite(m.index) ? `#${m.index}` : "";
-      return idx ? `Marker ${idx}` : "Marker";
-    };
-    if (regions.length){
-      const hdr = document.createElement("div");
-      hdr.className = "small";
-      hdr.style.margin = "6px 0";
-      hdr.textContent = "Regions";
-      list.appendChild(hdr);
-    }
-    regions.forEach((r)=>{
-      const row = document.createElement("div");
-      row.className = "fxItem";
-      const start = Number.isFinite(r.start) ? formatTimecode(r.start) : "—";
-      const end = Number.isFinite(r.end) ? formatTimecode(r.end) : "—";
-      const startVal = Number.isFinite(r.start) ? r.start : null;
-      const endVal = Number.isFinite(r.end) ? r.end : null;
-      row.innerHTML = `<div class="nm">Region: ${escapeHtml(fmtRegionName(r))}</div>
-        <div class="small">${start} → ${end}</div>
-        <div class="fxCtl">
-          <button class="miniBtn">Go</button>
-          <button class="miniBtn">Loop</button>
-        </div>`;
-      const [goBtn, loopBtn] = row.querySelectorAll("button");
-      goBtn.addEventListener("click", ()=>{
-        const idx = Number.isFinite(r.index) ? r.index : -1;
-        wsSend({type:"gotoRegion", index: idx, start: startVal, end: endVal});
-        closeModal();
-      });
-      loopBtn.addEventListener("click", ()=>{
-        const idx = Number.isFinite(r.index) ? r.index : -1;
-        wsSend({type:"loopRegion", index: idx, start: startVal, end: endVal});
-        closeModal();
-      });
-      list.appendChild(row);
-    });
-    if (markers.length){
-      const hdr = document.createElement("div");
-      hdr.className = "small";
-      hdr.style.margin = "10px 0 6px";
-      hdr.textContent = "Markers";
-      list.appendChild(hdr);
-    }
-    markers.forEach((m)=>{
-      const row = document.createElement("div");
-      row.className = "fxItem";
-      const pos = Number.isFinite(m.position) ? formatTimecode(m.position) : "—";
-      row.innerHTML = `<div class="nm">Marker: ${escapeHtml(fmtMarkerName(m))}</div>
-        <div class="small">${pos}</div>
-        <div class="fxCtl"><button class="miniBtn">Go</button></div>`;
-      row.querySelector("button").addEventListener("click", ()=>{
-        const idx = Number.isFinite(m.index) ? m.index : -1;
-        wsSend({type:"gotoMarker", index: idx});
-        closeModal();
-      });
-      list.appendChild(row);
-    });
-    wrap.appendChild(list);
-    modalBody.appendChild(wrap);
-    return;
-  }
 
   function renderBpmModal(){
     modalTitle.textContent = "BPM";
@@ -8713,10 +8586,6 @@ const FX_ADD_CATALOG = [
     }
     if (openModal.kind === "transport"){
       renderTransportModal();
-      return;
-    }
-    if (openModal.kind === "regions"){
-      renderRegionsModal();
       return;
     }
     if (openModal.kind === "bpm"){
@@ -9395,7 +9264,6 @@ modalBody.appendChild(wrap);
   const transportRec = document.getElementById("transportRec");
   const transportTime = document.getElementById("transportTime");
   const transportBars = document.getElementById("transportBars");
-  const transportRegion = document.getElementById("transportRegion");
   const transportBpm = document.getElementById("transportBpm");
   transportRec?.classList.add("rec");
 
@@ -9621,14 +9489,6 @@ modalBody.appendChild(wrap);
     renderModal();
   }
 
-  function openRegionsModal(){
-    overlay.style.display = "block";
-    modal.style.display = "block";
-    openModal = {kind:"regions"};
-    wsSend({type:"reqRegions"});
-    wsSend({type:"reqState"});
-    renderModal();
-  }
 
   function openBpmModal(){
     const current = (lastState && lastState.transport && Number.isFinite(lastState.transport.bpm)) ? Math.round(lastState.transport.bpm) : 120;
@@ -9653,7 +9513,6 @@ modalBody.appendChild(wrap);
   transportPlay?.addEventListener("click", ()=>wsSend({type:"transport", action:"play"}));
   transportPause?.addEventListener("click", ()=>wsSend({type:"transport", action:"pause"}));
   transportRec?.addEventListener("click", ()=>wsSend({type:"transport", action:"record"}));
-  transportRegion?.addEventListener("click", openRegionsModal);
   transportBpm?.addEventListener("click", openBpmModal);
 
   // ---------- Init ----------
