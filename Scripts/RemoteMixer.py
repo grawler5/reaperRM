@@ -606,8 +606,6 @@ def build_state():
         depth, compact, indent = track_folder_info(tr)
         name = get_track_name(tr)
         is_spacer = _is_visual_spacer(tr)
-        if is_spacer and (not name or name == "Track" or name == "Spacer"):
-            name = "Spacer"
         t = {
             "kind":"track",
             "guid": track_guid(tr),
@@ -798,8 +796,9 @@ def get_regions_and_markers():
         if "RPR_EnumProjectMarkers3" in globals():
             r = None
             for args in (
-                (0, i, 0, 0, 0, "", 0, 0),
-                (0, i, 0, 0, 0, "", 0),
+                (0, i, 0, 0, 0, "", 512, 0, 0),
+                (0, i, 0, 0, 0, "", 512, 0),
+                (0, i, 0, 0, 0, "", 512),
             ):
                 try:
                     r = RPR_EnumProjectMarkers3(*args)
@@ -826,8 +825,9 @@ def get_regions_and_markers():
         if "RPR_EnumProjectMarkers2" in globals():
             r = None
             for args in (
+                (0, i, 0, 0, 0, "", 512, 0),
+                (0, i, 0, 0, 0, "", 512),
                 (0, i, 0, 0, 0, "", 0),
-                (0, i, 0, 0, 0, ""),
             ):
                 try:
                     r = RPR_EnumProjectMarkers2(*args)
@@ -855,7 +855,7 @@ def get_regions_and_markers():
             r = None
             for args in (
                 (i, 0, 0, 0, "", 512),
-                (i, 0, 0, 0, ""),
+                (i, 0, 0, 0, "", 0),
             ):
                 try:
                     r = RPR_EnumProjectMarkers(*args)
@@ -1340,10 +1340,6 @@ def handle_cmd(cmd, sock):
                 if isinstance(tr, tuple): tr = tr[0]
                 if tr:
                     try:
-                        RPR_GetSetMediaTrackInfo_String(tr, "P_NAME", "Spacer", True)
-                    except Exception:
-                        pass
-                    try:
                         RPR_GetSetMediaTrackInfo_String(tr, "P_MCP_LAYOUT", "Spacer", True)
                         RPR_GetSetMediaTrackInfo_String(tr, "P_TCP_LAYOUT", "Spacer", True)
                     except Exception:
@@ -1352,6 +1348,17 @@ def handle_cmd(cmd, sock):
                 RPR_UpdateArrange()
             except Exception:
                 pass
+            return
+        if typ == "deleteTrack":
+            guid = cmd.get("guid", "")
+            tr = find_track_by_guid(guid)
+            if tr:
+                try:
+                    RPR_DeleteTrack(tr)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
             return
         if typ == "moveTrack":
             guid = cmd.get("guid","")

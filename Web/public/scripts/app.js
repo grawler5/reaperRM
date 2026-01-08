@@ -5712,7 +5712,7 @@ function buildReaCompPanelControl(win, ctrl){
     return {el: card, update, updateTrackMeter, ctrl};
   }
 
-function buildToggleControl(win, ctrl){
+  function buildToggleControl(win, ctrl){
     const card = document.createElement("div");
     card.className = "plugCtrl";
     const btn = document.createElement("button");
@@ -5746,6 +5746,53 @@ function buildToggleControl(win, ctrl){
     return {el: card, update, ctrl};
   }
 
+  function clearLayoutScale(win){
+    if (!win || !win._layoutUI) return;
+    const ui = win._layoutUI;
+    if (ui.scaleObserver){
+      try{ ui.scaleObserver.disconnect(); }catch(_){}
+      ui.scaleObserver = null;
+    }
+  }
+
+  function setupLayoutScale(win, container){
+    if (!win || !win._layoutUI || !win._layoutUI.stage) return;
+    const ui = win._layoutUI;
+    if (ui.scaleObserver) return;
+    const stage = ui.stage;
+    const scope = stage.closest(".pluginWinBody") || container;
+    if (!scope) return;
+
+    const fit = ()=>{
+      if (!ui.baseW || !ui.baseH){
+        stage.style.transform = "scale(1)";
+        stage.style.width = "auto";
+        stage.style.height = "auto";
+        const rect = stage.getBoundingClientRect();
+        ui.baseW = rect.width || stage.offsetWidth || 1;
+        ui.baseH = rect.height || stage.offsetHeight || 1;
+      }
+      const pad = 20;
+      const availW = Math.max(10, scope.clientWidth - pad);
+      const availH = Math.max(10, scope.clientHeight - pad);
+      let sc = Math.min(availW / ui.baseW, availH / ui.baseH);
+      const maxScale = (scope.closest(".pluginWin") && scope.closest(".pluginWin").classList.contains("fullscreen")) ? 2.0 : 1.6;
+      sc = Math.max(0.5, Math.min(maxScale, sc));
+      stage.style.transform = `scale(${sc})`;
+      stage.style.width = ui.baseW + "px";
+      stage.style.height = ui.baseH + "px";
+      stage.style.margin = "0 auto";
+    };
+
+    ui.scaleFit = fit;
+    try{
+      const ro = new ResizeObserver(()=>fit());
+      ro.observe(scope);
+      ui.scaleObserver = ro;
+    }catch(_){}
+    requestAnimationFrame(fit);
+  }
+
   function renderLayoutInto(win, layout, container){
     // If we built the UI before params arrived, rebuild once we have params
     // so pattern-based mapping works and we don't get a permanent "Couldn't match..." banner.
@@ -5759,13 +5806,24 @@ function buildToggleControl(win, ctrl){
 
     // build once; update on subsequent polls
     if (!win._layoutUI || win._layoutUI.layoutId !== layout.id){
+      clearLayoutScale(win);
       win._layoutUI = {
         layoutId: layout.id,
         controls: [],
         builtWithEmptyParams: !(Array.isArray(win.params) && win.params.length > 0),
+        stage: null,
+        baseW: null,
+        baseH: null,
+        scaleObserver: null,
+        scaleFit: null,
       };
       container.innerHTML = "";
 let foundAny = false;
+      const stage = document.createElement("div");
+      stage.className = "plugLayoutStage";
+      win._layoutUI.stage = stage;
+      container.classList.add("layoutScaled");
+      container.appendChild(stage);
       // If the layout contains a custom panel, we don't require param-name matching.
       // (Those panels can use known indices or do their own mapping.)
       const layoutHasCustomPanel = (layout.sections||[]).some(sec =>
@@ -5825,7 +5883,7 @@ for (const c of (sec.controls||[])){
           grid.appendChild(ui.el);
         }
         secEl.appendChild(grid);
-        container.appendChild(secEl);
+        stage.appendChild(secEl);
       }
 
       const haveParams = Array.isArray(win.params) && win.params.length > 0;
@@ -5833,8 +5891,9 @@ for (const c of (sec.controls||[])){
         const note = document.createElement("div");
         note.className = "plugNote";
         note.innerHTML = `Couldn't match known parameters for this plugin build.<br><br>Use <b>Inspector</b> to view raw params and we can map them.`;
-        container.appendChild(note);
+        stage.appendChild(note);
       }
+      setupLayoutScale(win, container);
     }
 
     // update: rebind params (in case indices changed) and refresh values
@@ -5939,6 +5998,8 @@ for (const c of (sec.controls||[])){
       renderLayoutInto(win, layout, listEl);
       return;
     }
+    clearLayoutScale(win);
+    listEl.classList.remove("layoutScaled");
     const q = (win.search||"").trim().toLowerCase();
     const params = Array.isArray(win.params) ? win.params : [];
     const view = q ? params.filter(p=>String(p.name||"").toLowerCase().includes(q) || String(p.index).includes(q)) : params;
@@ -7798,6 +7859,24 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       menu.appendChild(mi);
     };
 
+    const mkSubmenu = (label, contentEl)=>{
+      const wrap = document.createElement("div");
+      wrap.className = "mi hasSubmenu";
+      wrap.innerHTML = `<span>${escapeHtml(label)}</span><span class="submenuCaret">›</span>`;
+      const sub = document.createElement("div");
+      sub.className = "submenu";
+      sub.appendChild(contentEl);
+      wrap.appendChild(sub);
+      wrap.addEventListener("click", (ev)=>{
+        ev.stopPropagation();
+        wrap.classList.toggle("open");
+      });
+      wrap.addEventListener("pointerdown", (ev)=>{
+        if (ev.pointerType === "touch") ev.stopPropagation();
+      });
+      menu.appendChild(wrap);
+    };
+
     const mkPalette = (colors)=>{
       const palette = document.createElement("div");
       palette.className = "trackColorPalette";
@@ -7827,11 +7906,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       wsSend({type:"renameTrack", guid: t.guid, name});
       setTimeout(()=>wsSend({type:"reqState"}), 80);
     });
-    const colorLabel = document.createElement("div");
-    colorLabel.className = "mi label";
-    colorLabel.textContent = "Track color";
-    menu.appendChild(colorLabel);
-    menu.appendChild(mkPalette([
+    mkSubmenu("Track color", mkPalette([
       "#ff0080",
       "#008000",
       "#00ff80",
@@ -7874,6 +7949,11 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       wsSend({type:"moveTrack", guid: t.guid, toIndex: idx-1});
       setTimeout(()=>wsSend({type:"reqState"}), 120);
     });
+    mkItem("Delete track", ()=>{
+      if (!confirm(`Delete track "${t.name || ("Track " + t.idx)}"?`)) return;
+      wsSend({type:"deleteTrack", guid: t.guid});
+      setTimeout(()=>wsSend({type:"reqState"}), 160);
+    }, t.kind === "master");
 
     document.body.appendChild(menu);
     const pad = 8;

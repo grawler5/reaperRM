@@ -304,7 +304,8 @@ wss.on("connection", (ws) => {
       "reqFxList","reqFxParams",
       "setSendVol","setSendMute","setSendMode","setSendSrcChan","setSendDstChan","addSend",
       "setRecvVol","setRecvMute","setRecvSrcChan","setRecvDstChan","addReturn",
-      "renameTrack","setTrackColor","moveTrack","createFolderWithTrack","moveTrackToFolder"
+      "renameTrack","setTrackColor","moveTrack","createFolderWithTrack","moveTrackToFolder",
+      "deleteTrack"
     ]);
     if (needsGuid.has(msg.type)){
       const guid = String(msg.guid||"");
