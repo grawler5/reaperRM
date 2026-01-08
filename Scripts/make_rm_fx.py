@@ -131,13 +131,15 @@ cc_max = max_slider_idx(cc)
 cc_in = cc_max + 1
 cc_sc = cc_max + 2
 cc_out = cc_max + 3
+cc_gr = cc_max + 4
 cc = insert_before_section(cc, textwrap.dedent(f'''
 slider{cc_in}:0<0,1,0.0001>-Z Telemetry: In Peak
 slider{cc_sc}:0<0,1,0.0001>-Z Telemetry: Sidechain Peak
 slider{cc_out}:0<0,1,0.0001>-Z Telemetry: Out Peak
+slider{cc_gr}:0<0,24,0.01>-Z Telemetry: GR (dB)
 '''), '@init')
 # init pk vars
-cc = ensure_init_vars(cc, 'pkIn=0; pkSC=0; pkOut=0;\n')
+cc = ensure_init_vars(cc, 'pkIn=0; pkSC=0; pkOut=0; tele_eps = exp(-46.051701859880914);\n')
 # inject @sample peak capture (begin and end)
 cc = cc.replace('@sample\n', '@sample\n// telemetry peak capture\npkIn = max(pkIn, max(abs(spl0), abs(spl1)));\npkSC = max(pkSC, max(abs(spl2), abs(spl3)));\n')
 # after main output assignment, near end of @sample, add pkOut
@@ -148,10 +150,14 @@ cc = ensure_block_and_append(cc, textwrap.dedent(f'''
   slider{cc_in} = pkIn;
   slider{cc_sc} = pkSC;
   slider{cc_out} = pkOut;
+  gr_db = abs(ratio2db(max(tele_eps, gr_meter2)));
+  gr_db > 24 ? gr_db = 24;
+  slider{cc_gr} = gr_db;
   pkIn = 0; pkSC = 0; pkOut = 0;
   slider_automate(slider{cc_in});
   slider_automate(slider{cc_sc});
   slider_automate(slider{cc_out});
+  slider_automate(slider{cc_gr});
 '''))
 write('RM_Compressor2.jsfx', cc)
 

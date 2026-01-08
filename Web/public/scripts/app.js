@@ -6848,6 +6848,7 @@ applyResponsiveMode();
   let touchDrag = null;
   let touchDropTarget = null;
   let dragDropState = null;
+  let dragDropEl = null;
 
   function setTouchDropTarget(el){
     if (touchDropTarget && touchDropTarget !== el){
@@ -6874,13 +6875,27 @@ applyResponsiveMode();
     const info = getDropTargetInfo(strip);
     if (!strip || !info || (touchDrag && info.guid === touchDrag.guid)){
       setTouchDropTarget(null);
+      clearDropHighlight();
       return;
     }
     setTouchDropTarget(strip);
+    try{
+      const rect = strip.getBoundingClientRect();
+      const after = (x - rect.left) > rect.width / 2;
+      setDropHighlight(strip, after);
+    }catch(_){ }
     if (touchDrag){
       touchDrag.lastX = x;
       touchDrag.lastY = y;
     }
+  }
+
+  function clearDropHighlight(){
+    if (dragDropEl){
+      dragDropEl.classList.remove("dropBefore", "dropAfter");
+      dragDropEl = null;
+    }
+    dragDropState = null;
   }
 
   function startTouchDrag(kind, guid, el, pointerId, x, y){
@@ -6908,8 +6923,9 @@ applyResponsiveMode();
           }
         }catch(_){ }
         if (kind === "spacer"){
+          const spacerTarget = beforeGuid || getNextTrackGuid(info.guid) || info.guid;
           wsSend({type:"setSpacer", guid, enabled:false});
-          wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
+          wsSend({type:"setSpacer", guid: spacerTarget, enabled:true});
           setTimeout(()=>wsSend({type:"reqState"}), 120);
         } else if (info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid, folderGuid: info.folderGuid});
@@ -6923,6 +6939,7 @@ applyResponsiveMode();
     if (touchDropTarget) touchDropTarget.classList.remove("dropTarget");
     if (el) el.classList.remove("dragging");
     document.body.classList.remove("draggingTrack");
+    clearDropHighlight();
     touchDropTarget = null;
     touchDrag = null;
     draggingTrackGuid = null;
@@ -7393,6 +7410,16 @@ applyResponsiveMode();
 
   if (mixerWrap){
     mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
+    mixerWrap.addEventListener("dragover", (ev)=>{
+      if (!draggingTrackGuid && !draggingSpacerGuid) return;
+      if (ev.target.closest(".strip")) return;
+      clearDropHighlight();
+    });
+    mixerWrap.addEventListener("dragleave", (ev)=>{
+      if (!draggingTrackGuid && !draggingSpacerGuid) return;
+      if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest(".strip")) return;
+      clearDropHighlight();
+    });
     mixerWrap.addEventListener("dblclick", (ev)=>{
       if (ev.target.closest(".strip")) return;
       wsSend({type:"addTrack"});
@@ -7572,8 +7599,27 @@ applyResponsiveMode();
     return "";
   }
 
+  function getNextTrackGuid(guid){
+    if (!guid) return "";
+    const items = orderedItems();
+    const idx = items.findIndex(it => it.guid === guid);
+    if (idx < 0) return "";
+    for (let i = idx + 1; i < items.length; i += 1){
+      const next = items[i];
+      if (!next) continue;
+      if (next.kind === "spacer") continue;
+      if (next.kind === "master") continue;
+      return next.guid;
+    }
+    return "";
+  }
+
   function setDropHighlight(el, after){
     if (!el) return;
+    if (dragDropEl && dragDropEl !== el){
+      dragDropEl.classList.remove("dropBefore", "dropAfter");
+    }
+    dragDropEl = el;
     el.classList.toggle("dropAfter", !!after);
     el.classList.toggle("dropBefore", !after);
     dragDropState = {guid: el.dataset.targetGuid || el.dataset.guid || "", after: !!after};
@@ -7597,6 +7643,8 @@ applyResponsiveMode();
     });
     el.addEventListener("dragleave", ()=>{
       el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      if (dragDropEl === el) clearDropHighlight();
     });
     el.addEventListener("dragover", (ev)=>{
       if (!draggingTrackGuid && !draggingSpacerGuid) return;
@@ -7611,8 +7659,9 @@ applyResponsiveMode();
       ev.preventDefault();
       el.classList.remove("dropTarget");
       el.classList.remove("dropAfter", "dropBefore");
+      clearDropHighlight();
       if (draggingSpacerGuid && draggingSpacerGuid !== t.guid){
-        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.guid) || t.guid) : t.guid;
+        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextTrackGuid(t.guid) || t.guid) : t.guid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
         wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
         draggingSpacerGuid = null;
@@ -7635,7 +7684,7 @@ applyResponsiveMode();
       el.classList.remove("dragging");
       el.classList.remove("dropTarget");
       el.classList.remove("dropAfter", "dropBefore");
-      dragDropState = null;
+      clearDropHighlight();
       document.body.classList.remove("draggingTrack");
     });
 
@@ -7664,6 +7713,8 @@ applyResponsiveMode();
     });
     el.addEventListener("dragleave", ()=>{
       el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      if (dragDropEl === el) clearDropHighlight();
     });
     el.addEventListener("dragover", (ev)=>{
       if (!draggingSpacerGuid && !draggingTrackGuid) return;
@@ -7677,8 +7728,9 @@ applyResponsiveMode();
       ev.preventDefault();
       el.classList.remove("dropTarget");
       el.classList.remove("dropAfter", "dropBefore");
+      clearDropHighlight();
       if (draggingSpacerGuid && t.targetGuid && draggingSpacerGuid !== t.targetGuid){
-        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.targetGuid) || t.targetGuid) : t.targetGuid;
+        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextTrackGuid(t.targetGuid) || t.targetGuid) : t.targetGuid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
         wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
         draggingSpacerGuid = null;
@@ -7702,7 +7754,7 @@ applyResponsiveMode();
       el.classList.remove("dragging");
       el.classList.remove("dropTarget");
       el.classList.remove("dropAfter", "dropBefore");
-      dragDropState = null;
+      clearDropHighlight();
       document.body.classList.remove("draggingTrack");
     });
 

@@ -29,8 +29,9 @@ out_pin:R out
 slider14:0<0,1,0.0001>-Z Telemetry: In Peak
 slider15:0<0,1,0.0001>-Z Telemetry: Sidechain Peak
 slider16:0<0,1,0.0001>-Z Telemetry: Out Peak
+slider17:0<0,24,0.01>-Z Telemetry: GR (dB)
 @init
-pkIn=0; pkSC=0; pkOut=0;
+pkIn=0; pkSC=0; pkOut=0; tele_eps = exp(-46.051701859880914);
 ext_noinit = 1; 
 gfx_ext_retina = 1;
 
@@ -691,7 +692,11 @@ ovrlgain = ovrlg;
 slider14 = pkIn;
 slider15 = pkSC;
 slider16 = pkOut;
+gr_db = abs(ratio2db(max(tele_eps, gr_meter2)));
+gr_db > 24 ? gr_db = 24;
+slider17 = gr_db;
 pkIn = 0; pkSC = 0; pkOut = 0;
 slider_automate(slider14);
 slider_automate(slider15);
 slider_automate(slider16);
+slider_automate(slider17);
