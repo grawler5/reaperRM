@@ -4084,6 +4084,7 @@ function buildRMEqProQPanelControl(win, ctrl){
         <div class="rmEqPointSub">—</div>
       </div>
       <div class="rmEqHdrRight">
+        <button class="miniBtn rmEqDelete" data-role="delete">Delete</button>
         <button class="miniBtn rmEqToggle" data-role="toggle">On</button>
         <button class="miniBtn rmEqNav" data-nav="1">›</button>
         <button class="miniBtn rmEqCollapse" data-role="collapse" title="Hide panel">▾</button>
@@ -4153,6 +4154,7 @@ function buildRMEqProQPanelControl(win, ctrl){
   const ttlName = pointPanel.querySelector(".rmEqPointName");
   const ttlSub  = pointPanel.querySelector(".rmEqPointSub");
   const toggleBtn = pointPanel.querySelector('[data-role="toggle"]');
+  const deleteBtn = pointPanel.querySelector('[data-role="delete"]');
   const collapseBtn = pointPanel.querySelector('[data-role="collapse"]');
   const typeBtnsWrap = pointPanel.querySelector('[data-role="typeBtns"]');
   const slopeBtnsWrap = pointPanel.querySelector('[data-role="slopeBtns"]');
@@ -4558,6 +4560,20 @@ function buildRMEqProQPanelControl(win, ctrl){
     draw();
   });
 
+  if (deleteBtn){
+    deleteBtn.addEventListener("click", ()=>{
+      if (!selected.startsWith("B")) return;
+      remap();
+      const pOn = getOnParamFor(selected);
+      if (!pOn) return;
+      bringPluginToFront(win);
+      setParamRaw(pOn, 0, 0, 1);
+      ensureSelectedActive();
+      updatePanel();
+      draw();
+    });
+  }
+
   typeBtnsWrap.querySelectorAll("button").forEach(btn=>{
     btn.addEventListener("click", ()=>{
       remap();
@@ -4924,23 +4940,40 @@ function buildRMEqProQPanelControl(win, ctrl){
     const pSpec = getP(idx.specOn);
     const specOn2 = pSpec ? ((pSpec.value||0) >= 0.5) : false;
     if (specOn2 && idx.specBins && idx.specBins.length){
-      ctx.strokeStyle = "rgba(255,255,255,.35)";
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      const y0 = gainToY(0,h);
-      const dbMin = -90;
       const binCount = idx.specBins.length;
       const fMin = 20;
       const fMax = 20000;
-      idx.specBins.forEach((pi, i)=>{
-        const pp = getP(pi);
-        const v = pp ? clamp01(pp.value||0) : 0;
-        const f = fMin * Math.pow(fMax/fMin, i/Math.max(1,(binCount-1)));
+      const y0 = gainToY(0,h);
+      const dbMin = -90;
+      const bins = new Array(binCount);
+      for (let i=0;i<binCount;i++){
+        const pp = getP(idx.specBins[i]);
+        bins[i] = pp ? clamp01(pp.value||0) : 0;
+      }
+      const smoothed = bins.map((v,i)=>{
+        const v0 = bins[Math.max(0,i-1)];
+        const v1 = bins[Math.min(binCount-1,i+1)];
+        return (v0 + v*2 + v1) / 4;
+      });
+
+      const stepsPerBin = allowAddBands ? 6 : 3;
+      const steps = (binCount - 1) * stepsPerBin;
+      ctx.strokeStyle = "rgba(255,255,255,.35)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let i=0;i<=steps;i++){
+        const t = i / Math.max(1, steps);
+        const raw = t * (binCount - 1);
+        const idx0 = Math.floor(raw);
+        const idx1 = Math.min(binCount - 1, idx0 + 1);
+        const frac = raw - idx0;
+        const v = smoothed[idx0] + (smoothed[idx1] - smoothed[idx0]) * frac;
+        const f = fMin * Math.pow(fMax/fMin, raw / Math.max(1,(binCount - 1)));
         const x = freqToX(f, w);
         const db = dbMin + v * (0 - dbMin);
         const y = y0 + ((-db)/(-dbMin)) * (h - y0);
         if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      });
+      }
       ctx.stroke();
       ctx.globalAlpha = 0.10;
       ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
@@ -5123,11 +5156,7 @@ function buildRMEqProQPanelControl(win, ctrl){
       el.style.top = y+"px";
       el.classList.toggle("sel", selected === def.id);
       el.classList.toggle("off", !isOn);
-      if (allowAddBands && def.kind === "band"){
-        el.classList.toggle("hidden", !isOn && selected !== def.id);
-      } else {
-        el.classList.remove("hidden");
-      }
+      el.classList.remove("hidden");
     });
   }
 
@@ -5173,6 +5202,10 @@ function buildRMEqProQPanelControl(win, ctrl){
 
     // type vs slope block
     if (selected.startsWith("B")){
+      if (deleteBtn){
+        deleteBtn.style.display = allowAddBands ? "" : "none";
+        deleteBtn.disabled = !isOn;
+      }
       typeBtnsWrap.style.display = "";
       slopeBtnsWrap.style.display = "none";
 
@@ -5184,6 +5217,10 @@ function buildRMEqProQPanelControl(win, ctrl){
 
       knobEls.q.querySelector(".rmEqKnobLab").textContent = (t===1 || t===2 || t===3) ? "SLOPE" : "Q";
     }else{
+      if (deleteBtn){
+        deleteBtn.style.display = "none";
+        deleteBtn.disabled = true;
+      }
       typeBtnsWrap.style.display = "none";
       slopeBtnsWrap.style.display = "";
 

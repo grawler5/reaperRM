@@ -2608,9 +2608,6 @@ background: linear-gradient(180deg,
   outline:2px solid rgba(255,255,255,.28);
   outline-offset:2px;
 }
-.rmEqPoint.hidden{
-  display:none;
-}
 .rmEqControls{
   margin-top:10px;
   display:grid;
@@ -2768,6 +2765,11 @@ background: linear-gradient(180deg,
 .rmEqPointName{ font-size:18px; font-weight:900; letter-spacing:.02em; }
 .rmEqPointSub{ font-size:12px; opacity:.7; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .rmEqHdrRight{ display:flex; align-items:center; gap:8px; }
+.rmEqDelete{
+  min-width:64px;
+  height:30px;
+  border-radius:12px;
+}
 
 .rmEqPointBody{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
 .rmEqTypeBlock{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
@@ -2886,6 +2888,7 @@ background: linear-gradient(180deg,
   .rmEqKnobLab{ font-size:9px; }
   .rmEqNav{ width:30px; height:26px; border-radius: 9px; }
   .rmEqToggle{ min-width:48px; height:26px; border-radius: 9px; font-size:12px; }
+  .rmEqDelete{ min-width:52px; height:26px; border-radius: 9px; font-size:12px; }
   .rmEqBottomRow{ padding:8px 10px; border-radius:14px; gap:8px; }
   .rmEqOutVal{ min-width:56px; font-size:12px; }
   .rmEqBottomRight .pill{ height:28px; }
