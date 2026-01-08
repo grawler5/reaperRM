@@ -1049,6 +1049,18 @@ def handle_cmd(cmd, sock):
             except Exception:
                 pass
             return
+        if typ == "setSpacer":
+            guid = cmd.get("guid", "")
+            enabled = bool(cmd.get("enabled", False))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try:
+                    RPR_SetMediaTrackInfo_Value(tr, "I_SPACER", 1.0 if enabled else 0.0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
+            return
         if typ == "deleteTrack":
             guid = cmd.get("guid", "")
             tr = find_track_by_guid(guid)

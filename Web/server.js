@@ -289,7 +289,7 @@ wss.on("connection", (ws) => {
       "setSendVol","setSendMute","setSendMode","setSendSrcChan","setSendDstChan","addSend",
       "setRecvVol","setRecvMute","setRecvSrcChan","setRecvDstChan","addReturn",
       "renameTrack","setTrackColor","moveTrack","createFolderWithTrack","moveTrackToFolder",
-      "deleteTrack"
+      "deleteTrack","setSpacer"
     ]);
     if (needsGuid.has(msg.type)){
       const guid = String(msg.guid||"");

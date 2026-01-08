@@ -148,7 +148,7 @@
           releaseFind:[/\brelease\b/i],
           kneeFind:[/\bknee\b/i],
           ratioFind:[/\bratio\b/i],
-          detectFind:[/detect|detector|side\s*chain\s*source|source/i],
+          detectFind:[/detect|detector|side\s*chain\s*source|side\s*chain|sidechain|source/i],
           lpFind:[/\blp\b|low\s*pass|lowpass/i],
           hpFind:[/\bhp\b|high\s*pass|highpass/i],
           bpmSyncFind:[/bpm\s*sync|tempo\s*sync|sync/i],
@@ -178,7 +178,7 @@
           releaseFind:[/\brelease\b/i],
           kneeFind:[/\bknee\b/i],
           ratioFind:[/\bratio\b/i],
-          detectFind:[/detect|detector|side\s*chain\s*source|source/i],
+          detectFind:[/detect|detector|side\s*chain\s*source|side\s*chain|sidechain|source/i],
           lpFind:[/\blp\b|low\s*pass|lowpass/i],
           hpFind:[/\bhp\b|high\s*pass|highpass/i],
           bpmSyncFind:[/bpm\s*sync|tempo\s*sync|sync/i],
@@ -6926,13 +6926,13 @@ applyResponsiveMode();
           const spacerTarget = beforeGuid || getNextTrackGuid(info.guid) || info.guid;
           wsSend({type:"setSpacer", guid, enabled:false});
           wsSend({type:"setSpacer", guid: spacerTarget, enabled:true});
-          setTimeout(()=>wsSend({type:"reqState"}), 120);
+          setTimeout(()=>wsSend({type:"reqState"}), 40);
         } else if (info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid, folderGuid: info.folderGuid});
-          setTimeout(()=>wsSend({type:"reqState"}), 120);
+          setTimeout(()=>wsSend({type:"reqState"}), 40);
         } else {
           wsSend({type:"moveTrack", guid, beforeGuid});
-          setTimeout(()=>wsSend({type:"reqState"}), 120);
+          setTimeout(()=>wsSend({type:"reqState"}), 40);
         }
       }
     }
@@ -7665,7 +7665,7 @@ applyResponsiveMode();
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
         wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
         draggingSpacerGuid = null;
-        setTimeout(()=>wsSend({type:"reqState"}), 120);
+        setTimeout(()=>wsSend({type:"reqState"}), 40);
         return;
       }
       if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
@@ -7677,7 +7677,7 @@ applyResponsiveMode();
         wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
       }
       draggingTrackGuid = null;
-      setTimeout(()=>wsSend({type:"reqState"}), 120);
+      setTimeout(()=>wsSend({type:"reqState"}), 40);
     });
     el.addEventListener("dragend", ()=>{
       draggingTrackGuid = null;
@@ -7734,7 +7734,7 @@ applyResponsiveMode();
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
         wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
         draggingSpacerGuid = null;
-        setTimeout(()=>wsSend({type:"reqState"}), 120);
+        setTimeout(()=>wsSend({type:"reqState"}), 40);
         return;
       }
       if (draggingTrackGuid && t.targetGuid){
@@ -7746,7 +7746,7 @@ applyResponsiveMode();
           wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
         }
         draggingTrackGuid = null;
-        setTimeout(()=>wsSend({type:"reqState"}), 120);
+        setTimeout(()=>wsSend({type:"reqState"}), 40);
       }
     });
     el.addEventListener("dragend", ()=>{
