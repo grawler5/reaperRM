@@ -4946,6 +4946,9 @@ function buildRMEqProQPanelControl(win, ctrl){
       const fMax = 20000;
       const y0 = gainToY(0,h);
       const dbMin = -90;
+      const dbMax = 12;
+      const tiltRef = 1000;
+      const tiltDbPerOct = 1.5;
       if (!specSmooth || specSmooth.length !== binCount){
         specSmooth = new Array(binCount).fill(0);
       }
@@ -4996,7 +4999,9 @@ function buildRMEqProQPanelControl(win, ctrl){
         const v = catmull(spatial[idx0], spatial[idx1], spatial[idx2], spatial[idx3], frac);
         const f = fMin * Math.pow(fMax/fMin, raw / Math.max(1,(binCount - 1)));
         const x = freqToX(f, w);
-        const db = dbMin + clamp01(v) * (0 - dbMin);
+        const tilt = tiltDbPerOct * Math.log2(Math.max(1, f) / tiltRef);
+        let db = dbMin + clamp01(v) * (0 - dbMin) + tilt;
+        db = clamp(db, dbMin, dbMax);
         const y = y0 + ((-db)/(-dbMin)) * (h - y0);
         if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
