@@ -6926,13 +6926,18 @@ applyResponsiveMode();
           const spacerTarget = beforeGuid || getNextTrackGuid(info.guid) || info.guid;
           wsSend({type:"setSpacer", guid, enabled:false});
           wsSend({type:"setSpacer", guid: spacerTarget, enabled:true});
-          setTimeout(()=>wsSend({type:"reqState"}), 40);
+          moveSpacerWidth(guid, spacerTarget);
+          renderOrUpdate(true);
+          setTimeout(()=>wsSend({type:"reqState"}), 10);
         } else if (info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid, folderGuid: info.folderGuid});
-          setTimeout(()=>wsSend({type:"reqState"}), 40);
+          setTimeout(()=>wsSend({type:"reqState"}), 10);
         } else {
-          wsSend({type:"moveTrack", guid, beforeGuid});
-          setTimeout(()=>wsSend({type:"reqState"}), 40);
+          const targetBefore = dragDropState && dragDropState.after
+            ? (getNextTrackGuidAfter(info.guid, guid) || info.guid)
+            : info.guid;
+          wsSend({type:"moveTrack", guid, beforeGuid: targetBefore});
+          setTimeout(()=>wsSend({type:"reqState"}), 10);
         }
       }
     }
@@ -7614,6 +7619,32 @@ applyResponsiveMode();
     return "";
   }
 
+  function getNextTrackGuidAfter(guid, skipGuid){
+    if (!guid) return "";
+    const items = orderedItems();
+    const idx = items.findIndex(it => it.guid === guid);
+    if (idx < 0) return "";
+    for (let i = idx + 1; i < items.length; i += 1){
+      const next = items[i];
+      if (!next || !next.guid) continue;
+      if (next.guid === skipGuid) continue;
+      if (next.kind === "spacer") continue;
+      if (next.kind === "master") continue;
+      return next.guid;
+    }
+    return "";
+  }
+
+  function moveSpacerWidth(oldGuid, newGuid){
+    if (!oldGuid || !newGuid || oldGuid === newGuid) return;
+    const widths = cfg.spacerWidths || {};
+    if (!Object.prototype.hasOwnProperty.call(widths, oldGuid)) return;
+    widths[newGuid] = widths[oldGuid];
+    delete widths[oldGuid];
+    cfg.spacerWidths = widths;
+    saveCfg();
+  }
+
   function setDropHighlight(el, after){
     if (!el) return;
     if (dragDropEl && dragDropEl !== el){
@@ -7661,11 +7692,15 @@ applyResponsiveMode();
       el.classList.remove("dropAfter", "dropBefore");
       clearDropHighlight();
       if (draggingSpacerGuid && draggingSpacerGuid !== t.guid){
-        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextTrackGuid(t.guid) || t.guid) : t.guid;
+        const beforeGuid = (dragDropState && dragDropState.after)
+          ? (getNextTrackGuidAfter(t.guid, draggingSpacerGuid) || t.guid)
+          : t.guid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
         wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
+        moveSpacerWidth(draggingSpacerGuid, beforeGuid);
+        renderOrUpdate(true);
         draggingSpacerGuid = null;
-        setTimeout(()=>wsSend({type:"reqState"}), 40);
+        setTimeout(()=>wsSend({type:"reqState"}), 10);
         return;
       }
       if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
@@ -7673,11 +7708,13 @@ applyResponsiveMode();
       if (info && info.folderGuid){
         wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
       } else {
-        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.guid) || t.guid) : t.guid;
+        const beforeGuid = (dragDropState && dragDropState.after)
+          ? (getNextTrackGuidAfter(t.guid, draggingTrackGuid) || t.guid)
+          : t.guid;
         wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
       }
       draggingTrackGuid = null;
-      setTimeout(()=>wsSend({type:"reqState"}), 40);
+      setTimeout(()=>wsSend({type:"reqState"}), 10);
     });
     el.addEventListener("dragend", ()=>{
       draggingTrackGuid = null;
@@ -7730,11 +7767,15 @@ applyResponsiveMode();
       el.classList.remove("dropAfter", "dropBefore");
       clearDropHighlight();
       if (draggingSpacerGuid && t.targetGuid && draggingSpacerGuid !== t.targetGuid){
-        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextTrackGuid(t.targetGuid) || t.targetGuid) : t.targetGuid;
+        const beforeGuid = (dragDropState && dragDropState.after)
+          ? (getNextTrackGuidAfter(t.targetGuid, draggingSpacerGuid) || t.targetGuid)
+          : t.targetGuid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
         wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
+        moveSpacerWidth(draggingSpacerGuid, beforeGuid);
+        renderOrUpdate(true);
         draggingSpacerGuid = null;
-        setTimeout(()=>wsSend({type:"reqState"}), 40);
+        setTimeout(()=>wsSend({type:"reqState"}), 10);
         return;
       }
       if (draggingTrackGuid && t.targetGuid){
@@ -7742,11 +7783,13 @@ applyResponsiveMode();
         if (info && info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
         } else {
-          const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.targetGuid) || t.targetGuid) : t.targetGuid;
+          const beforeGuid = (dragDropState && dragDropState.after)
+            ? (getNextTrackGuidAfter(t.targetGuid, draggingTrackGuid) || t.targetGuid)
+            : t.targetGuid;
           wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
         }
         draggingTrackGuid = null;
-        setTimeout(()=>wsSend({type:"reqState"}), 40);
+        setTimeout(()=>wsSend({type:"reqState"}), 10);
       }
     });
     el.addEventListener("dragend", ()=>{

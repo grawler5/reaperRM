@@ -1379,7 +1379,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 	.pluginWin.layout_rm_lexikan2:not(.fullscreen){ width:min(800px, 92vw); height:min(500px, 90vh); }
 	.pluginWin.layout_rm_eq4:not(.fullscreen),
 	.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(700px, 90vh); }
-	.pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(980px, 94vw); height:min(560px, 90vh); }
+.pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
+.pluginWin.layout_rm_comp2:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
 /* Keep RM_Gate window snug to its UI */
 .pluginWin.layout_rm_gate:not(.fullscreen){ width:min(460px, 92vw); height:min(560px, 90vh); }
 .pluginWin.layout_rm_gate:not(.fullscreen) .pluginWinBody{ overflow:hidden; }
@@ -2096,8 +2097,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_gate:not(.fullscreen){ width:min(460px, 92vw); height:min(560px, 90vh); }
 .pluginWin.layout_rm_eq4:not(.fullscreen),
 .pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(700px, 90vh); }
-.pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(980px, 94vw); height:min(560px, 90vh); }
-.pluginWin.layout_rm_comp2:not(.fullscreen){ width:min(980px, 94vw); height:min(560px, 90vh); }
+.pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
+.pluginWin.layout_rm_comp2:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
 
 /* ---- ReaComp (dark, minimal) ---- */
 .reacompPanel{
@@ -2165,8 +2166,11 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
   color: rgba(255,255,255,.92);
   display:grid;
-  grid-template-columns: 200px 1fr 170px;
+  grid-template-columns: minmax(200px, 1fr) minmax(320px, 2fr) minmax(200px, 1fr);
   gap:14px;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
 }
 .rmCompCol{ display:flex; flex-direction:column; gap:12px; }
 .rmCompCard{
@@ -2192,7 +2196,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .rmCompVTrack{
   position:relative;
   width:56px;
-  height:260px;
+  height:240px;
   border-radius:14px;
   background: rgba(0,0,0,.35);
   border:1px solid rgba(255,255,255,.08);
@@ -2234,7 +2238,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .rmCompGrMeter{
   position:relative;
   width:18px;
-  height:240px;
+  height:220px;
   border-radius:10px;
   background: rgba(0,0,0,.35);
   border:1px solid rgba(255,255,255,.08);
@@ -2295,8 +2299,8 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 
 @media (max-width: 720px){
   .rmCompPanel{ grid-template-columns: 1fr; }
-  .rmCompVTrack{ height:220px; }
-  .rmCompGrMeter{ height:200px; }
+  .rmCompVTrack{ height:200px; }
+  .rmCompGrMeter{ height:180px; }
 }
 
 .rcThreshold{
