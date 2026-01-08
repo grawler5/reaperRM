@@ -8344,6 +8344,15 @@ modalBody.appendChild(wrap);
     }
     return opts;
   }
+  function _chanPairValue(label){
+    if (!label) return 0;
+    const txt = String(label).trim();
+    const parts = txt.split(/[-/]/);
+    const start = parseInt(parts[0], 10);
+    if (!Number.isFinite(start)) return 0;
+    const zero = Math.max(0, start - 1);
+    return zero - (zero % 2);
+  }
 
   function renderSendsTab(t){
     const sends = (t.sendDetails || []);
@@ -8405,6 +8414,8 @@ modalBody.appendChild(wrap);
       const card = document.createElement("div");
       card.className = "sendCard";
       const modePre = (sd.mode && sd.mode!==0);
+      const srcVal = _chanPairValue(sd.srcCh);
+      const dstVal = _chanPairValue(sd.dstCh);
       card.innerHTML = `
         <div class="sendTop">
           <div class="sendName">${escapeHtml(sd.destName||("Send "+(sd.index+1)))}</div>
@@ -8415,6 +8426,16 @@ modalBody.appendChild(wrap);
             <button class="${modePre?'on':''}">Pre</button>
           </div>
         </div>
+        <div class="row" style="margin:6px 0 2px 0;">
+          <label class="small" style="width:40px;">Ch</label>
+          <select class="sendChan src" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
+          <div class="small">→</div>
+          <select class="sendChan dst" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
+        </div>
         <div class="sendFader">
           <label class="small" style="width:40px">Lvl</label>
           <input type="range" min="0" max="1" step="0.001" value="${normFromDb((sd.vol&&sd.vol>0)?(20*Math.log10(sd.vol)):-60)}">
@@ -8423,8 +8444,12 @@ modalBody.appendChild(wrap);
       `;
       const [bMute, bPost, bPre] = card.querySelectorAll(".sendTop button");
       const segBtns = card.querySelectorAll(".seg button");
+      const srcSelRow = card.querySelector("select.sendChan.src");
+      const dstSelRow = card.querySelector("select.sendChan.dst");
       const sl = card.querySelector("input[type=range]");
       const valEl = card.querySelectorAll(".sendFader .small")[1];
+      if (srcSelRow) srcSelRow.value = String(srcVal);
+      if (dstSelRow) dstSelRow.value = String(dstVal);
 
       bMute.addEventListener("click", ()=>{
         const v=!sd.mute; sd.mute=v; bMute.classList.toggle("on", v);
@@ -8447,6 +8472,20 @@ modalBody.appendChild(wrap);
         sd.vol=vol;
         if (valEl) valEl.textContent = `${dbFromVol(vol)} dB`;
         wsSend({type:"setSendVol", guid:t.guid, index: sd.index, vol});
+      });
+      srcSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(srcSelRow.value, 10);
+        sd.srcCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(sd.srcCh)} → ${_chanLabel(sd.dstCh)}`;
+        wsSend({type:"setSendSrcChan", guid:t.guid, index: sd.index, chan: val});
+      });
+      dstSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(dstSelRow.value, 10);
+        sd.dstCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(sd.srcCh)} → ${_chanLabel(sd.dstCh)}`;
+        wsSend({type:"setSendDstChan", guid:t.guid, index: sd.index, chan: val});
       });
       list.appendChild(card);
     });
@@ -8517,11 +8556,23 @@ modalBody.appendChild(wrap);
     rows.forEach(rd=>{
       const card = document.createElement("div");
       card.className = "sendCard";
+      const srcVal = _chanPairValue(rd.srcCh);
+      const dstVal = _chanPairValue(rd.dstCh);
       card.innerHTML = `
         <div class="sendTop">
           <div class="sendName">${escapeHtml(rd.srcName||("Return "+(rd.index+1)))}</div>
           <div class="sendMeta">${_chanLabel(rd.srcCh)} → ${_chanLabel(rd.dstCh)}</div>
           <button class="miniBtn ${rd.mute?'on':''}">Mute</button>
+        </div>
+        <div class="row" style="margin:6px 0 2px 0;">
+          <label class="small" style="width:40px;">Ch</label>
+          <select class="sendChan src" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
+          <div class="small">→</div>
+          <select class="sendChan dst" style="width:82px;height:30px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 8px;">
+            ${chanOpts}
+          </select>
         </div>
         <div class="sendFader">
           <label class="small" style="width:40px">Lvl</label>
@@ -8530,8 +8581,12 @@ modalBody.appendChild(wrap);
         </div>
       `;
       const bMute = card.querySelector(".sendTop button");
+      const srcSelRow = card.querySelector("select.sendChan.src");
+      const dstSelRow = card.querySelector("select.sendChan.dst");
       const sl = card.querySelector("input[type=range]");
       const valEl = card.querySelectorAll(".sendFader .small")[1];
+      if (srcSelRow) srcSelRow.value = String(srcVal);
+      if (dstSelRow) dstSelRow.value = String(dstVal);
       bMute.addEventListener("click", ()=>{
         const v=!rd.mute; rd.mute=v; bMute.classList.toggle("on", v);
         wsSend({type:"setRecvMute", guid:t.guid, index: rd.index, mute:v});
@@ -8543,6 +8598,20 @@ modalBody.appendChild(wrap);
         rd.vol=vol;
         if (valEl) valEl.textContent = `${dbFromVol(vol)} dB`;
         wsSend({type:"setRecvVol", guid:t.guid, index: rd.index, vol});
+      });
+      srcSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(srcSelRow.value, 10);
+        rd.srcCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(rd.srcCh)} → ${_chanLabel(rd.dstCh)}`;
+        wsSend({type:"setRecvSrcChan", guid:t.guid, index: rd.index, chan: val});
+      });
+      dstSelRow?.addEventListener("change", ()=>{
+        const val = parseInt(dstSelRow.value, 10);
+        rd.dstCh = _chanPairLabel(val);
+        const meta = card.querySelector(".sendMeta");
+        if (meta) meta.textContent = `${_chanLabel(rd.srcCh)} → ${_chanLabel(rd.dstCh)}`;
+        wsSend({type:"setRecvDstChan", guid:t.guid, index: rd.index, chan: val});
       });
       list.appendChild(card);
     });

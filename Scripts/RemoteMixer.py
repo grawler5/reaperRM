@@ -727,10 +727,16 @@ def get_regions_and_markers():
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers3" in globals():
             r = None
-            try:
-                r = RPR_EnumProjectMarkers3(0, i, 0, 0, 0, "", 512)
-            except Exception:
-                r = None
+            for args in (
+                (0, i, 0, 0, 0, "", 0, 0),
+                (0, i, 0, 0, 0, "", 0),
+            ):
+                try:
+                    r = RPR_EnumProjectMarkers3(*args)
+                except Exception:
+                    r = None
+                if isinstance(r, tuple):
+                    break
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -747,10 +753,16 @@ def get_regions_and_markers():
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers2" in globals():
             r = None
-            try:
-                r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512)
-            except Exception:
-                r = None
+            for args in (
+                (0, i, 0, 0, 0, "", 0),
+                (0, i, 0, 0, 0, ""),
+            ):
+                try:
+                    r = RPR_EnumProjectMarkers2(*args)
+                except Exception:
+                    r = None
+                if isinstance(r, tuple):
+                    break
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -1271,6 +1283,24 @@ def handle_cmd(cmd, sock):
                 try: RPR_SetTrackSendInfo_Value(tr, 0, idx, "I_SENDMODE", mode)
                 except Exception: pass
             return
+        if typ == "setSendSrcChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, 0, idx, "I_SRCCHAN", chan)
+                except Exception: pass
+            return
+        if typ == "setSendDstChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, 0, idx, "I_DSTCHAN", chan)
+                except Exception: pass
+            return
         if typ == "addSend":
             guid = cmd.get("guid","")
             dest_guid = cmd.get("destGuid","")
@@ -1307,6 +1337,24 @@ def handle_cmd(cmd, sock):
             tr = find_track_by_guid(guid)
             if tr:
                 try: RPR_SetTrackSendInfo_Value(tr, -1, idx, "B_MUTE", 1.0 if mute else 0.0)
+                except Exception: pass
+            return
+        if typ == "setRecvSrcChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, -1, idx, "I_SRCCHAN", chan)
+                except Exception: pass
+            return
+        if typ == "setRecvDstChan":
+            guid = cmd.get("guid","")
+            idx = int(cmd.get("index", 0))
+            chan = int(cmd.get("chan", 0))
+            tr = find_track_by_guid(guid)
+            if tr:
+                try: RPR_SetTrackSendInfo_Value(tr, -1, idx, "I_DSTCHAN", chan)
                 except Exception: pass
             return
         if typ == "addReturn":
