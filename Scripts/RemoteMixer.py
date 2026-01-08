@@ -213,14 +213,14 @@ def _is_visual_spacer(track):
     try:
         layout = _track_layout(track, "P_MCP_LAYOUT")
         layout_l = _as_str(layout).strip().lower()
-        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
+        if layout_l in ("spacer", "separator", "divider", "space", "blank", "visual spacer", "visual_spacer"):
             return True
     except Exception:
         pass
     try:
         layout = _track_layout(track, "P_TCP_LAYOUT")
         layout_l = _as_str(layout).strip().lower()
-        if "spacer" in layout_l or "separator" in layout_l or "divider" in layout_l:
+        if layout_l in ("spacer", "separator", "divider", "space", "blank", "visual spacer", "visual_spacer"):
             return True
     except Exception:
         pass
@@ -781,31 +781,12 @@ def get_regions_and_markers():
                 pass
         return ""
 
-    def _is_numeric_name(s):
-        try:
-            t = _as_str(s).strip()
-            if not t:
-                return False
-            # Reject numeric-only strings like "12.34"
-            float(t)
-            return True
-        except Exception:
-            return False
-
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers3" in globals():
-            r = None
-            for args in (
-                (0, i, 0, 0, 0, "", 512, 0, 0),
-                (0, i, 0, 0, 0, "", 512, 0),
-                (0, i, 0, 0, 0, "", 512),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers3(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
+            try:
+                r = RPR_EnumProjectMarkers3(0, i, 0, 0, 0, "", 512, 0, 0)
+            except Exception:
+                r = None
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -817,24 +798,14 @@ def get_regions_and_markers():
                     name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
-                if _is_numeric_name(name):
-                    name = ""
                 if not name:
                     name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers2" in globals():
-            r = None
-            for args in (
-                (0, i, 0, 0, 0, "", 512, 0),
-                (0, i, 0, 0, 0, "", 512),
-                (0, i, 0, 0, 0, "", 0),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers2(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
+            try:
+                r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512)
+            except Exception:
+                r = None
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -846,23 +817,14 @@ def get_regions_and_markers():
                     name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
-                if _is_numeric_name(name):
-                    name = ""
                 if not name:
                     name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
         if "RPR_EnumProjectMarkers" in globals():
-            r = None
-            for args in (
-                (i, 0, 0, 0, "", 512),
-                (i, 0, 0, 0, "", 0),
-            ):
-                try:
-                    r = RPR_EnumProjectMarkers(*args)
-                except Exception:
-                    r = None
-                if isinstance(r, tuple):
-                    break
+            try:
+                r = RPR_EnumProjectMarkers(i, 0, 0, 0, "", 512)
+            except Exception:
+                r = None
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
@@ -874,8 +836,6 @@ def get_regions_and_markers():
                     name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
-                if _is_numeric_name(name):
-                    name = ""
                 if not name:
                     name = _fetch_marker_name(idx, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
@@ -1339,6 +1299,10 @@ def handle_cmd(cmd, sock):
                 tr = RPR_GetTrack(0, idx)
                 if isinstance(tr, tuple): tr = tr[0]
                 if tr:
+                    try:
+                        RPR_GetSetMediaTrackInfo_String(tr, "P_NAME", "", True)
+                    except Exception:
+                        pass
                     try:
                         RPR_GetSetMediaTrackInfo_String(tr, "P_MCP_LAYOUT", "Spacer", True)
                         RPR_GetSetMediaTrackInfo_String(tr, "P_TCP_LAYOUT", "Spacer", True)

@@ -201,6 +201,7 @@
     box-shadow:0 10px 20px rgba(0,0,0,.35);
     position:relative;
     overflow:visible;
+    transition: transform 0.18s ease;
   }
   .strip.spacer{
     width:48px;
@@ -1343,17 +1344,22 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 
 /* Size presets for specific plugin layouts (desktop) */
 .pluginWin.layout_reacomp:not(.fullscreen){ width:min(960px, 92vw); height:min(640px, 90vh); }
-.pluginWin.layout_la1a:not(.fullscreen){ width:min(860px, 92vw); height:min(520px, 85vh); }
-.pluginWin.layout_rm_la1a:not(.fullscreen){ width:min(860px, 92vw); height:min(520px, 85vh); }
-	.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(620px, 96vw); height:min(480px, 92vh); }
-	.pluginWin.layout_rm_kicker50hz:not(.fullscreen){ width:min(680px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_kicker50:not(.fullscreen){ width:min(680px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_deesser:not(.fullscreen){ width:min(720px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_delaymachine:not(.fullscreen){ width:min(760px, 92vw); height:min(560px, 90vh); }
-	.pluginWin.layout_rm_eqt1a:not(.fullscreen){ width:min(700px, 92vw); height:min(520px, 90vh); }
-	.pluginWin.layout_rm_lexikan2:not(.fullscreen){ width:min(760px, 92vw); height:min(560px, 90vh); }
+.pluginWin.layout_ns1:not(.fullscreen),
+.pluginWin.layout_rm_ns:not(.fullscreen){ width:min(360px, 92vw); height:min(440px, 90vh); }
+.pluginWin.layout_la1a:not(.fullscreen){ width:min(840px, 92vw); height:min(320px, 85vh); }
+.pluginWin.layout_rm_la1a:not(.fullscreen){ width:min(840px, 92vw); height:min(320px, 85vh); }
+	.pluginWin.layout_rm_1175:not(.fullscreen){ width:min(940px, 94vw); height:min(300px, 80vh); }
+	.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(600px, 92vw); height:min(440px, 86vh); }
+	.pluginWin.layout_rm_kicker50hz:not(.fullscreen){ width:min(720px, 92vw); height:min(440px, 86vh); }
+	.pluginWin.layout_rm_kicker50:not(.fullscreen){ width:min(720px, 92vw); height:min(440px, 86vh); }
+	.pluginWin.layout_rm_deesser:not(.fullscreen){ width:min(680px, 92vw); height:min(420px, 86vh); }
+	.pluginWin.layout_rm_delaymachine:not(.fullscreen){ width:min(800px, 92vw); height:min(500px, 90vh); }
+	.pluginWin.layout_rm_eqt1a:not(.fullscreen){ width:min(800px, 92vw); height:min(500px, 90vh); }
+	.pluginWin.layout_rm_lexikan2:not(.fullscreen){ width:min(800px, 92vw); height:min(500px, 90vh); }
+	.pluginWin.layout_rm_eq4:not(.fullscreen),
+	.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(620px, 90vh); }
 /* Keep RM_Gate window snug to its UI */
-.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(520px, 92vw); height:min(520px, 88vh); }
+.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(460px, 92vw); height:min(560px, 90vh); }
 .pluginWin.layout_rm_gate:not(.fullscreen) .pluginWinBody{ overflow:hidden; }
 .pluginWin.layout_rm_gate .plugSection{ margin-bottom:0; }
 
@@ -2058,15 +2064,16 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 }
 
 /* Size presets for image-based Tukan panels (desktop) */
-.pluginWin.layout_nc76:not(.fullscreen){ width:min(980px, 92vw); height:min(520px, 85vh); }
+.pluginWin.layout_nc76:not(.fullscreen){ width:min(940px, 94vw); height:min(300px, 80vh); }
 .pluginWin.layout_preamp:not(.fullscreen),
-.pluginWin.layout_rm_preamp:not(.fullscreen){ width:min(520px, 92vw); height:min(720px, 90vh); }
-.pluginWin.layout_rm_1175:not(.fullscreen){ width:min(980px, 92vw); height:min(520px, 85vh); }
+.pluginWin.layout_rm_preamp:not(.fullscreen){ width:min(420px, 92vw); height:min(500px, 85vh); }
+.pluginWin.layout_rm_1175:not(.fullscreen){ width:min(940px, 94vw); height:min(300px, 80vh); }
 /* Size presets for RM layouts */
-.pluginWin.layout_ns1:not(.fullscreen){ width:min(520px, 92vw); height:min(520px, 85vh); }
-.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(520px, 92vw); height:min(760px, 90vh); }
+.pluginWin.layout_ns1:not(.fullscreen),
+.pluginWin.layout_rm_ns:not(.fullscreen){ width:min(360px, 92vw); height:min(440px, 90vh); }
+.pluginWin.layout_rm_gate:not(.fullscreen){ width:min(460px, 92vw); height:min(560px, 90vh); }
 .pluginWin.layout_rm_eq4:not(.fullscreen),
-.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(980px, 92vw); height:min(760px, 90vh); }
+.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(620px, 90vh); }
 
 /* ---- ReaComp (dark, minimal) ---- */
 .reacompPanel{
@@ -2657,7 +2664,7 @@ background: linear-gradient(180deg,
 }
 
 /* Default window sizing so the full L2 UI is visible (still scales down if needed) */
-.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(620px, 96vw); height:min(480px, 92vh); }
+.pluginWin.layout_rm_limiter2:not(.fullscreen){ width:min(600px, 92vw); height:min(440px, 86vh); }
 .pluginWin.layout_rm_limiter2 .plugLayoutHdr{ display:none; }
 .pluginWin.layout_rm_limiter2 .pluginWinBody{ overflow:hidden; }
 

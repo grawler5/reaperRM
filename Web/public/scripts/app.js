@@ -5746,6 +5746,8 @@ function buildReaCompPanelControl(win, ctrl){
     return {el: card, update, ctrl};
   }
 
+  const LAYOUT_SCALE_IDS = new Set(["ns1", "rm_ns", "rm_gate"]);
+
   function clearLayoutScale(win){
     if (!win || !win._layoutUI) return;
     const ui = win._layoutUI;
@@ -5776,7 +5778,7 @@ function buildReaCompPanelControl(win, ctrl){
       const availW = Math.max(10, scope.clientWidth - pad);
       const availH = Math.max(10, scope.clientHeight - pad);
       let sc = Math.min(availW / ui.baseW, availH / ui.baseH);
-      const maxScale = (scope.closest(".pluginWin") && scope.closest(".pluginWin").classList.contains("fullscreen")) ? 2.0 : 1.6;
+      const maxScale = (scope.closest(".pluginWin") && scope.closest(".pluginWin").classList.contains("fullscreen")) ? 1.6 : 1.2;
       sc = Math.max(0.5, Math.min(maxScale, sc));
       stage.style.transform = `scale(${sc})`;
       stage.style.width = ui.baseW + "px";
@@ -5794,6 +5796,7 @@ function buildReaCompPanelControl(win, ctrl){
   }
 
   function renderLayoutInto(win, layout, container){
+    const useScale = !!(layout && layout.id && LAYOUT_SCALE_IDS.has(layout.id));
     // If we built the UI before params arrived, rebuild once we have params
     // so pattern-based mapping works and we don't get a permanent "Couldn't match..." banner.
     if (win._layoutUI && win._layoutUI.layoutId === layout.id && win._layoutUI.builtWithEmptyParams){
@@ -5816,14 +5819,21 @@ function buildReaCompPanelControl(win, ctrl){
         baseH: null,
         scaleObserver: null,
         scaleFit: null,
+        useScale,
       };
       container.innerHTML = "";
 let foundAny = false;
-      const stage = document.createElement("div");
-      stage.className = "plugLayoutStage";
-      win._layoutUI.stage = stage;
-      container.classList.add("layoutScaled");
-      container.appendChild(stage);
+      let target = container;
+      if (useScale){
+        const stage = document.createElement("div");
+        stage.className = "plugLayoutStage";
+        win._layoutUI.stage = stage;
+        container.classList.add("layoutScaled");
+        container.appendChild(stage);
+        target = stage;
+      } else {
+        container.classList.remove("layoutScaled");
+      }
       // If the layout contains a custom panel, we don't require param-name matching.
       // (Those panels can use known indices or do their own mapping.)
       const layoutHasCustomPanel = (layout.sections||[]).some(sec =>
@@ -5883,7 +5893,7 @@ for (const c of (sec.controls||[])){
           grid.appendChild(ui.el);
         }
         secEl.appendChild(grid);
-        stage.appendChild(secEl);
+        target.appendChild(secEl);
       }
 
       const haveParams = Array.isArray(win.params) && win.params.length > 0;
@@ -5891,9 +5901,9 @@ for (const c of (sec.controls||[])){
         const note = document.createElement("div");
         note.className = "plugNote";
         note.innerHTML = `Couldn't match known parameters for this plugin build.<br><br>Use <b>Inspector</b> to view raw params and we can map them.`;
-        stage.appendChild(note);
+        target.appendChild(note);
       }
-      setupLayoutScale(win, container);
+      if (useScale) setupLayoutScale(win, container);
     }
 
     // update: rebind params (in case indices changed) and refresh values
@@ -7095,7 +7105,8 @@ applyResponsiveMode();
       const items = orderedItems();
       const wantOrder = items.map(x=>x.guid).join("|");
       const haveOrder = mixer.getAttribute("data-order") || "";
-      const mustRebuild = forceRebuild || haveOrder !== wantOrder || stripEls.size === 0;
+      const orderChanged = haveOrder !== wantOrder;
+      const mustRebuild = forceRebuild || stripEls.size === 0;
 
       // SOLO dim logic
       const anySolo = (lastState.tracks||[]).some(t=>t.solo);
@@ -7108,6 +7119,45 @@ applyResponsiveMode();
           const el = createStrip(it);
           mixer.appendChild(el);
           stripEls.set(it.guid, el);
+        }
+      } else if (orderChanged){
+        const firstRects = new Map();
+        for (const [guid, el] of stripEls){
+          if (!el || !el.getBoundingClientRect) continue;
+          firstRects.set(guid, el.getBoundingClientRect());
+        }
+        const wanted = new Set(items.map(it=>it.guid));
+        for (const [guid, el] of stripEls){
+          if (wanted.has(guid)) continue;
+          try{ el.remove(); }catch(_){ }
+          stripEls.delete(guid);
+        }
+        for (const it of items){
+          let el = stripEls.get(it.guid);
+          if (!el){
+            el = createStrip(it);
+            stripEls.set(it.guid, el);
+          }
+          mixer.appendChild(el);
+        }
+        mixer.setAttribute("data-order", wantOrder);
+        for (const it of items){
+          const el = stripEls.get(it.guid);
+          if (!el) continue;
+          updateStrip(el, it);
+          const first = firstRects.get(it.guid);
+          if (!first) continue;
+          const last = el.getBoundingClientRect();
+          const dx = first.left - last.left;
+          const dy = first.top - last.top;
+          if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5){
+            el.style.transition = "none";
+            el.style.transform = `translate(${dx}px, ${dy}px)`;
+            requestAnimationFrame(()=>{
+              el.style.transition = "transform 180ms ease";
+              el.style.transform = "";
+            });
+          }
         }
       } else {
         for (const it of items){
