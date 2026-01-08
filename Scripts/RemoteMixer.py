@@ -172,6 +172,33 @@ def _pick_num(ret, default=0.0):
     except Exception:
         return default
 
+def _track_index(track):
+    try:
+        idx = RPR_GetMediaTrackInfo_Value(track, "IP_TRACKNUMBER")
+        if isinstance(idx, tuple): idx = idx[0]
+        return max(0, int(idx) - 1)
+    except Exception:
+        return 0
+
+def _color_from_hex(s):
+    try:
+        t = _as_str(s).strip().lstrip("#")
+        if len(t) == 3:
+            t = "".join([c*2 for c in t])
+        if len(t) != 6:
+            return None
+        r = int(t[0:2], 16)
+        g = int(t[2:4], 16)
+        b = int(t[4:6], 16)
+        if "RPR_ColorToNative" in globals():
+            col = RPR_ColorToNative(r, g, b)
+            if isinstance(col, tuple): col = col[0]
+        else:
+            col = (r | (g<<8) | (b<<16))
+        return int(col) | 0x1000000
+    except Exception:
+        return None
+
 
 def _safe_json(obj):
     try:
@@ -724,6 +751,17 @@ def get_regions_and_markers():
                 pass
         return ""
 
+    def _is_numeric_name(s):
+        try:
+            t = _as_str(s).strip()
+            if not t:
+                return False
+            # Reject numeric-only strings like "12.34"
+            float(t)
+            return True
+        except Exception:
+            return False
+
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers3" in globals():
             r = None
@@ -748,6 +786,8 @@ def get_regions_and_markers():
                     name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
+                if _is_numeric_name(name):
+                    name = ""
                 if not name:
                     name = _fetch_marker_name(i, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
@@ -774,6 +814,8 @@ def get_regions_and_markers():
                     name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
+                if _is_numeric_name(name):
+                    name = ""
                 if not name:
                     name = _fetch_marker_name(i, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
@@ -800,6 +842,8 @@ def get_regions_and_markers():
                     name = _pick_human_string(r, "")
                 if not isrgn and end > start and end > 0:
                     isrgn = 1
+                if _is_numeric_name(name):
+                    name = ""
                 if not name:
                     name = _fetch_marker_name(i, bool(isrgn))
                 return ret, isrgn, start, end, name, idx
@@ -1243,6 +1287,94 @@ def handle_cmd(cmd, sock):
             tr = find_track_by_guid(guid)
             if tr:
                 RPR_SetMediaTrackInfo_Value(tr, "I_RECARM", 1.0 if rec else 0.0)
+            return
+        if typ == "addTrack":
+            try:
+                cnt = RPR_CountTracks(0)
+                if isinstance(cnt, tuple): cnt = cnt[0]
+                RPR_InsertTrackAtIndex(int(cnt), True)
+                RPR_TrackList_AdjustWindows(False)
+                RPR_UpdateArrange()
+            except Exception:
+                pass
+            return
+        if typ == "moveTrack":
+            guid = cmd.get("guid","")
+            before_guid = cmd.get("beforeGuid", None)
+            to_index = cmd.get("toIndex", None)
+            tr = find_track_by_guid(guid)
+            if tr:
+                src_idx = _track_index(tr)
+                dest_idx = None
+                if before_guid:
+                    tr_before = find_track_by_guid(before_guid)
+                    if tr_before:
+                        dest_idx = _track_index(tr_before)
+                if dest_idx is None and to_index is not None:
+                    try: dest_idx = int(to_index)
+                    except Exception: dest_idx = None
+                if dest_idx is None:
+                    return
+                if dest_idx > src_idx:
+                    dest_idx -= 1
+                try:
+                    RPR_SetOnlyTrackSelected(tr)
+                    RPR_ReorderSelectedTracks(dest_idx, 0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
+            return
+        if typ == "setTrackColor":
+            guid = cmd.get("guid","")
+            color = _color_from_hex(cmd.get("color",""))
+            tr = find_track_by_guid(guid)
+            if tr and color is not None:
+                try:
+                    RPR_SetTrackColor(tr, color)
+                except Exception:
+                    pass
+            return
+        if typ == "createFolderWithTrack":
+            guid = cmd.get("guid","")
+            tr = find_track_by_guid(guid)
+            if tr:
+                idx = _track_index(tr)
+                try:
+                    RPR_InsertTrackAtIndex(idx, True)
+                    folder_tr = RPR_GetTrack(0, idx)
+                    if isinstance(folder_tr, tuple): folder_tr = folder_tr[0]
+                    if folder_tr:
+                        RPR_GetSetMediaTrackInfo_String(folder_tr, "P_NAME", "Folder", True)
+                        RPR_SetMediaTrackInfo_Value(folder_tr, "I_FOLDERDEPTH", 1.0)
+                    tr = find_track_by_guid(guid)
+                    if tr:
+                        depth = RPR_GetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH")
+                        if isinstance(depth, tuple): depth = depth[0]
+                        if int(depth) == 0:
+                            RPR_SetMediaTrackInfo_Value(tr, "I_FOLDERDEPTH", -1.0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
+            return
+        if typ == "moveTrackToFolder":
+            guid = cmd.get("guid","")
+            folder_guid = cmd.get("folderGuid","")
+            tr = find_track_by_guid(guid)
+            folder_tr = find_track_by_guid(folder_guid)
+            if tr and folder_tr:
+                dest_idx = _track_index(folder_tr) + 1
+                src_idx = _track_index(tr)
+                if dest_idx > src_idx:
+                    dest_idx -= 1
+                try:
+                    RPR_SetOnlyTrackSelected(tr)
+                    RPR_ReorderSelectedTracks(dest_idx, 0)
+                    RPR_TrackList_AdjustWindows(False)
+                    RPR_UpdateArrange()
+                except Exception:
+                    pass
             return
         if typ == "renameTrack":
             guid = cmd.get("guid","")

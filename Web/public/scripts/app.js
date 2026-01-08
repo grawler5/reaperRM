@@ -6168,6 +6168,7 @@ applyResponsiveMode();
     scene: "default",
     folderView: {},               // guid -> "expanded"|"compact"|"hidden"
     hiddenTracks: {},             // guid -> true (UI only)
+    compactTracks: {},            // guid -> true
   };
 
   function loadCfg(){
@@ -6195,9 +6196,53 @@ applyResponsiveMode();
   }
   applyTheme();
 
-  // Multiuser
-  let projectInfo = null;   // {projectId, projectName, users, admin, ui}
-  let currentUser = null;
+  // Scenes
+  let projectInfo = null;   // {projectId, projectName, ui}
+  let sceneState = { projectId: null, scenes: [], current: "main" };
+
+  const defaultScenes = ()=>[
+    {name:"main", all:true, guids:[]},
+    {name:"mon1", all:false, guids:[]},
+    {name:"mon2", all:false, guids:[]}
+  ];
+  const sceneKey = (pid)=> `rm_scenes_${pid||"default"}`;
+  const sceneCurrentKey = (pid)=> `rm_scene_current_${pid||"default"}`;
+
+  function loadScenes(pid){
+    try{
+      const raw = localStorage.getItem(sceneKey(pid));
+      const obj = raw ? JSON.parse(raw) : null;
+      if (obj && Array.isArray(obj.scenes)){
+        return { projectId: pid, scenes: obj.scenes, current: obj.current || "main" };
+      }
+    }catch{}
+    return { projectId: pid, scenes: defaultScenes(), current: "main" };
+  }
+  function saveScenes(){
+    try{
+      localStorage.setItem(sceneKey(sceneState.projectId), JSON.stringify({scenes: sceneState.scenes, current: sceneState.current}));
+      localStorage.setItem(sceneCurrentKey(sceneState.projectId), sceneState.current);
+    }catch{}
+  }
+  function ensureScenes(pid){
+    const next = loadScenes(pid);
+    if (!next.scenes.find(s=>s.name==="main")){
+      next.scenes = defaultScenes();
+      next.current = "main";
+    }
+    sceneState = next;
+    return sceneState;
+  }
+  function setCurrentScene(name){
+    const found = sceneState.scenes.find(s=>s.name===name);
+    sceneState.current = found ? name : "main";
+    saveScenes();
+    updateSceneSelect();
+    renderOrUpdate(true);
+  }
+  function getCurrentScene(){
+    return sceneState.scenes.find(s=>s.name===sceneState.current) || sceneState.scenes.find(s=>s.name==="main") || {name:"main", all:true, guids:[]};
+  }
 
 
   // ---------- WS ----------
@@ -6388,6 +6433,7 @@ applyResponsiveMode();
   let sliderTargets = new Map(); // guid -> targetY (0..1)
   let sliderCurrent = new Map(); // guid -> currentY (0..1)
   let draggingGuid = null;
+  let draggingTrackGuid = null;
 
   // FX slots cache
   let fxCache = new Map(); // guid -> {fx:[], ts}
@@ -6401,66 +6447,33 @@ applyResponsiveMode();
     try{ ws.send(JSON.stringify(obj)); } catch {}
   }
 
-  
-  // ----- User picker -----
-  // Use lazy DOM lookups to avoid init-order issues
-function showUserPicker(){
-    if (!projectInfo) return;
+  const sceneSelect = document.getElementById("sceneSelect");
+  const sceneManageBtn = document.getElementById("sceneManageBtn");
 
-    const userOverlay = document.getElementById("overlay");
-    const userModal   = document.getElementById("modal");
-    const userGrid    = document.getElementById("modalBody");
-    const modalTitle  = document.getElementById("modalTitle");
-    const tabsEl      = document.getElementById("tabs");
-
-    if (!userOverlay || !userModal || !userGrid || !modalTitle || !tabsEl) return;
-
-    // close any open modal state
-    openModal = null;
-
-    modalTitle.textContent = "Select user";
-    tabsEl.innerHTML = "";
-    userGrid.innerHTML = "";
-
-    const grid = document.createElement("div");
-    grid.style.display = "grid";
-    grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(120px, 1fr))";
-    grid.style.gap = "10px";
-
-    for (const u of (projectInfo.users||[])){
-      const b = document.createElement("button");
-      b.className = "userBtn";
-      b.textContent = u;
-      b.onclick = ()=> selectUser(u);
-      grid.appendChild(b);
+  function updateSceneSelect(){
+    if (!sceneSelect) return;
+    sceneSelect.innerHTML = "";
+    for (const sc of sceneState.scenes){
+      const opt = document.createElement("option");
+      opt.value = sc.name;
+      opt.textContent = sc.name;
+      if (sc.name === sceneState.current) opt.selected = true;
+      sceneSelect.appendChild(opt);
     }
-    userGrid.appendChild(grid);
+  }
 
-    userOverlay.style.display = "block";
-    userModal.style.display = "block";
-  }
-function hideUserPicker(){
-    const userOverlay = document.getElementById("overlay");
-    const userModal   = document.getElementById("modal");
-    const userGrid    = document.getElementById("modalBody");
-    const tabsEl      = document.getElementById("tabs");
-    if (userOverlay) userOverlay.style.display = "none";
-    if (userModal) userModal.style.display = "none";
-    try{
-      if (userGrid) userGrid.innerHTML = "";
-      if (tabsEl) tabsEl.innerHTML = "";
-    }catch(e){}
-  }
-  function selectUser(u){
+  function openSceneManager(){
     if (!projectInfo) return;
-    currentUser = u;
-    try{ localStorage.setItem("rm_user_"+projectInfo.projectId, u); }catch{}
-    hideUserPicker();
-    wsSend({type:"setUser", user:u});
-    // Ask fresh state after switching
-    wsSend({type:"reqState"});
-    renderOrUpdate();
+    openModal = {kind:"scenes"};
+    overlay.style.display = "block";
+    modal.style.display = "block";
+    renderModal();
   }
+
+  if (sceneSelect){
+    sceneSelect.addEventListener("change", ()=> setCurrentScene(sceneSelect.value));
+  }
+  sceneManageBtn?.addEventListener("click", openSceneManager);
 
 
   function connectWS(){
@@ -6487,33 +6500,12 @@ function hideUserPicker(){
           if (typeof projectInfo.ui.footerIntensity === "number") cfg.footerIntensity = projectInfo.ui.footerIntensity;
           saveCfg();
         }
-        // Auto user
-        try{
-          const saved = localStorage.getItem("rm_user_"+projectInfo.projectId);
-          if (saved && (projectInfo.users||[]).includes(saved)){
-            currentUser = saved;
-            wsSend({type:"setUser", user:saved});
-          } else {
-            // default to main if present
-            if ((projectInfo.users||[]).includes("main")){
-              // don't auto-select; show picker first time
-            }
-            showUserPicker();
-          }
-        }catch{
-          showUserPicker();
-        }
+        ensureScenes(projectInfo.projectId);
+        const savedScene = localStorage.getItem(sceneCurrentKey(projectInfo.projectId));
+        if (savedScene) sceneState.current = savedScene;
+        updateSceneSelect();
         // Update brand
         if (brandEl) brandEl.textContent = normalizeProjectName(projectInfo.projectName);
-        return;
-      }
-      if (msg.type === "user"){
-        currentUser = msg.user || currentUser;
-        return;
-      }
-      if (msg.type === "assignments"){
-        // admin panel may refresh assignments; we just re-render
-        renderOrUpdate();
         return;
       }
 
@@ -6689,6 +6681,27 @@ function hideUserPicker(){
   // Build visible track list with folder collapse/compact + hiddenTracks
   function buildVisibleTracks(){
   const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+  const scene = getCurrentScene();
+  const expandWithParents = (allowedSet)=>{
+    if (!allowedSet) return null;
+    const parentsByDepth = [];
+    const include = new Set(allowedSet);
+    for (const t of tracks){
+      const d = Number(t.indent||0);
+      parentsByDepth.length = d;
+      if (include.has(t.guid)){
+        for (const p of parentsByDepth) include.add(p.guid);
+      }
+      if (Number(t.folderDepth||0) > 0){
+        parentsByDepth[d] = { guid: t.guid };
+      }
+    }
+    return include;
+  };
+  let sceneAllowed = null;
+  if (scene && !(scene.all || scene.name === "main")){
+    sceneAllowed = expandWithParents(new Set(scene.guids || []));
+  }
   const out = [];
   const stack = []; // {guid, indent, lastVisibleGuid}
   const gapL = new Set();
@@ -6705,6 +6718,9 @@ function hideUserPicker(){
   };
 
   for (const t of tracks){
+    if (sceneAllowed && !sceneAllowed.has(t.guid)){
+      continue;
+    }
     closeFoldersToIndent(t.indent);
 
     // determine if hidden/compact by any ancestor folder mode
@@ -6734,7 +6750,7 @@ function hideUserPicker(){
         groupColors.set(t.guid, t.color || "");
       }
       const groupColor = groupId ? (groupColors.get(groupId) || "") : "";
-      const item = Object.assign({}, t, { _compact: compactByParent, _folderGroupId: groupId, _folderGroupColor: groupColor });
+      const item = Object.assign({}, t, { _compact: compactByParent || !!cfg.compactTracks[t.guid], _folderGroupId: groupId, _folderGroupColor: groupColor });
       out.push(item);
 
       // group start gap
@@ -6837,6 +6853,11 @@ function hideUserPicker(){
 
   if (mixerWrap){
     mixerWrap.addEventListener("scroll", scheduleFolderFrames, {passive:true});
+    mixerWrap.addEventListener("dblclick", (ev)=>{
+      if (ev.target.closest(".strip")) return;
+      wsSend({type:"addTrack"});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
   }
   window.addEventListener("resize", scheduleFolderFrames, {passive:true});
 
@@ -7119,6 +7140,42 @@ slotbar.appendChild(folderBtn);
 
     // Events
     title.addEventListener("click", (ev)=>{ ev.stopPropagation(); openTrackMenu(t.guid, "general"); });
+    el.addEventListener("contextmenu", (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
+      openTrackContextMenu(t.guid, ev.clientX, ev.clientY);
+    });
+    // Touch long-press to open menu
+    let touchHold = null;
+    el.addEventListener("pointerdown", (ev)=>{
+      if (ev.pointerType !== "touch") return;
+      touchHold = setTimeout(()=> openTrackContextMenu(t.guid, ev.clientX, ev.clientY), 650);
+    });
+    const clearTouchHold = ()=>{ if (touchHold) { clearTimeout(touchHold); touchHold = null; } };
+    el.addEventListener("pointerup", clearTouchHold);
+    el.addEventListener("pointerleave", clearTouchHold);
+    el.addEventListener("pointercancel", clearTouchHold);
+
+    // Drag reorder (mouse)
+    el.setAttribute("draggable", "true");
+    el.addEventListener("dragstart", (ev)=>{
+      draggingTrackGuid = t.guid;
+      ev.dataTransfer.effectAllowed = "move";
+      try{ ev.dataTransfer.setData("text/plain", t.guid); }catch(_){}
+    });
+    el.addEventListener("dragover", (ev)=>{
+      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+    });
+    el.addEventListener("drop", (ev)=>{
+      ev.preventDefault();
+      if (!draggingTrackGuid || draggingTrackGuid === t.guid) return;
+      wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: t.guid});
+      draggingTrackGuid = null;
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    el.addEventListener("dragend", ()=>{ draggingTrackGuid = null; });
     fxBtn.addEventListener("click",(ev)=>{
       ev.stopPropagation();
       if (fxBtn._holdTriggered){ fxBtn._holdTriggered = false; return; }
@@ -7508,6 +7565,96 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     menu.style.left = left + "px";
     menu.style.top = top + "px";
     _fxAddMenuEl = menu;
+  }
+
+  let _trackMenuEl = null;
+  function closeTrackMenu(){
+    if (_trackMenuEl){
+      try{ _trackMenuEl.remove(); }catch(_){}
+      _trackMenuEl = null;
+    }
+  }
+  document.addEventListener("click", (e)=>{
+    if (_trackMenuEl && !(_trackMenuEl.contains(e.target))) closeTrackMenu();
+  }, true);
+
+  function openTrackContextMenu(guid, x, y){
+    closeTrackMenu();
+    const t = trackByGuid.get(guid);
+    if (!t) return;
+    const menu = document.createElement("div");
+    menu.className = "trackMenu";
+
+    const mkItem = (label, onClick, disabled=false)=>{
+      const mi = document.createElement("div");
+      mi.className = "mi" + (disabled ? " disabled" : "");
+      mi.textContent = label;
+      if (!disabled){
+        mi.addEventListener("click", (ev)=>{ ev.stopPropagation(); onClick(); closeTrackMenu(); });
+      }
+      menu.appendChild(mi);
+    };
+
+    mkItem("Rename", ()=>{
+      const current = t.name || "";
+      const next = prompt("Rename track", current);
+      if (next === null) return;
+      const name = String(next).trim();
+      if (!name) return;
+      wsSend({type:"renameTrack", guid: t.guid, name});
+      setTimeout(()=>wsSend({type:"reqState"}), 80);
+    });
+    mkItem("Set color", ()=>{
+      const next = prompt("Track color (#RRGGBB)", "");
+      if (next === null) return;
+      const color = String(next).trim();
+      if (!color) return;
+      wsSend({type:"setTrackColor", guid: t.guid, color});
+      setTimeout(()=>wsSend({type:"reqState"}), 80);
+    });
+    const compactOn = !!cfg.compactTracks[t.guid];
+    mkItem(compactOn ? "Disable compact view" : "Enable compact view", ()=>{
+      if (compactOn) delete cfg.compactTracks[t.guid];
+      else cfg.compactTracks[t.guid] = true;
+      saveCfg();
+      renderOrUpdate(true);
+    });
+    mkItem("Create folder with this track", ()=>{
+      wsSend({type:"createFolderWithTrack", guid: t.guid});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+    const folders = (lastState && lastState.tracks) ? lastState.tracks.filter(tr=>tr.folderDepth>0 && tr.guid !== t.guid) : [];
+    mkItem("Move to folder...", ()=>{
+      if (!folders.length) return;
+      const options = folders.map((f, i)=>`${i+1}: ${f.name || ("Track " + f.idx)}`).join("\n");
+      const pick = prompt(`Select folder:\n${options}`, "1");
+      if (!pick) return;
+      const idx = parseInt(pick, 10);
+      if (!Number.isFinite(idx) || idx < 1 || idx > folders.length) return;
+      wsSend({type:"moveTrackToFolder", guid: t.guid, folderGuid: folders[idx-1].guid});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    }, !folders.length);
+    mkItem("Move track...", ()=>{
+      const total = (lastState && lastState.tracks) ? lastState.tracks.length : 0;
+      const pick = prompt(`Move to track number (1-${total})`, "");
+      if (!pick) return;
+      const idx = parseInt(pick, 10);
+      if (!Number.isFinite(idx) || idx < 1 || idx > total) return;
+      wsSend({type:"moveTrack", guid: t.guid, toIndex: idx-1});
+      setTimeout(()=>wsSend({type:"reqState"}), 120);
+    });
+
+    document.body.appendChild(menu);
+    const pad = 8;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    if (left + mw > vw - pad) left = Math.max(pad, vw - pad - mw);
+    if (top + mh > vh - pad) top = Math.max(pad, vh - pad - mh);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    _trackMenuEl = menu;
   }
 
   function showSlotActions(row, guid, fx){
@@ -8003,15 +8150,19 @@ const FX_ADD_CATALOG = [
     }
     const list = document.createElement("div");
     list.className = "fxList";
+    const isNumericLabel = (val)=>{
+      const s = String(val || "").trim();
+      return !!(s && /^-?\d+(\.\d+)?$/.test(s));
+    };
     const fmtRegionName = (r)=>{
       const name = String(r.name || "").trim();
-      if (name) return name;
+      if (name && !isNumericLabel(name)) return name;
       const idx = Number.isFinite(r.index) ? `#${r.index}` : "";
       return idx ? `Region ${idx}` : "Region";
     };
     const fmtMarkerName = (m)=>{
       const name = String(m.name || "").trim();
-      if (name) return name;
+      if (name && !isNumericLabel(name)) return name;
       const idx = Number.isFinite(m.index) ? `#${m.index}` : "";
       return idx ? `Marker ${idx}` : "Marker";
     };
@@ -8071,6 +8222,7 @@ const FX_ADD_CATALOG = [
     });
     wrap.appendChild(list);
     modalBody.appendChild(wrap);
+    return;
   }
 
   function renderBpmModal(){
@@ -8154,6 +8306,10 @@ const FX_ADD_CATALOG = [
     }
     if (openModal.kind === "settings"){
       renderSettingsModal();
+      return;
+    }
+    if (openModal.kind === "scenes"){
+      renderScenesModal();
       return;
     }
     if (openModal.kind === "transport"){
@@ -8473,6 +8629,13 @@ modalBody.appendChild(wrap);
         if (valEl) valEl.textContent = `${dbFromVol(vol)} dB`;
         wsSend({type:"setSendVol", guid:t.guid, index: sd.index, vol});
       });
+      sl.addEventListener("dblclick", (ev)=>{
+        ev.preventDefault();
+        sd.vol = 1;
+        if (valEl) valEl.textContent = `${dbFromVol(1)} dB`;
+        sl.value = String(normFromDb(0));
+        wsSend({type:"setSendVol", guid:t.guid, index: sd.index, vol: 1});
+      });
       srcSelRow?.addEventListener("change", ()=>{
         const val = parseInt(srcSelRow.value, 10);
         sd.srcCh = _chanPairLabel(val);
@@ -8598,6 +8761,13 @@ modalBody.appendChild(wrap);
         rd.vol=vol;
         if (valEl) valEl.textContent = `${dbFromVol(vol)} dB`;
         wsSend({type:"setRecvVol", guid:t.guid, index: rd.index, vol});
+      });
+      sl.addEventListener("dblclick", (ev)=>{
+        ev.preventDefault();
+        rd.vol = 1;
+        if (valEl) valEl.textContent = `${dbFromVol(1)} dB`;
+        sl.value = String(normFromDb(0));
+        wsSend({type:"setRecvVol", guid:t.guid, index: rd.index, vol: 1});
       });
       srcSelRow?.addEventListener("change", ()=>{
         const val = parseInt(srcSelRow.value, 10);
@@ -8737,6 +8907,85 @@ modalBody.appendChild(wrap);
     modalBody.appendChild(wrap);
   }
 
+  function renderScenesModal(){
+    modalTitle.textContent = "Scenes";
+    tabsEl.innerHTML = "";
+    modalBody.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    const headerRow = document.createElement("div");
+    headerRow.className = "row";
+    const sceneOptions = sceneState.scenes.map(sc=>`<option value="${escapeHtml(sc.name)}">${escapeHtml(sc.name)}</option>`).join("");
+    headerRow.innerHTML = `<label>Scene</label>
+      <select style="flex:1;height:34px;border-radius:10px;border:1px solid rgba(0,0,0,.75);background:#22252a;color:#ddd;padding:0 10px;">
+        ${sceneOptions}
+      </select>
+      <button class="miniBtn">Add</button>
+      <button class="miniBtn">Delete</button>`;
+    const sel = headerRow.querySelector("select");
+    const [addBtn, delBtn] = headerRow.querySelectorAll("button");
+    sel.value = sceneState.current;
+    sel.addEventListener("change", ()=> setCurrentScene(sel.value));
+    addBtn.addEventListener("click", ()=>{
+      const name = prompt("New scene name", "");
+      if (!name) return;
+      const clean = String(name).trim();
+      if (!clean) return;
+      if (sceneState.scenes.find(sc=>sc.name.toLowerCase() === clean.toLowerCase())){
+        alert("Scene already exists.");
+        return;
+      }
+      sceneState.scenes.push({name: clean, all:false, guids: []});
+      setCurrentScene(clean);
+    });
+    delBtn.addEventListener("click", ()=>{
+      const cur = getCurrentScene();
+      if (cur.name === "main"){
+        alert("Main scene cannot be deleted.");
+        return;
+      }
+      if (!confirm(`Delete scene "${cur.name}"?`)) return;
+      sceneState.scenes = sceneState.scenes.filter(sc=>sc.name !== cur.name);
+      setCurrentScene("main");
+    });
+    wrap.appendChild(headerRow);
+
+    const cur = getCurrentScene();
+    const info = document.createElement("div");
+    info.className = "small";
+    info.style.margin = "6px 0 10px";
+    info.textContent = cur.all || cur.name === "main"
+      ? "Main scene shows all tracks."
+      : "Select tracks visible in this scene.";
+    wrap.appendChild(info);
+
+    if (!(cur.all || cur.name === "main")){
+      const list = document.createElement("div");
+      list.className = "fxList";
+      const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
+      tracks.forEach(t=>{
+        const row = document.createElement("div");
+        row.className = "fxItem";
+        const shown = (cur.guids || []).includes(t.guid);
+        row.innerHTML = `<div class="nm">${escapeHtml(t.name||("Track " + t.idx))}</div>
+          <div class="fxCtl"><button class="miniBtn ${shown?'on':''}">${shown ? "Shown" : "Hidden"}</button></div>`;
+        const btn = row.querySelector("button");
+        btn.addEventListener("click", ()=>{
+          const next = new Set(cur.guids || []);
+          if (next.has(t.guid)) next.delete(t.guid); else next.add(t.guid);
+          cur.guids = Array.from(next);
+          saveScenes();
+          renderModal();
+          renderOrUpdate(true);
+        });
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+    }
+
+    modalBody.appendChild(wrap);
+  }
+
   // ---------- Settings ----------
   const fsBtn = document.getElementById("fsBtn");
   const settingsBtn = document.getElementById("settingsBtn");
@@ -8793,8 +9042,8 @@ modalBody.appendChild(wrap);
     tm.appendChild(list);
 
     const tracks = (lastState && lastState.tracks) ? lastState.tracks : [];
-    let asMon1 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon1) ? projectInfo.assignments.mon1 : []);
-    let asMon2 = new Set((projectInfo && projectInfo.assignments && projectInfo.assignments.mon2) ? projectInfo.assignments.mon2 : []);
+    const scene = getCurrentScene();
+    const sceneLocked = scene.all || scene.name === "main";
 
     const renderList = ()=>{
       const q = (tm.querySelector("#tmSearch").value||"").toLowerCase().trim();
@@ -8803,33 +9052,20 @@ modalBody.appendChild(wrap);
         if (q && !(String(t.name||"").toLowerCase().includes(q) || String(t.idx||"").includes(q))) return;
         const row = document.createElement("div");
         row.className = "fxItem";
-        const on = !cfg.hiddenTracks[t.guid];
+        const shown = sceneLocked ? true : (scene.guids || []).includes(t.guid);
         const dot = hexOrEmpty(t.color) ? `<span style="display:inline-block; width:10px; height:10px; border-radius:999px; background:${hexOrEmpty(t.color)}; margin-right:8px;"></span>` : `<span style="display:inline-block; width:10px; height:10px; border-radius:999px; background:#444; margin-right:8px;"></span>`;
         const fxWarn = (t.fxAllOff && (t.fxCount||0)>0) ? `<span class="pill" style="border-color:rgba(255,80,80,.6); background:rgba(120,30,30,.25);">FX OFF</span>` : ((t.fxCount||0)>0 ? `<span class="pill">FX ${t.fxCount||0}</span>` : ``);
         row.innerHTML = `<div class="nm">${dot}${t.idx} — ${escapeHtml(t.name||"")}</div>
-          <div class="fxCtl">${fxWarn}${(currentUser==="main" && t.kind!=="master")
-            ? ('<button class="miniBtn asBtn '+(asMon1.has(t.guid)?'on':'')+'" data-target="mon1">mon1</button>' +
-               '<button class="miniBtn asBtn '+(asMon2.has(t.guid)?'on':'')+'" data-target="mon2">mon2</button>')
-            : ''}<button class="miniBtn tmToggle ${on?'on':''}">${on?'Shown':'Hidden'}</button></div>`;
+          <div class="fxCtl">${fxWarn}<button class="miniBtn tmToggle ${shown?'on':''}" ${sceneLocked?'disabled':''}>${shown?'Shown':'Hidden'}</button></div>`;
         row.querySelector(".tmToggle").addEventListener("click", (e)=>{ e.stopPropagation();
-          const nowOn = !!cfg.hiddenTracks[t.guid];
-          if (nowOn) delete cfg.hiddenTracks[t.guid];
-          else cfg.hiddenTracks[t.guid]=true;
-          saveCfg();
+          if (sceneLocked) return;
+          const next = new Set(scene.guids || []);
+          if (next.has(t.guid)) next.delete(t.guid);
+          else next.add(t.guid);
+          scene.guids = Array.from(next);
+          saveScenes();
           renderOrUpdate(true);
           renderList();
-        });
-
-        row.querySelectorAll(".asBtn").forEach(btn=>{
-          btn.addEventListener("click", (e)=>{
-            e.stopPropagation();
-            const target = btn.dataset.target;
-            const set = (target==="mon1") ? asMon1 : asMon2;
-            if (set.has(t.guid)) set.delete(t.guid); else set.add(t.guid);
-            if (projectInfo && projectInfo.assignments) projectInfo.assignments[target] = Array.from(set);
-            wsSend({type:"adminSetAssignments", target, guids:Array.from(set)});
-            btn.classList.toggle("on", set.has(t.guid));
-          });
         });
 
         list.appendChild(row);
@@ -8838,14 +9074,16 @@ modalBody.appendChild(wrap);
 
     tm.querySelector("#tmSearch").addEventListener("input", renderList);
     tm.querySelector("#tmShowAll").addEventListener("click", ()=>{
-      cfg.hiddenTracks = {};
-      saveCfg();
+      if (sceneLocked) return;
+      scene.guids = tracks.map(t=>t.guid);
+      saveScenes();
       renderOrUpdate(true);
       renderList();
     });
     tm.querySelector("#tmHideAll").addEventListener("click", ()=>{
-      tracks.forEach(t=>{ cfg.hiddenTracks[t.guid]=true; });
-      saveCfg();
+      if (sceneLocked) return;
+      scene.guids = [];
+      saveScenes();
       renderOrUpdate(true);
       renderList();
     });
@@ -8883,14 +9121,6 @@ modalBody.appendChild(wrap);
     };
 
     if (openModal.tab === "main"){
-      const userRow = document.createElement("div");
-      userRow.className = "row";
-      const uName = currentUser || "(select)";
-      userRow.innerHTML = `<label>User</label><button class="miniBtn on">${uName}</button><button class="miniBtn">Change</button>`;
-      const userBtns = userRow.querySelectorAll("button");
-      userBtns[1].addEventListener("click", ()=>{ showUserPicker(); });
-      wrap.appendChild(userRow);
-
       wrap.appendChild(mkToggle("Master enabled", "masterEnabled", ()=>renderOrUpdate(true)));
 
       const side = document.createElement("div");

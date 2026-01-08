@@ -45,6 +45,32 @@
   #leftHeader{display:flex; flex-direction:column; gap:2px;}
   #centerHeader{display:flex; align-items:center; gap:10px; flex:1; justify-content:center;}
   #rightHeader{display:flex; align-items:center; gap:8px;}
+  #sceneWrap{ display:flex; align-items:center; gap:6px; }
+  #sceneSelect{
+    height:28px;
+    border-radius:8px;
+    border:1px solid #131519;
+    background:#22252a;
+    color:#ddd;
+    padding:0 8px;
+    font-size:12px;
+  }
+  #sceneManageBtn{
+    height:28px;
+    border-radius:8px;
+    border:1px solid #131519;
+    background:#22252a;
+    color:#ddd;
+    padding:0 10px;
+    font-size:12px;
+    cursor:pointer;
+  }
+  body.light #sceneSelect,
+  body.light #sceneManageBtn{
+    background:#f4f6fa;
+    color:#1b1f26;
+    border-color:rgba(0,0,0,.2);
+  }
   .pill{background:#22252a; border:1px solid #111317; color:#eaeaea; border-radius:999px; padding:5px 10px; font-size:12px; cursor:pointer; user-select:none}
   .pill.on{border-color:#2a72ff; box-shadow:0 0 0 1px rgba(60,120,255,.25) inset;}
   .pill:active{transform:translateY(1px)}
@@ -740,6 +766,32 @@ body.phoneLandscape .strip.fxExpanded .fxSlots{ display:flex !important; }
 }
 .fxAddMenu .small{ opacity:.8; font-size:11px; }
 
+/* Track context menu */
+.trackMenu{
+  position:fixed;
+  z-index:9999;
+  min-width:200px;
+  max-width:280px;
+  padding:8px;
+  border-radius:12px;
+  background:rgba(25,28,33,.98);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 16px 40px rgba(0,0,0,.55);
+}
+.trackMenu .mi{
+  padding:8px 10px;
+  border-radius:10px;
+  cursor:pointer;
+  border:1px solid transparent;
+}
+.trackMenu .mi:hover{
+  background:rgba(255,255,255,.08);
+  border-color:rgba(255,255,255,.10);
+}
+.trackMenu .mi.disabled{
+  opacity:.5;
+  cursor:default;
+}
 
 
 /* ===== Patch v5.20.1 ===== */

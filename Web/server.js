@@ -208,7 +208,7 @@ let lastState = null;
 let lastMeter = null;
 
 wss.on("connection", (ws) => {
-  ws.user = null;
+  ws.user = "main";
   wsClients.add(ws);
 
   if (currentProjectId) sendTo(ws, {
@@ -234,11 +234,8 @@ wss.on("connection", (ws) => {
       return;
     }
     if (msg.type === "setUser"){
-      ws.user = String(msg.user||"");
-      sendTo(ws, {type:"user", user: ws.user});
-      // send latest state/meter filtered
-      if (lastState) sendTo(ws, filterStateFor(ws, lastState));
-      if (lastMeter) sendTo(ws, filterMeterFor(ws, lastMeter));
+      // user selection removed; keep main
+      ws.user = "main";
       return;
     }
     if (msg.type === "reqRegions"){
@@ -307,7 +304,7 @@ wss.on("connection", (ws) => {
       "reqFxList","reqFxParams",
       "setSendVol","setSendMute","setSendMode","setSendSrcChan","setSendDstChan","addSend",
       "setRecvVol","setRecvMute","setRecvSrcChan","setRecvDstChan","addReturn",
-      "renameTrack"
+      "renameTrack","setTrackColor","moveTrack","createFolderWithTrack","moveTrackToFolder"
     ]);
     if (needsGuid.has(msg.type)){
       const guid = String(msg.guid||"");
