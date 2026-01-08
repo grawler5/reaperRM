@@ -714,7 +714,7 @@ def get_regions_and_markers():
 
     def _enum_marker(i):
         if "RPR_EnumProjectMarkers2" in globals():
-            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512, 0)
+            r = RPR_EnumProjectMarkers2(0, i, 0, 0, 0, "", 512, 0, 0)
             if isinstance(r, tuple):
                 ret = int(r[0]) if len(r) > 0 else 0
                 isrgn = int(r[1]) if len(r) > 1 else 0
