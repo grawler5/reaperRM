@@ -237,10 +237,23 @@
     opacity:0.6;
     filter:grayscale(0.4);
   }
-  .strip.dropTarget{
-    outline:3px solid rgba(94, 203, 255, 0.75);
-    outline-offset:-3px;
-  }
+.strip.dropTarget{
+  outline:3px solid rgba(94, 203, 255, 0.75);
+  outline-offset:-3px;
+}
+.strip.dropBefore::after,
+.strip.dropAfter::after{
+  content:"";
+  position:absolute;
+  top:6px;
+  bottom:6px;
+  width:4px;
+  border-radius:4px;
+  background: rgba(94, 203, 255, 0.95);
+  box-shadow: 0 0 10px rgba(94, 203, 255, 0.8);
+}
+.strip.dropBefore::after{ left:-6px; }
+.strip.dropAfter::after{ right:-6px; }
   .strip::before{
     content:"";
     position:absolute; inset:0;
@@ -2076,6 +2089,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .pluginWin.layout_rm_eq4:not(.fullscreen),
 .pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(700px, 90vh); }
 .pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(980px, 94vw); height:min(560px, 90vh); }
+.pluginWin.layout_rm_comp2:not(.fullscreen){ width:min(980px, 94vw); height:min(560px, 90vh); }
 
 /* ---- ReaComp (dark, minimal) ---- */
 .reacompPanel{
@@ -2256,6 +2270,20 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   box-shadow: 0 0 0 1px rgba(100,160,255,.35) inset;
 }
 .rmCompBottomRow{ margin-top:6px; }
+.rmCompSelectRow{
+  display:grid;
+  grid-template-columns: 90px 1fr;
+  gap:10px;
+  align-items:center;
+}
+.rmCompSelect{
+  appearance:none;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  color: rgba(255,255,255,.9);
+  padding:8px 12px;
+}
 
 @media (max-width: 720px){
   .rmCompPanel{ grid-template-columns: 1fr; }

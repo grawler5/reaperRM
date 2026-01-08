@@ -142,15 +142,23 @@
     title: "RM_Compressor2",
     sections: [
       { title: "", controls: [
-        {type:"knob", label:"Thresh", find:[/thresh/i] },
-        {type:"knob", label:"Knee", find:[/knee/i] },
-        {type:"knob", label:"Ratio", find:[/ratio/i] },
-        {type:"knob", label:"Attack", find:[/attack/i] },
-        {type:"knob", label:"Release", find:[/release/i] },
-        {type:"knob", label:"Output", find:[/output/i] },
-        {type:"paramMeter", label:"In", find:[/telemetry.*in\s*peak/i] },
-        {type:"paramMeter", label:"SC", find:[/telemetry.*sidechain\s*peak/i] },
-        {type:"paramMeter", label:"Out", find:[/telemetry.*out\s*peak/i] }
+        {type:"rmCompressorPanel", extra:{
+          thresholdFind:[/threshold|\bthresh\b/i],
+          attackFind:[/\battack\b/i],
+          releaseFind:[/\brelease\b/i],
+          kneeFind:[/\bknee\b/i],
+          ratioFind:[/\bratio\b/i],
+          detectFind:[/detect|detector|side\s*chain\s*source|source/i],
+          lpFind:[/\blp\b|low\s*pass|lowpass/i],
+          hpFind:[/\bhp\b|high\s*pass|highpass/i],
+          bpmSyncFind:[/bpm\s*sync|tempo\s*sync|sync/i],
+          autoMakeupFind:[/auto\s*makeup|makeup\b/i],
+          limitOutFind:[/limit\s*out|output\s*limit/i],
+          outGainFind:[/output\s*gain|\bout\s*gain\b|\boutput\b/i],
+          inPeakFind:[/telemetry.*(in|input).*peak/i],
+          outPeakFind:[/telemetry.*out.*peak/i],
+          grFind:[/telemetry.*\bgr\b|gain\s*reduction/i],
+        } }
       ] }
     ]
   },
@@ -169,6 +177,7 @@
           attackFind:[/\battack\b/i],
           releaseFind:[/\brelease\b/i],
           kneeFind:[/\bknee\b/i],
+          ratioFind:[/\bratio\b/i],
           detectFind:[/detect|detector|side\s*chain\s*source|source/i],
           lpFind:[/\blp\b|low\s*pass|lowpass/i],
           hpFind:[/\bhp\b|high\s*pass|highpass/i],
@@ -1063,26 +1072,35 @@ function formatParam(p){
     envCard.innerHTML = `<div class="rmCompCardTitle">ENVELOPE</div>`;
     const rowAttack = mkHSlider("Attack", ex.attackFind);
     const rowRelease = mkHSlider("Release", ex.releaseFind);
+    const rowRatio = mkHSlider("Ratio", ex.ratioFind);
     const rowKnee = mkHSlider("Knee", ex.kneeFind);
     envCard.appendChild(rowAttack.row);
     envCard.appendChild(rowRelease.row);
+    envCard.appendChild(rowRatio.row);
     envCard.appendChild(rowKnee.row);
     mid.appendChild(envCard);
 
     const detectCard = document.createElement("div");
     detectCard.className = "rmCompCard";
-    detectCard.innerHTML = `<div class="rmCompCardTitle">DETECTOR</div>`;
-    const detectBtns = document.createElement("div");
-    detectBtns.className = "rmCompButtonRow";
-    const btnMain = document.createElement("button");
-    btnMain.type = "button";
-    btnMain.textContent = "Main";
-    const btnSc = document.createElement("button");
-    btnSc.type = "button";
-    btnSc.textContent = "SC";
-    detectBtns.appendChild(btnMain);
-    detectBtns.appendChild(btnSc);
-    detectCard.appendChild(detectBtns);
+    detectCard.innerHTML = `<div class="rmCompCardTitle">DETECTOR INPUT</div>`;
+    const detectRow = document.createElement("div");
+    detectRow.className = "rmCompSelectRow";
+    const detectLabel = document.createElement("div");
+    detectLabel.className = "rmCompLabel";
+    detectLabel.textContent = "Source";
+    const detectSelect = document.createElement("select");
+    detectSelect.className = "rmCompSelect";
+    const optMain = document.createElement("option");
+    optMain.value = "main";
+    optMain.textContent = "Main Inputs";
+    const optSc = document.createElement("option");
+    optSc.value = "sc";
+    optSc.textContent = "Sidechain";
+    detectSelect.appendChild(optMain);
+    detectSelect.appendChild(optSc);
+    detectRow.appendChild(detectLabel);
+    detectRow.appendChild(detectSelect);
+    detectCard.appendChild(detectRow);
     mid.appendChild(detectCard);
 
     const filterCard = document.createElement("div");
@@ -1146,18 +1164,18 @@ function formatParam(p){
         if (document.activeElement !== row.sl) row.sl.value = String(p.value||0);
         row.val.textContent = formatParam(p);
       };
-      [rowAttack, rowRelease, rowKnee, rowLP, rowHP].forEach(updateRow);
+      [rowAttack, rowRelease, rowRatio, rowKnee, rowLP, rowHP].forEach(updateRow);
 
       const pDetect = getP(ex.detectFind);
       if (pDetect){
         const raw = (pDetect.raw != null) ? pDetect.raw : (pDetect.min != null && pDetect.max != null ? pDetect.min + (pDetect.value||0) * (pDetect.max - pDetect.min) : pDetect.value||0);
         const midVal = (pDetect.min != null && pDetect.max != null) ? (pDetect.min + pDetect.max) / 2 : 0.5;
         const isSc = raw > midVal;
-        btnMain.classList.toggle("on", !isSc);
-        btnSc.classList.toggle("on", isSc);
+        detectSelect.value = isSc ? "sc" : "main";
+        detectSelect.disabled = false;
       } else {
-        btnMain.classList.remove("on");
-        btnSc.classList.remove("on");
+        detectSelect.value = "main";
+        detectSelect.disabled = true;
       }
 
       const toggleState = (btn, patterns)=>{
@@ -1171,16 +1189,12 @@ function formatParam(p){
       toggleState(btnLimit, ex.limitOutFind);
     };
 
-    btnMain.addEventListener("click", ()=>{
+    detectSelect.addEventListener("change", ()=>{
       const p = getP(ex.detectFind);
       if (!p) return;
-      const target = (p.min != null && p.max != null) ? p.min : 0;
-      setParamRaw(p, target, 0, 1);
-    });
-    btnSc.addEventListener("click", ()=>{
-      const p = getP(ex.detectFind);
-      if (!p) return;
-      const target = (p.min != null && p.max != null) ? p.max : 1;
+      const target = (detectSelect.value === "sc")
+        ? ((p.min != null && p.max != null) ? p.max : 1)
+        : ((p.min != null && p.max != null) ? p.min : 0);
       setParamRaw(p, target, 0, 1);
     });
 
@@ -6833,6 +6847,7 @@ applyResponsiveMode();
   let draggingSpacerGuid = null;
   let touchDrag = null;
   let touchDropTarget = null;
+  let dragDropState = null;
 
   function setTouchDropTarget(el){
     if (touchDropTarget && touchDropTarget !== el){
@@ -6862,6 +6877,10 @@ applyResponsiveMode();
       return;
     }
     setTouchDropTarget(strip);
+    if (touchDrag){
+      touchDrag.lastX = x;
+      touchDrag.lastY = y;
+    }
   }
 
   function startTouchDrag(kind, guid, el, pointerId, x, y){
@@ -6879,15 +6898,24 @@ applyResponsiveMode();
     if (applyMove && touchDropTarget){
       const info = getDropTargetInfo(touchDropTarget);
       if (info && info.guid && info.guid !== guid){
+        let beforeGuid = info.guid;
+        try{
+          const rect = touchDropTarget.getBoundingClientRect();
+          const after = touchDrag.lastX != null ? (touchDrag.lastX > rect.left + rect.width / 2) : false;
+          if (after){
+            const nextGuid = getNextStripGuid(info.guid);
+            if (nextGuid) beforeGuid = nextGuid;
+          }
+        }catch(_){ }
         if (kind === "spacer"){
           wsSend({type:"setSpacer", guid, enabled:false});
-          wsSend({type:"setSpacer", guid: info.guid, enabled:true});
+          wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
           setTimeout(()=>wsSend({type:"reqState"}), 120);
         } else if (info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid, folderGuid: info.folderGuid});
           setTimeout(()=>wsSend({type:"reqState"}), 120);
         } else {
-          wsSend({type:"moveTrack", guid, beforeGuid: info.guid});
+          wsSend({type:"moveTrack", guid, beforeGuid});
           setTimeout(()=>wsSend({type:"reqState"}), 120);
         }
       }
@@ -7248,13 +7276,14 @@ applyResponsiveMode();
     if (isVisible){
       const groupId = (stack.length > 0) ? stack[0].guid : (t.folderDepth > 0 ? t.guid : null);
       if (t.spacerAbove){
+        const spacerGroupId = (stack.length > 0 || t.folderDepth <= 0) ? groupId : null;
         out.push({
           kind: "spacer",
           guid: `spacer:${t.guid}`,
           targetGuid: t.guid,
           width: (cfg.spacerWidths && cfg.spacerWidths[t.guid]) ? cfg.spacerWidths[t.guid] : "standard",
           _compact: compactByParent || !!cfg.compactTracks[t.guid],
-          _folderGroupId: groupId,
+          _folderGroupId: spacerGroupId,
         });
       }
       if (t.folderDepth > 0 && stack.length === 0){
@@ -7531,6 +7560,25 @@ applyResponsiveMode();
     }
   }
 
+  function getNextStripGuid(guid){
+    if (!guid) return "";
+    const items = orderedItems();
+    const idx = items.findIndex(it => it.guid === guid);
+    if (idx < 0) return "";
+    for (let i = idx + 1; i < items.length; i += 1){
+      const next = items[i];
+      if (next && next.guid) return next.guid;
+    }
+    return "";
+  }
+
+  function setDropHighlight(el, after){
+    if (!el) return;
+    el.classList.toggle("dropAfter", !!after);
+    el.classList.toggle("dropBefore", !after);
+    dragDropState = {guid: el.dataset.targetGuid || el.dataset.guid || "", after: !!after};
+  }
+
   function attachTrackReorder(el, t){
     if (!el || t.kind === "master") return;
 
@@ -7555,13 +7603,18 @@ applyResponsiveMode();
       if (draggingTrackGuid === t.guid || draggingSpacerGuid === t.guid) return;
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "move";
+      const rect = el.getBoundingClientRect();
+      const after = (ev.clientX - rect.left) > rect.width / 2;
+      setDropHighlight(el, after);
     });
     el.addEventListener("drop", (ev)=>{
       ev.preventDefault();
       el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
       if (draggingSpacerGuid && draggingSpacerGuid !== t.guid){
+        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.guid) || t.guid) : t.guid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
-        wsSend({type:"setSpacer", guid: t.guid, enabled:true});
+        wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
         draggingSpacerGuid = null;
         setTimeout(()=>wsSend({type:"reqState"}), 120);
         return;
@@ -7571,7 +7624,8 @@ applyResponsiveMode();
       if (info && info.folderGuid){
         wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
       } else {
-        wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: t.guid});
+        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.guid) || t.guid) : t.guid;
+        wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
       }
       draggingTrackGuid = null;
       setTimeout(()=>wsSend({type:"reqState"}), 120);
@@ -7580,6 +7634,8 @@ applyResponsiveMode();
       draggingTrackGuid = null;
       el.classList.remove("dragging");
       el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      dragDropState = null;
       document.body.classList.remove("draggingTrack");
     });
 
@@ -7613,13 +7669,18 @@ applyResponsiveMode();
       if (!draggingSpacerGuid && !draggingTrackGuid) return;
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "move";
+      const rect = el.getBoundingClientRect();
+      const after = (ev.clientX - rect.left) > rect.width / 2;
+      setDropHighlight(el, after);
     });
     el.addEventListener("drop", (ev)=>{
       ev.preventDefault();
       el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
       if (draggingSpacerGuid && t.targetGuid && draggingSpacerGuid !== t.targetGuid){
+        const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.targetGuid) || t.targetGuid) : t.targetGuid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
-        wsSend({type:"setSpacer", guid: t.targetGuid, enabled:true});
+        wsSend({type:"setSpacer", guid: beforeGuid, enabled:true});
         draggingSpacerGuid = null;
         setTimeout(()=>wsSend({type:"reqState"}), 120);
         return;
@@ -7629,7 +7690,8 @@ applyResponsiveMode();
         if (info && info.folderGuid){
           wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
         } else {
-          wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: t.targetGuid});
+          const beforeGuid = (dragDropState && dragDropState.after) ? (getNextStripGuid(t.targetGuid) || t.targetGuid) : t.targetGuid;
+          wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
         }
         draggingTrackGuid = null;
         setTimeout(()=>wsSend({type:"reqState"}), 120);
@@ -7639,6 +7701,8 @@ applyResponsiveMode();
       draggingSpacerGuid = null;
       el.classList.remove("dragging");
       el.classList.remove("dropTarget");
+      el.classList.remove("dropAfter", "dropBefore");
+      dragDropState = null;
       document.body.classList.remove("draggingTrack");
     });
 
