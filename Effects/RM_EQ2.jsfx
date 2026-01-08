@@ -339,7 +339,7 @@ st = 0;
 opst = st + BIQ_STATE;
 
 // spectrum buffers (fixed FFT)
-FFTSZ = 1024;
+FFTSZ = 2048;
 ring   = opst + ONE_STATE;
 win    = ring + FFTSZ;
 fftbuf = win + (FFTSZ*0.5+1);

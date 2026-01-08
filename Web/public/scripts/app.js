@@ -4954,11 +4954,15 @@ function buildRMEqProQPanelControl(win, ctrl){
         const pp = getP(idx.specBins[i]);
         bins[i] = pp ? clamp01(pp.value||0) : 0;
       }
-      const smoothingBase = allowAddBands ? 0.18 : 0.24;
       for (let i=0;i<binCount;i++){
         const t = i / Math.max(1, binCount - 1);
-        const alpha = smoothingBase + (1 - smoothingBase) * (0.35 + 0.65 * t);
-        specSmooth[i] = specSmooth[i] + (bins[i] - specSmooth[i]) * alpha;
+        const lowBoost = Math.pow(1 - t, 0.35);
+        const cur = specSmooth[i];
+        const target = bins[i];
+        const attack = 0.55 + 0.35 * lowBoost;
+        const decay = 0.08 + 0.12 * (1 - lowBoost);
+        const a = target > cur ? attack : decay;
+        specSmooth[i] = cur + (target - cur) * a;
       }
       const spatial = specSmooth.map((v,i)=>{
         const v0 = specSmooth[Math.max(0,i-1)];
@@ -4972,14 +4976,17 @@ function buildRMEqProQPanelControl(win, ctrl){
         return 0.5 * ((2*p1) + (-p0+p2)*t + (2*p0-5*p1+4*p2-p3)*t2 + (-p0+3*p1-3*p2+p3)*t3);
       };
 
-      const stepsPerBin = allowAddBands ? 8 : 5;
+      const stepsPerBin = allowAddBands ? 10 : 7;
       const steps = (binCount - 1) * stepsPerBin;
-      ctx.strokeStyle = "rgba(255,255,255,.35)";
-      ctx.lineWidth = 1.2;
+      ctx.save();
+      ctx.strokeStyle = "rgba(235,235,235,.55)";
+      ctx.lineWidth = 1.35;
+      ctx.shadowColor = "rgba(255,255,255,.20)";
+      ctx.shadowBlur = 6;
       ctx.beginPath();
       for (let i=0;i<=steps;i++){
         const t = i / Math.max(1, steps);
-        const tWarp = Math.pow(t, 0.72);
+        const tWarp = Math.pow(t, 0.6);
         const raw = tWarp * (binCount - 1);
         const idx1 = Math.floor(raw);
         const frac = raw - idx1;
@@ -4994,9 +5001,15 @@ function buildRMEqProQPanelControl(win, ctrl){
         if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
       }
       ctx.stroke();
-      ctx.globalAlpha = 0.10;
+      ctx.restore();
+
+      const fillGrad = ctx.createLinearGradient(0, y0, 0, h);
+      fillGrad.addColorStop(0, "rgba(255,255,255,.18)");
+      fillGrad.addColorStop(0.65, "rgba(255,255,255,.08)");
+      fillGrad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.globalAlpha = 0.12;
       ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
-      ctx.fillStyle = "rgba(255,255,255,.55)";
+      ctx.fillStyle = fillGrad;
       ctx.fill();
       ctx.globalAlpha = 1;
     }
