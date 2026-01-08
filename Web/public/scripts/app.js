@@ -6087,6 +6087,12 @@ applyResponsiveMode();
     if (!transport) return;
     transportLive.data = Object.assign({}, transport);
     transportLive.ts = performance.now();
+    if (Array.isArray(transport.regions) || Array.isArray(transport.markers)){
+      lastRegionsPayload = {
+        regions: Array.isArray(transport.regions) ? transport.regions : [],
+        markers: Array.isArray(transport.markers) ? transport.markers : []
+      };
+    }
     applyTransportRefs(transport, {
       time: transportTime,
       bars: transportBars,
@@ -6100,6 +6106,9 @@ applyResponsiveMode();
     if (openModal && openModal.kind === "transport" && openModal.transportRefs){
       applyTransportRefs(transport, openModal.transportRefs);
     }
+    if (openModal && openModal.kind === "regions"){
+      renderModal();
+    }
   };
 
   let lastState = null;     // {master, tracks[]}
@@ -6112,6 +6121,7 @@ applyResponsiveMode();
   let meterAnimRaf = 0;
   let meterAnimLastT = 0;
   const transportLive = {data: null, ts: 0};
+  let lastRegionsPayload = null;
 
   function ensureMeterAnim(){
     if (meterAnimRaf) return;
@@ -6359,6 +6369,23 @@ function hideUserPicker(){
           openModal.fxParams = msg.params || [];
           renderModal();
         }
+        return;
+      }
+      if (msg.type === "regions"){
+        const baseTransport = transportLive.data || (lastState && lastState.transport) || {};
+        const nextTransport = Object.assign({}, baseTransport, {
+          regions: Array.isArray(msg.regions) ? msg.regions : [],
+          markers: Array.isArray(msg.markers) ? msg.markers : [],
+          regionName: msg.regionName || baseTransport.regionName || "",
+          regionIndex: Number.isFinite(msg.regionIndex) ? msg.regionIndex : baseTransport.regionIndex,
+        });
+        if (!lastState) lastState = {master: null, tracks: [], transport: nextTransport};
+        else lastState.transport = nextTransport;
+        lastRegionsPayload = {
+          regions: Array.isArray(msg.regions) ? msg.regions : [],
+          markers: Array.isArray(msg.markers) ? msg.markers : []
+        };
+        updateTransportUI(nextTransport);
         return;
       }
     };
@@ -6895,7 +6922,13 @@ slotbar.appendChild(folderBtn);
       if (was) fxExpanded.delete(guid);
       else fxExpanded.add(guid);
       // ensure we have the FX list ready when expanding
-      const cur = Object.assign({}, trackByGuid.get(guid) || t, {_compact: !!t._compact});
+      const cur = Object.assign({}, trackByGuid.get(guid) || t, {
+        _compact: !!t._compact,
+        _gapL: !!t._gapL,
+        _gapR: !!t._gapR,
+        _folderGroupId: t._folderGroupId || null,
+        _folderGroupColor: t._folderGroupColor || "",
+      });
       const fxCount = cur.fxCount || 0;
       if (!was && fxCount>0){
         // request list even if cfg.showFxSlots is off
@@ -7084,7 +7117,15 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
 
     // VOL label
     const db = dbFromVol(t.vol||1.0);
-    r.volDb.textContent = db + " dB";
+    const clipState = meterAnim.get(t.guid);
+    const now = performance.now();
+    if (clipState && clipState.clipUntil && clipState.clipUntil > now && Number.isFinite(clipState.clipDb)){
+      r.volDb.textContent = `CLIP +${clipState.clipDb.toFixed(1)} dB`;
+      r.volDb.classList.add("clip");
+    } else {
+      r.volDb.textContent = db + " dB";
+      r.volDb.classList.remove("clip");
+    }
 
     // narrow strip detection (hide VOL label on very thin strips)
     const w = (el.getBoundingClientRect ? el.getBoundingClientRect().width : el.offsetWidth);
@@ -7714,9 +7755,13 @@ const FX_ADD_CATALOG = [
     tabsEl.innerHTML = "";
     modalBody.innerHTML = "";
     const wrap = document.createElement("div");
-    const transport = (lastState && lastState.transport) ? lastState.transport : {};
-    const regions = Array.isArray(transport.regions) ? transport.regions : [];
-    const markers = Array.isArray(transport.markers) ? transport.markers : [];
+    const transport = transportLive.data || ((lastState && lastState.transport) ? lastState.transport : {});
+    const regions = (lastRegionsPayload && Array.isArray(lastRegionsPayload.regions))
+      ? lastRegionsPayload.regions
+      : (Array.isArray(transport.regions) ? transport.regions : []);
+    const markers = (lastRegionsPayload && Array.isArray(lastRegionsPayload.markers))
+      ? lastRegionsPayload.markers
+      : (Array.isArray(transport.markers) ? transport.markers : []);
     if (!regions.length && !markers.length){
       wrap.innerHTML = `<div class="small">No regions or markers in project.</div>`;
       modalBody.appendChild(wrap);
@@ -8495,6 +8540,8 @@ modalBody.appendChild(wrap);
     overlay.style.display = "block";
     modal.style.display = "block";
     openModal = {kind:"regions"};
+    wsSend({type:"reqRegions"});
+    wsSend({type:"reqState"});
     renderModal();
   }
 
