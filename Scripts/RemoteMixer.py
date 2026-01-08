@@ -716,10 +716,14 @@ def get_regions_and_markers():
         if "RPR_GetSetProjectMarkerByIndex2" in globals():
             try:
                 r = RPR_GetSetProjectMarkerByIndex2(0, i, isrgn, 0, 0, "", 512, 0)
-                if isinstance(r, tuple) and len(r) > 5:
-                    nm = _as_str(r[5])
-                    if nm:
-                        return nm
+                if isinstance(r, tuple):
+                    if len(r) > 4:
+                        nm = _as_str(r[4])
+                        if nm:
+                            return nm
+                    for v in r:
+                        if isinstance(v, (str, bytes)) and _as_str(v).strip():
+                            return _as_str(v)
             except Exception:
                 pass
         return ""
