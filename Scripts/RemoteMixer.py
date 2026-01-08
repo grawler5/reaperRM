@@ -726,7 +726,7 @@ def get_regions_and_markers():
                 else:
                     r = None
             if r is None and "RPR_EnumProjectMarkers" in globals():
-                r = RPR_EnumProjectMarkers(i, 0, 0, 0, "", 0)
+                r = RPR_EnumProjectMarkers(i, 0, 0, 0, "", 512, 0)
                 if isinstance(r, tuple):
                     isrgn = int(r[1]) if len(r) > 1 else 0
                     start = float(r[2]) if len(r) > 2 else 0.0
