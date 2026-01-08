@@ -5,7 +5,7 @@ slider1:50<0,100,1>Reduction
 gain = 1;
 
 @slider
-reduction_amt = max(0, min(100, slider1));
+reduction_amt = max(0, min(100, 100 - slider1));
 thresh_db = -10 - (reduction_amt * 0.6);
 reduction_db = 6 + (reduction_amt * 0.42);
 atk_ms = 5 + (reduction_amt * 0.8);
