@@ -947,9 +947,9 @@ function formatParam(p){
       </div>
       <div class="rmCompMeterReadouts">
         <div class="rmCompMeterReadout rmCompInPeakVal">—</div>
+        <div class="rmCompVal rmCompThreshVal">—</div>
         <div class="rmCompMeterReadout rmCompGrPeakVal">—</div>
       </div>
-      <div class="rmCompVal">—</div>
     `;
     left.appendChild(threshCard);
 
@@ -957,7 +957,7 @@ function formatParam(p){
     const threshThumb = threshCard.querySelector(".rmCompVThumb");
     const threshVu = threshCard.querySelector(".rmCompVUMeter");
     const grFill = threshCard.querySelector(".rmCompGrFill");
-    const threshVal = threshCard.querySelector(".rmCompVal");
+    const threshVal = threshCard.querySelector(".rmCompThreshVal");
     const inPeakVal = threshCard.querySelector(".rmCompInPeakVal");
     const grPeakVal = threshCard.querySelector(".rmCompGrPeakVal");
 
@@ -1142,22 +1142,12 @@ function formatParam(p){
       }
       return (p.value || 0);
     };
-    const formatRawValue = (p, raw)=>{
+    const formatPeakValue = (p, raw)=>{
       if (!p || !Number.isFinite(raw)) return "—";
       const fmt = (p.fmt != null && String(p.fmt).trim() !== "") ? String(p.fmt) : "";
-      if (!fmt){
-        return raw.toFixed(2);
-      }
       const match = fmt.match(/-?\d+(?:\.\d+)?\s*(.*)$/);
-      let decimals = 2;
-      let unit = "";
-      if (match){
-        const num = match[0].trim().split(/\s+/)[0];
-        const dec = num.split(".")[1];
-        decimals = dec ? dec.length : 0;
-        unit = match[1] ? match[1].trim() : "";
-      }
-      const val = raw.toFixed(decimals);
+      const unit = match && match[1] ? match[1].trim() : "";
+      const val = raw.toFixed(1);
       return unit ? `${val} ${unit}` : val;
     };
 
@@ -1206,17 +1196,17 @@ function formatParam(p){
 
       const pInPk = getP(ex.inPeakFind);
       const inTarget = clamp01(pInPk ? normFromParam(pInPk, 0, 1) : 0);
-      meterState.in = meterState.in + (inTarget - meterState.in) * 0.2;
+      meterState.in = meterState.in + (inTarget - meterState.in) * 0.12;
       if (threshVu) threshVu.style.height = (meterState.in * 100) + "%";
 
       const pOutPk = getP(ex.outPeakFind);
       const outTarget = clamp01(pOutPk ? normFromParam(pOutPk, 0, 1) : 0);
-      meterState.out = meterState.out + (outTarget - meterState.out) * 0.2;
+      meterState.out = meterState.out + (outTarget - meterState.out) * 0.12;
       if (outVu) outVu.style.height = (meterState.out * 100) + "%";
 
       const pGr = getP(ex.grFind);
       const grTarget = clamp01(pGr ? normFromParam(pGr, 0, 24) : 0);
-      meterState.gr = meterState.gr + (grTarget - meterState.gr) * 0.25;
+      meterState.gr = meterState.gr + (grTarget - meterState.gr) * 0.16;
       if (grFill) grFill.style.height = (meterState.gr * 100) + "%";
       if (pInPk){
         const raw = getParamRawValue(pInPk, 0, 1);
@@ -1226,8 +1216,8 @@ function formatParam(p){
         const raw = getParamRawValue(pGr, 0, 24);
         meterState.peakGrRaw = meterState.peakGrRaw == null ? raw : Math.max(raw, meterState.peakGrRaw * 0.96);
       }
-      if (inPeakVal) inPeakVal.textContent = pInPk ? formatRawValue(pInPk, meterState.peakInRaw ?? getParamRawValue(pInPk, 0, 1)) : "—";
-      if (grPeakVal) grPeakVal.textContent = pGr ? formatRawValue(pGr, meterState.peakGrRaw ?? getParamRawValue(pGr, 0, 24)) : "—";
+      if (inPeakVal) inPeakVal.textContent = pInPk ? formatPeakValue(pInPk, meterState.peakInRaw ?? getParamRawValue(pInPk, 0, 1)) : "—";
+      if (grPeakVal) grPeakVal.textContent = pGr ? formatPeakValue(pGr, meterState.peakGrRaw ?? getParamRawValue(pGr, 0, 24)) : "—";
 
       const updateRow = (row)=>{
         const p = getP(row.patterns);
@@ -6977,10 +6967,8 @@ applyResponsiveMode();
 
   function getDropTrackTargetIndex(dropGuid, draggingGuid, after){
     const dropIdx = getTrackIndexByGuid(dropGuid);
-    const fromIdx = getTrackIndexByGuid(draggingGuid);
-    if (dropIdx == null || fromIdx == null) return null;
+    if (dropIdx == null) return null;
     let target = dropIdx + (after ? 1 : 0);
-    if (fromIdx < target) target -= 1;
     return Math.max(0, Math.min((lastState.tracks || []).length - 1, target));
   }
 
