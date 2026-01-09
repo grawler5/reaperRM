@@ -1381,6 +1381,15 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 	.pluginWin.layout_rm_eq2:not(.fullscreen){ width:min(920px, 92vw); height:min(700px, 90vh); }
 .pluginWin.layout_rm_compressor:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
 .pluginWin.layout_rm_comp2:not(.fullscreen){ width:min(1100px, 96vw); height:min(640px, 92vh); }
+.pluginWin.layout_rm_comp2 .pluginWinBody{ padding:0; }
+.pluginWin.layout_rm_comp2 .pluginParamList{ height:100%; }
+.pluginWin.layout_rm_comp2 .rmCompPanel{ min-height:100%; }
+.pluginWin.layout_rm_comp2 .plugSection{
+  padding:0;
+  width:100%;
+  height:100%;
+}
+.pluginWin.layout_rm_comp2 .plugGrid{ height:100%; }
 /* Keep RM_Gate window snug to its UI */
 .pluginWin.layout_rm_gate:not(.fullscreen){ width:min(460px, 92vw); height:min(560px, 90vh); }
 .pluginWin.layout_rm_gate:not(.fullscreen) .pluginWinBody{ overflow:hidden; }
@@ -2160,22 +2169,45 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 /* ---- RM_Compressor (custom) ---- */
 .rmCompPanel{
   border-radius: 18px;
-  padding: 14px;
+  padding: 16px;
   background: linear-gradient(rgba(18,20,26,.96), rgba(11,12,16,.96));
   border:1px solid rgba(255,255,255,.10);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
   color: rgba(255,255,255,.92);
   display:grid;
-  grid-template-columns: minmax(260px, 1.3fr) minmax(320px, 2fr) minmax(180px, 0.8fr);
+  grid-template-columns: minmax(170px, 0.8fr) minmax(320px, 2fr) minmax(80px, 0.4fr);
   gap:14px;
   width:100%;
   max-width:100%;
+  min-height:100%;
+  height:100%;
   box-sizing:border-box;
+  align-items:stretch;
 }
-.rmCompCol{ display:flex; flex-direction:column; gap:12px; }
+.rmCompCol{ display:flex; flex-direction:column; gap:12px; height:100%; }
+.rmCompLeft{ justify-content:space-between; }
+.rmCompMid{ justify-content:space-between; }
+.rmCompRight{ align-items:center; justify-content:flex-end; }
 .rmCompRight .rmCompCard{
-  max-width: 220px;
-  align-self:center;
+  max-width: none;
+  width:100%;
+  align-self:flex-start;
+}
+.rmCompOutput{
+  flex: 1 1 auto;
+  width: 70px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+.rmCompOutput .rmCompVTrack{
+  flex:1 1 auto;
+  margin:0 auto;
+}
+.rmCompThreshold{
+  flex:1 1 auto;
+  display:flex;
+  flex-direction:column;
 }
 .rmCompCard{
   background: rgba(255,255,255,.04);
@@ -2203,19 +2235,26 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 }
 .rmCompThresholdRow{
   display:flex;
-  gap:10px;
+  gap:8px;
   align-items:center;
   justify-content:center;
+  flex:1 1 auto;
 }
+.rmCompThreshold .rmCompVTrack{ width:32px; }
+.rmCompThreshold .rmCompVThumb{ width:58px; }
+.rmCompThreshold .rmCompGrMeter{ width:24px; height:100%; }
+.rmCompThreshold .rmCompVTrack{ height:100%; }
+.rmCompOutput .rmCompVTrack{ height:100%; width:32px; }
 .rmCompVTrack{
   position:relative;
-  width:56px;
+  width:32px;
   height:240px;
   border-radius:14px;
   background: rgba(0,0,0,.35);
   border:1px solid rgba(255,255,255,.08);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.4);
   overflow:hidden;
+  flex:1 1 auto;
 }
 .rmCompVUMeter{
   position:absolute;
@@ -2257,6 +2296,27 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   background: rgba(0,0,0,.35);
   border:1px solid rgba(255,255,255,.08);
   overflow:hidden;
+}
+.rmCompMeterReadouts{
+  display:grid;
+  grid-template-columns: 1fr 80px 1fr;
+  gap:8px;
+  margin-top:10px;
+  align-items:center;
+}
+.rmCompThreshVal{
+  margin-top:0;
+  padding: 6px 4px;
+}
+.rmCompMeterReadout{
+  font-size:12px;
+  font-weight:600;
+  text-align:center;
+  background: rgba(0,0,0,.25);
+  border:1px solid rgba(255,255,255,.10);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-variant-numeric: tabular-nums;
 }
 .rmCompGrFill{
   position:absolute;
@@ -2309,6 +2369,21 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   background: rgba(0,0,0,.35);
   color: rgba(255,255,255,.9);
   padding:8px 12px;
+}
+.rmCompDetectRow{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.rmCompDetectRow .rmCompMiniBtn{ margin-top:0; }
+.rmCompDetectToggle.on{
+  background: rgba(60,120,255,.35);
+  border-color: rgba(100,160,255,.55);
+  box-shadow: 0 0 0 1px rgba(100,160,255,.35) inset;
+}
+.rmCompDetectRowThreshold{
+  margin-top:16px;
+  justify-content:center;
 }
 
 @media (max-width: 720px){
