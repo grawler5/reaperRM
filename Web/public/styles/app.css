@@ -3958,3 +3958,164 @@ background: linear-gradient(180deg,
   background: rgba(150,200,255,0.95);
   box-shadow: 0 0 8px rgba(150,200,255,0.6);
 }
+/* ===== RM_Compressor2 (layout_rm_comp2) — v5 aesthetic pass =====
+   Goals based on latest screenshot:
+   - rmCompPanel (dark background) must span the whole window width
+   - Threshold block not too wide
+   - THRESHOLD title centered
+   - Threshold fader + GR meter side-by-side, same strip width as Output, centered
+   - All vertical strips same (taller) height
+   - Threshold numeric box: narrower + centered above the faders
+   - No overflow outside the Threshold card
+   - Bottom buttons sit higher (breathing room from window bottom)
+   - When window is small, content should scroll instead of being clipped
+*/
+
+/* Stop the "layoutScaled" centering/scaling from shrinking rmCompPanel in wide windows */
+.pluginWin.layout_rm_comp2 .pluginParamList.layoutScaled{
+  display:block;
+  overflow:auto;
+  align-items:stretch;
+  justify-content:stretch;
+}
+.pluginWin.layout_rm_comp2 .plugLayoutStage{
+  transform:none !important;
+  width:100%;
+  height:100%;
+}
+
+/* Make the layout a single full-width cell */
+.pluginWin.layout_rm_comp2 .plugGrid{
+  grid-template-columns: 1fr !important;
+  justify-items: stretch;
+  align-items: stretch;
+  height: 100%;
+}
+.pluginWin.layout_rm_comp2 .plugGrid > .plugCtrl{
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+}
+
+/* Panel spans the whole available area + extra bottom space */
+.pluginWin.layout_rm_comp2 .rmCompPanel{
+  width:100%;
+  max-width:none;
+  height:100%;
+  min-height:100%;
+  min-width:0;
+  padding:16px 16px 34px;
+
+  /* Narrower Threshold column, roomy middle, compact Output */
+  grid-template-columns:
+    clamp(230px, 21vw, 265px)
+    minmax(360px, 1fr)
+    clamp(98px, 9vw, 120px);
+  gap:16px;
+}
+
+/* Taller, consistent vertical strip height */
+.pluginWin.layout_rm_comp2{
+  --rmStripW: 32px;
+  --rmCompMeterH: clamp(280px, 62vh, 440px);
+}
+
+/* Output strip */
+.pluginWin.layout_rm_comp2 .rmCompOutput{
+  width: 70px;
+}
+.pluginWin.layout_rm_comp2 .rmCompOutput .rmCompVTrack{
+  width: var(--rmStripW);
+  height: var(--rmCompMeterH);
+  flex: 0 0 auto;
+  margin: 0 auto;
+}
+
+/* Threshold: title centered */
+.pluginWin.layout_rm_comp2 .rmCompThreshold{
+  position:relative;
+  min-width:0;
+  overflow:hidden; /* safety: nothing can poke outside */
+}
+.pluginWin.layout_rm_comp2 .rmCompThreshold .rmCompCardTitle{
+  text-align:center;
+  margin: 2px 0 10px 0;
+}
+
+/* Threshold numeric readout: narrow + above the faders */
+.pluginWin.layout_rm_comp2 .rmCompThreshVal{
+  position:absolute;
+  top: 36px;              /* sits under the title */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 72px;
+  padding: 6px 6px;
+  margin: 0;
+  z-index: 3;
+}
+
+/* Threshold fader + GR meter: 2 equal strips, centered */
+.pluginWin.layout_rm_comp2 .rmCompThresholdRow{
+  display:grid;
+  grid-template-columns: var(--rmStripW) var(--rmStripW);
+  justify-content:center;
+  align-items:stretch;
+  column-gap: 14px;
+
+  /* fixed height so strips are always tall, not "floating" inside a bigger flex area */
+  height: var(--rmCompMeterH);
+  flex: 0 0 auto;
+
+  /* space for the absolute threshold value above */
+  margin-top: 34px;
+}
+
+.pluginWin.layout_rm_comp2 .rmCompThreshold .rmCompVTrack,
+.pluginWin.layout_rm_comp2 .rmCompThreshold .rmCompGrMeter{
+  width: var(--rmStripW);
+  height: 100%;
+  min-height: 220px;
+}
+
+/* Thumb: slightly narrower so it never touches borders */
+.pluginWin.layout_rm_comp2 .rmCompThreshold .rmCompVThumb{
+  width: 44px;
+  height: 14px;
+  border-radius: 9px;
+}
+
+/* Meter readouts: only L/R in the grid; center value is absolute */
+.pluginWin.layout_rm_comp2 .rmCompMeterReadouts{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+  align-items:center;
+}
+.pluginWin.layout_rm_comp2 .rmCompMeterReadout{
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Lift the bottom buttons row a bit */
+.pluginWin.layout_rm_comp2 .rmCompBottomRow{
+  margin-top: 14px;
+  padding-bottom: 10px;
+}
+
+/* Small windows: reduce strip height a bit but keep proportions */
+@media (max-height: 560px){
+  .pluginWin.layout_rm_comp2{ --rmCompMeterH: clamp(220px, 54vh, 340px); }
+  .pluginWin.layout_rm_comp2 .rmCompPanel{ padding:12px 12px 26px; gap:12px; }
+  .pluginWin.layout_rm_comp2 .rmCompThreshVal{ top: 34px; width: 70px; }
+  .pluginWin.layout_rm_comp2 .rmCompThresholdRow{ margin-top: 30px; column-gap: 12px; }
+}
+
+/* Narrow windows: stack columns */
+@media (max-width: 760px){
+  .pluginWin.layout_rm_comp2 .rmCompPanel{ grid-template-columns: 1fr; }
+  .pluginWin.layout_rm_comp2 .rmCompOutput{ width:auto; }
+}
