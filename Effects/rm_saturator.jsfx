@@ -18,10 +18,10 @@ slider4:bias=0<-0.50,0.50,0.001>Bias (asym)
 slider5:tone_db=0<-12,12,0.1>Tone (tilt dB)
 
 slider6:locut=20<20,300,1>LoCut (Hz)
-slider7:hp_slope=0<0,15,1{6,12,18,24,30,36,42,48,54,60,66,72,78,84,90,96}>HP Slope (dB/oct)
+slider7:hp_slope=0<0,5,1{6,12,18,24,48,96}>HP Slope (dB/oct)
 
 slider8:hicut=20000<4000,20000,10>HiCut (Hz)
-slider9:lp_slope=0<0,15,1{6,12,18,24,30,36,42,48,54,60,66,72,78,84,90,96}>LP Slope (dB/oct)
+slider9:lp_slope=0<0,5,1{6,12,18,24,48,96}>LP Slope (dB/oct)
 
 slider10:auto=1<0,1,1{Off,On}>Auto level (RMS)
 slider11:out_db=0<-50,24,0.1>Output (dB)
@@ -232,8 +232,8 @@ sr  = srate;
 sr2 = sr*2;
 
 // stages from slope menus
-hp_stages = hp_slope + 1; // 0..15 -> 1..16
-lp_stages = lp_slope + 1;
+hp_stages = hp_slope <= 3 ? (hp_slope + 1) : (hp_slope == 4 ? 8 : 16);
+lp_stages = lp_slope <= 3 ? (lp_slope + 1) : (lp_slope == 4 ? 8 : 16);
 
 // Total drive
 drive_total_db = drive_db + punish*20;

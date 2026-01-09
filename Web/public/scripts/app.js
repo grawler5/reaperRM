@@ -24,6 +24,7 @@
     } catch {}
     return JSON.parse(JSON.stringify(obj));
   };
+  const clamp01 = (v)=> Math.max(0, Math.min(1, v||0));
 
 
 
@@ -45,6 +46,8 @@
   const pluginOverlay = document.getElementById("pluginOverlay");
   const pluginWins = new Map(); // key -> {key,guid,fxIndex,el,params,search,pollT,z}
   let pluginZ = 5100;
+  const fxPresetCache = new Map(); // fxName -> {presets:[], ts}
+  const fxPendingOpen = new Map(); // guid -> {name, ts}
 
   // --- Plugin layout registry (v1.2.1) ---
   // We render DAW-like panels for known plugins; otherwise fallback to raw parameter list.
@@ -242,6 +245,46 @@
           crushFind:[/crush/i],
           hpfFind:[/hpf/i],
           lpfFind:[/\blpf\b/i]
+        }}
+      ] }
+    ]
+  },
+  {
+    id: "rm_vox",
+    match: (name)=> /\bRM[\s_]*R?Vox\b/i.test(name),
+    title: "RM_Vox",
+    sections: [
+      { title: "", controls: [
+        {type:"rmVoxPanel", extra:{
+          gateFind:[/\bgate\b/i],
+          compFind:[/\bcomp\b/i],
+          gainFind:[/\bgain\b/i],
+          inFind:[/telemetry.*in.*peak/i],
+          grFind:[/telemetry.*\bgr\b/i],
+          outFind:[/telemetry.*out.*peak/i]
+        }}
+      ] }
+    ]
+  },
+  {
+    id: "rm_saturator",
+    match: (name)=> /\bRM[\s_]*Saturator\b/i.test(name),
+    title: "RM_Saturator",
+    sections: [
+      { title: "", controls: [
+        {type:"rmSaturatorPanel", extra:{
+          driveFind:[/\bdrive\b/i],
+          punishFind:[/\bpunish\b/i],
+          styleFind:[/\bstyle\b/i],
+          biasFind:[/\bbias\b/i],
+          toneFind:[/\btone\b/i],
+          locutFind:[/\blocut\b/i],
+          hicutFind:[/\bhicut\b/i],
+          hpSlopeFind:[/\bhp\s*slope\b/i],
+          lpSlopeFind:[/\blp\s*slope\b/i],
+          autoFind:[/\bauto\b/i],
+          outFind:[/\boutput\b/i],
+          mixFind:[/\bmix\b/i]
         }}
       ] }
     ]
@@ -3448,6 +3491,390 @@ function buildRMDelayMachinePanelControl(win, ctrl){
   return {el: host, update, ctrl};
 }
 
+function buildRMVoxPanelControl(win, ctrl){
+  const ex = (ctrl && ctrl.extra) ? ctrl.extra : {};
+  const host = document.createElement("div");
+  host.className = "rmVoxHost";
+  const panel = document.createElement("div");
+  panel.className = "rmVoxPanel";
+  host.appendChild(panel);
+
+  const header = document.createElement("div");
+  header.className = "rmVoxHeader";
+  header.innerHTML = `<div class="rmVoxTitle">RM VOX</div><div class="rmVoxSub">Gate / Comp / Gain</div>`;
+  panel.appendChild(header);
+
+  const faderRow = document.createElement("div");
+  faderRow.className = "rmVoxFaders";
+  panel.appendChild(faderRow);
+
+  const ps = ()=> (Array.isArray(win.params) ? win.params : []);
+  const find = (patterns)=> findParamByPatterns(ps(), patterns||[]);
+
+  const pGate = ()=> find(ex.gateFind) || ps().find(p=>/\bgate\b/i.test(String(p.name||""))) || null;
+  const pComp = ()=> find(ex.compFind) || ps().find(p=>/\bcomp\b/i.test(String(p.name||""))) || null;
+  const pGain = ()=> find(ex.gainFind) || ps().find(p=>/\bgain\b/i.test(String(p.name||""))) || null;
+
+  const pIn  = ()=> find(ex.inFind)  || ps().find(p=>/telemetry.*in.*peak/i.test(String(p.name||""))) || null;
+  const pGR  = ()=> find(ex.grFind)  || ps().find(p=>/telemetry.*\bgr\b/i.test(String(p.name||""))) || null;
+  const pOut = ()=> find(ex.outFind) || ps().find(p=>/telemetry.*out.*peak/i.test(String(p.name||""))) || null;
+
+  const clamp01 = (v)=> Math.max(0, Math.min(1, v||0));
+  const meterNorm = (p, maxVal=1)=>{
+    if (!p) return 0;
+    if (Number.isFinite(p.raw)){
+      const mx = Number.isFinite(p.max) ? p.max : maxVal;
+      if (Number.isFinite(mx) && mx > 0) return clamp01(p.raw / mx);
+    }
+    if (Number.isFinite(p.value)) return clamp01(p.value);
+    return 0;
+  };
+
+  function mkFader(label, getParam, getMeter, meterMax){
+    const wrap = document.createElement("div");
+    wrap.className = "rmVoxFaderWrap";
+    const lbl = document.createElement("div");
+    lbl.className = "rmVoxFaderLabel";
+    lbl.textContent = label;
+    const track = document.createElement("div");
+    track.className = "rmVoxFaderTrack";
+    const meter = document.createElement("div");
+    meter.className = "rmVoxFaderVu";
+    const meterFill = document.createElement("div");
+    meterFill.className = "rmVoxFaderVuFill";
+    meter.appendChild(meterFill);
+    const fill = document.createElement("div");
+    fill.className = "rmVoxFaderFill";
+    const thumb = document.createElement("div");
+    thumb.className = "rmVoxFaderThumb";
+    track.appendChild(meter);
+    track.appendChild(fill);
+    track.appendChild(thumb);
+    const val = document.createElement("div");
+    val.className = "rmVoxFaderVal";
+    val.textContent = "—";
+    wrap.appendChild(lbl);
+    wrap.appendChild(track);
+    wrap.appendChild(val);
+
+    let drag = null;
+    const setFromClientY = (ev)=>{
+      const p = getParam();
+      if (!p) return;
+      const r = track.getBoundingClientRect();
+      const y = Math.max(r.top, Math.min(r.bottom, ev.clientY));
+      const n = 1 - ((y - r.top) / Math.max(1, r.height));
+      const v = clamp01(n);
+      setParamNormalized(win, p.index, v);
+      p.value = v;
+      try{ setDraggedParamValue(win, p.index, v); }catch(_){ }
+      suppressPoll(win, 600);
+      update();
+    };
+
+    const startDrag = (ev)=>{
+      const p = getParam();
+      if (!p) return;
+      if (ev.button !== 0) return;
+      bringPluginToFront(win);
+      beginParamDrag(win, p.index);
+      suppressPoll(win, 600);
+      drag = {id: ev.pointerId};
+      try{ track.setPointerCapture(ev.pointerId); }catch(_){ }
+      ev.preventDefault();
+      setFromClientY(ev);
+    };
+
+    thumb.addEventListener("pointerdown", startDrag);
+    track.addEventListener("pointerdown", (ev)=>{
+      if (ev.target === thumb) return;
+      startDrag(ev);
+    });
+    track.addEventListener("pointermove", (ev)=>{
+      if (!drag || ev.pointerId !== drag.id) return;
+      setFromClientY(ev);
+    });
+    const endDrag = (ev)=>{
+      if (!drag || ev.pointerId !== drag.id) return;
+      const p = getParam();
+      if (p) endParamDrag(win, p.index);
+      drag = null;
+      try{ track.releasePointerCapture(ev.pointerId); }catch(_){ }
+    };
+    track.addEventListener("pointerup", endDrag);
+    track.addEventListener("pointercancel", endDrag);
+
+    const update = ()=>{
+      const p = getParam();
+      if (p){
+        const v = clamp01(p.value||0);
+        fill.style.height = (v*100) + "%";
+        thumb.style.top = ((1 - v)*100) + "%";
+        val.textContent = formatParam(p);
+      }else{
+        fill.style.height = "0%";
+        thumb.style.top = "100%";
+        val.textContent = "—";
+      }
+
+      const m = getMeter ? getMeter() : null;
+      const mv = meterNorm(m, meterMax || 1);
+      meterFill.style.height = (mv*100) + "%";
+    };
+
+    update();
+    return {el: wrap, update};
+  }
+
+  const fGate = mkFader("GATE", pGate, pIn, 1);
+  const fComp = mkFader("COMP", pComp, pGR, 24);
+  const fGain = mkFader("OUTPUT", pGain, pOut, 1);
+
+  faderRow.appendChild(fGate.el);
+  faderRow.appendChild(fComp.el);
+  faderRow.appendChild(fGain.el);
+
+  const update = ()=>{
+    fGate.update();
+    fComp.update();
+    fGain.update();
+  };
+  ctrl.update = ()=>update();
+  update();
+  return {el: host, update, ctrl};
+}
+
+function buildRMSaturatorPanelControl(win, ctrl){
+  const ex = (ctrl && ctrl.extra) ? ctrl.extra : {};
+  const host = document.createElement("div");
+  host.className = "rmSatHost";
+  const panel = document.createElement("div");
+  panel.className = "rmSatPanel";
+  host.appendChild(panel);
+
+  const header = document.createElement("div");
+  header.className = "rmSatHeader";
+  header.innerHTML = `<div class="rmSatTitle">RM SATURATOR</div><div class="rmSatSub">2x OS • Auto Level</div>`;
+  panel.appendChild(header);
+
+  const grid = document.createElement("div");
+  grid.className = "rmSatGrid";
+  panel.appendChild(grid);
+
+  const ps = ()=> (Array.isArray(win.params) ? win.params : []);
+  const find = (patterns)=> findParamByPatterns(ps(), patterns||[]);
+  const getRaw = (p, fbMin=0, fbMax=1)=>{
+    if (!p) return fbMin;
+    if (Number.isFinite(p.raw)) return p.raw;
+    const mn = Number.isFinite(p.min) ? p.min : fbMin;
+    const mx = Number.isFinite(p.max) ? p.max : fbMax;
+    return mn + (Number(p.value||0))*(mx-mn);
+  };
+
+  const clamp01 = (v)=> Math.max(0, Math.min(1, v||0));
+
+  const pDrive = ()=> find(ex.driveFind);
+  const pPunish = ()=> find(ex.punishFind);
+  const pStyle = ()=> find(ex.styleFind);
+  const pBias = ()=> find(ex.biasFind);
+  const pTone = ()=> find(ex.toneFind);
+  const pLocut = ()=> find(ex.locutFind);
+  const pHicut = ()=> find(ex.hicutFind);
+  const pHpSlope = ()=> find(ex.hpSlopeFind);
+  const pLpSlope = ()=> find(ex.lpSlopeFind);
+  const pAuto = ()=> find(ex.autoFind);
+  const pOut = ()=> find(ex.outFind);
+  const pMix = ()=> find(ex.mixFind);
+
+  const formatDb = (p)=>{
+    const raw = getRaw(p, -60, 60);
+    const rounded = Math.round(raw*10)/10;
+    return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)} dB`;
+  };
+  const formatHz = (p, fallbackMin, fallbackMax)=>{
+    const raw = getRaw(p, fallbackMin, fallbackMax);
+    if (raw >= 1000) return `${(raw/1000).toFixed(1)}k`;
+    return `${Math.round(raw)}`;
+  };
+  const formatPct = (p, fallbackMin, fallbackMax)=>{
+    const raw = getRaw(p, fallbackMin, fallbackMax);
+    return `${Math.round(raw)}%`;
+  };
+
+  const colDrive = document.createElement("div");
+  colDrive.className = "rmSatCol";
+  const colFilt = document.createElement("div");
+  colFilt.className = "rmSatCol";
+  const colOut = document.createElement("div");
+  colOut.className = "rmSatCol";
+  grid.appendChild(colDrive);
+  grid.appendChild(colFilt);
+  grid.appendChild(colOut);
+
+  const mkSection = (title)=>{
+    const sec = document.createElement("div");
+    sec.className = "rmSatSection";
+    const t = document.createElement("div");
+    t.className = "rmSatSectionTitle";
+    t.textContent = title;
+    sec.appendChild(t);
+    return sec;
+  };
+
+  const driveSec = mkSection("Drive");
+  const driveDial = buildRmDialControl(win, "DRIVE", pDrive, { valueFormatter: formatDb });
+  const biasDial = buildRmDialControl(win, "BIAS", pBias, { valueFormatter: (p)=> getRaw(p, -0.5, 0.5).toFixed(3) });
+  const toneDial = buildRmDialControl(win, "TONE", pTone, { valueFormatter: formatDb });
+  driveSec.appendChild(driveDial.el);
+  driveSec.appendChild(biasDial.el);
+  driveSec.appendChild(toneDial.el);
+
+  const punishBtn = document.createElement("button");
+  punishBtn.type = "button";
+  punishBtn.className = "rmSatToggle";
+  punishBtn.textContent = "PUNISH";
+  driveSec.appendChild(punishBtn);
+
+  const styleSec = mkSection("Style");
+  const styleRow = document.createElement("div");
+  styleRow.className = "rmSatButtonRow";
+  const styleLabels = ["Tape","Tube","Diode","Trans","Rect"];
+  const styleButtons = styleLabels.map((label, idx)=>{
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "rmSatBtn";
+    b.textContent = label;
+    b.addEventListener("click", ()=>{
+      const p = pStyle();
+      if (!p) return;
+      bringPluginToFront(win);
+      suppressPoll(win, 600);
+      const v = idx / (styleLabels.length - 1);
+      setParamNormalized(win, p.index, v);
+      p.value = v;
+      update();
+    });
+    styleRow.appendChild(b);
+    return b;
+  });
+  styleSec.appendChild(styleRow);
+
+  colDrive.appendChild(driveSec);
+  colDrive.appendChild(styleSec);
+
+  const filterSec = mkSection("Filters");
+  const loDial = buildRmDialControl(win, "LO CUT", pLocut, { valueFormatter: (p)=> formatHz(p, 20, 300) });
+  const hiDial = buildRmDialControl(win, "HI CUT", pHicut, { valueFormatter: (p)=> formatHz(p, 4000, 20000) });
+  filterSec.appendChild(loDial.el);
+  filterSec.appendChild(hiDial.el);
+
+  const slopeValues = [6,12,18,24,48,96];
+  const mkSlopeGroup = (label, getParam)=>{
+    const wrap = document.createElement("div");
+    wrap.className = "rmSatSlopeGroup";
+    const t = document.createElement("div");
+    t.className = "rmSatSlopeLabel";
+    t.textContent = label;
+    wrap.appendChild(t);
+    const row = document.createElement("div");
+    row.className = "rmSatButtonRow rmSatSlopeRow";
+    const btns = slopeValues.map((val, idx)=>{
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "rmSatBtn";
+      b.textContent = String(val);
+      b.addEventListener("click", ()=>{
+        const p = getParam();
+        if (!p) return;
+        bringPluginToFront(win);
+        suppressPoll(win, 600);
+        const v = idx / (slopeValues.length - 1);
+        setParamNormalized(win, p.index, v);
+        p.value = v;
+        update();
+      });
+      row.appendChild(b);
+      return b;
+    });
+    wrap.appendChild(row);
+    return {wrap, btns};
+  };
+
+  const hpSlopeGroup = mkSlopeGroup("HP SLOPE (dB/oct)", pHpSlope);
+  const lpSlopeGroup = mkSlopeGroup("LP SLOPE (dB/oct)", pLpSlope);
+  filterSec.appendChild(hpSlopeGroup.wrap);
+  filterSec.appendChild(lpSlopeGroup.wrap);
+  colFilt.appendChild(filterSec);
+
+  const outSec = mkSection("Output");
+  const outDial = buildRmDialControl(win, "OUTPUT", pOut, { valueFormatter: formatDb });
+  const mixDial = buildRmDialControl(win, "MIX", pMix, { valueFormatter: (p)=> formatPct(p, 0, 100) });
+  const autoBtn = document.createElement("button");
+  autoBtn.type = "button";
+  autoBtn.className = "rmSatToggle";
+  autoBtn.textContent = "AUTO LEVEL";
+  outSec.appendChild(outDial.el);
+  outSec.appendChild(mixDial.el);
+  outSec.appendChild(autoBtn);
+  colOut.appendChild(outSec);
+
+  const update = ()=>{
+    driveDial.update();
+    biasDial.update();
+    toneDial.update();
+    loDial.update();
+    hiDial.update();
+    outDial.update();
+    mixDial.update();
+
+    const pPun = pPunish();
+    punishBtn.disabled = !pPun;
+    punishBtn.classList.toggle("on", pPun ? clamp01(pPun.value) >= 0.5 : false);
+
+    const pSt = pStyle();
+    const styleRaw = getRaw(pSt, 0, styleLabels.length - 1);
+    styleButtons.forEach((b, idx)=> b.classList.toggle("on", Math.round(styleRaw) === idx));
+
+    const pHp = pHpSlope();
+    const hpRaw = getRaw(pHp, 0, slopeValues.length - 1);
+    hpSlopeGroup.btns.forEach((b, idx)=> b.classList.toggle("on", Math.round(hpRaw) === idx));
+
+    const pLp = pLpSlope();
+    const lpRaw = getRaw(pLp, 0, slopeValues.length - 1);
+    lpSlopeGroup.btns.forEach((b, idx)=> b.classList.toggle("on", Math.round(lpRaw) === idx));
+
+    const pAu = pAuto();
+    autoBtn.disabled = !pAu;
+    autoBtn.classList.toggle("on", pAu ? clamp01(pAu.value) >= 0.5 : false);
+  };
+
+  punishBtn.addEventListener("click", ()=>{
+    const p = pPunish();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 600);
+    const next = clamp01(p.value) >= 0.5 ? 0 : 1;
+    setParamNormalized(win, p.index, next);
+    p.value = next;
+    update();
+  });
+
+  autoBtn.addEventListener("click", ()=>{
+    const p = pAuto();
+    if (!p) return;
+    bringPluginToFront(win);
+    suppressPoll(win, 600);
+    const next = clamp01(p.value) >= 0.5 ? 0 : 1;
+    setParamNormalized(win, p.index, next);
+    p.value = next;
+    update();
+  });
+
+  ctrl.update = ()=>update();
+  update();
+  return {el: host, update, ctrl};
+}
+
 function buildRmDialControl(win, label, getParamFn, options = {}){
   const {steps = null, valueFormatter = null} = options;
   const wrap = document.createElement("div");
@@ -6325,6 +6752,8 @@ for (const c of (sec.controls||[])){
           else if (c.type === "rmL2Panel") ui = buildRML2PanelControl(win, ctrl);
           else if (c.type === "rmKickerL2Panel") ui = buildRMKickerL2PanelControl(win, ctrl);
           else if (c.type === "rmDelayMachinePanel") ui = buildRMDelayMachinePanelControl(win, ctrl);
+          else if (c.type === "rmVoxPanel") ui = buildRMVoxPanelControl(win, ctrl);
+          else if (c.type === "rmSaturatorPanel") ui = buildRMSaturatorPanelControl(win, ctrl);
           else if (c.type === "rmEqt1aPanel") ui = buildRMEqt1aPanelControl(win, ctrl);
 	          else if (c.type === "rmLexi2Panel") ui = buildRMLexi2PanelControl(win, ctrl);
           else if (c.type === "rmDeesserPanel") ui = buildRMDeesserPanelControl(win, ctrl);
@@ -6429,6 +6858,48 @@ for (const c of (sec.controls||[])){
     if (title){
       const tn = t ? (t.kind==="master" ? "MASTER" : (t.name||"Track")) : "Track";
       title.textContent = fxName ? `${tn} • ${fxName}` : `${tn} • FX #${win.fxIndex}`;
+    }
+
+    const toggleBtn = win.el.querySelector("[data-act=toggle]");
+    if (toggleBtn){
+      const cached = fxCache.get(win.guid);
+      const list = (cached && cached.fx) ? cached.fx : [];
+      const fx = list.find(f=>f.index===win.fxIndex);
+      const enabled = fx ? !!fx.enabled : false;
+      toggleBtn.textContent = enabled ? "ON" : "OFF";
+      toggleBtn.classList.toggle("on", enabled);
+      toggleBtn.disabled = !fx;
+      toggleBtn.title = enabled ? "Disable plugin" : "Enable plugin";
+    }
+
+    const presetWrap = win.el.querySelector(".pluginPresetBar");
+    const presetSelect = win.el.querySelector(".pluginPresetSelect");
+    const deletePresetBtn = win.el.querySelector("[data-act=deletePreset]");
+    if (presetWrap && presetSelect){
+      const fxKey = presetKeyFromName(fxName);
+      if (fxKey && win.presetKey !== fxKey){
+        win.presetKey = fxKey;
+        win.presetSelection = "";
+        wsSend({type:"reqFxPresets", guid: win.guid, fxName});
+      }
+      const cached = fxPresetCache.get(fxKey);
+      const presets = cached ? cached.presets : [];
+      presetSelect.innerHTML = "";
+      const optDefault = document.createElement("option");
+      optDefault.value = "";
+      optDefault.textContent = "Default";
+      presetSelect.appendChild(optDefault);
+      presets.forEach(p=>{
+        const opt = document.createElement("option");
+        opt.value = String(p.id);
+        opt.textContent = p.name || "Preset";
+        presetSelect.appendChild(opt);
+      });
+      if (win.presetSelection && !presets.find(p=>String(p.id) === String(win.presetSelection))){
+        win.presetSelection = "";
+      }
+      presetSelect.value = win.presetSelection || "";
+      if (deletePresetBtn) deletePresetBtn.disabled = !presetSelect.value;
     }
 
     const listEl = win.el.querySelector(".pluginParamList");
@@ -6540,10 +7011,16 @@ for (const c of (sec.controls||[])){
           <div class="pluginHdrBtns">
             <button class="miniBtn" data-act="refresh">Refresh</button>
             <button class="miniBtn" data-act="inspector">Inspector</button>
+            <button class="miniBtn" data-act="toggle">ON</button>
             <button class="miniBtn" data-act="close">✕</button>
           </div>
         </div>
         <div class="pluginWinBody">
+          <div class="pluginPresetBar">
+            <select class="pluginPresetSelect"></select>
+            <button class="miniBtn" data-act="savePreset">Save</button>
+            <button class="miniBtn" data-act="deletePreset">Delete</button>
+          </div>
           <div class="pluginSearch">
             <input type="text" placeholder="Search params…">
           </div>
@@ -6554,7 +7031,7 @@ for (const c of (sec.controls||[])){
       // default view: layout if known, otherwise raw inspector
       const fxName = getFxNameFromCache(guid, fxIndex);
       const hasLayout = !!pickLayout(fxName);
-      win = {key, guid, fxIndex, el, params: [], search: "", pollT: null, _suppressPoll:false, _dragParams:new Set(), _dragValues:new Map(), viewMode: hasLayout ? "layout" : "raw", _layoutUI:null, _viewModeLocked:false};
+      win = {key, guid, fxIndex, el, params: [], search: "", pollT: null, _suppressPoll:false, _dragParams:new Set(), _dragValues:new Map(), viewMode: hasLayout ? "layout" : "raw", _layoutUI:null, _viewModeLocked:false, presetSelection:"", presetKey:""};
       pluginWins.set(key, win);
 
       // interactions
@@ -6571,9 +7048,27 @@ for (const c of (sec.controls||[])){
 
       const btnInspector = el.querySelector("[data-act=inspector]");
       try{ btnInspector.addEventListener("pointerdown", (ev)=>ev.stopPropagation()); }catch(_){ }
+      const btnToggle = el.querySelector("[data-act=toggle]");
+      try{ btnToggle.addEventListener("pointerdown", (ev)=>ev.stopPropagation()); }catch(_){ }
+
+      const presetSelect = el.querySelector(".pluginPresetSelect");
+      const btnSavePreset = el.querySelector("[data-act=savePreset]");
+      const btnDeletePreset = el.querySelector("[data-act=deletePreset]");
 
       btnRefresh.addEventListener("click", ()=>wsSend({type:"reqFxParams", guid, fxIndex}));
       btnClose.addEventListener("click", ()=>closePluginWin(key));
+      if (btnToggle){
+        btnToggle.addEventListener("click", ()=>{
+          const cached = fxCache.get(guid);
+          const list = (cached && cached.fx) ? cached.fx : [];
+          const fx = list.find(f=>f.index===fxIndex);
+          if (!fx) return;
+          const enabled = !fx.enabled;
+          wsSend({type:"setFxEnabled", guid, index: fxIndex, enabled});
+          fx.enabled = enabled;
+          renderPluginWin(win);
+        });
+      }
       if (btnInspector){
         btnInspector.addEventListener("click", ()=>{
           win._viewModeLocked = true;
@@ -6592,6 +7087,55 @@ for (const c of (sec.controls||[])){
           }
           renderPluginWin(win);
           setPluginPollInterval(win);
+        });
+      }
+
+      if (presetSelect){
+        presetSelect.addEventListener("change", ()=>{
+          win.presetSelection = presetSelect.value || "";
+          if (!win.presetSelection) return;
+          const fxName = getFxNameFromCache(win.guid, win.fxIndex);
+          const keyName = presetKeyFromName(fxName);
+          const cached = fxPresetCache.get(keyName);
+          const presets = cached ? cached.presets : [];
+          const preset = presets.find(p=>String(p.id) === String(win.presetSelection));
+          if (!preset) return;
+          suppressPoll(win, 800);
+          for (const prm of (preset.params||[])){
+            const idx = Number(prm.index);
+            const val = clamp01(Number(prm.value));
+            if (!Number.isFinite(idx) || !Number.isFinite(val)) continue;
+            wsSend({type:"setFxParam", guid: win.guid, fxIndex: win.fxIndex, param: idx, value: val});
+            const local = (win.params||[]).find(p=>p.index===idx);
+            if (local) local.value = val;
+          }
+          renderPluginWin(win);
+        });
+      }
+      if (btnSavePreset){
+        btnSavePreset.addEventListener("click", ()=>{
+          const fxName = getFxNameFromCache(win.guid, win.fxIndex);
+          if (!fxName) return;
+          const name = prompt("Preset name?");
+          if (!name) return;
+          const params = (win.params||[]).filter(p=>{
+            const n = String(p.name||"");
+            return !/telemetry/i.test(n);
+          }).map(p=>({index: p.index, value: clamp01(p.value||0)}));
+          wsSend({type:"saveFxPreset", guid: win.guid, fxName, name, params});
+          win.presetSelection = "";
+          renderPluginWin(win);
+        });
+      }
+      if (btnDeletePreset){
+        btnDeletePreset.addEventListener("click", ()=>{
+          if (!win.presetSelection) return;
+          const fxName = getFxNameFromCache(win.guid, win.fxIndex);
+          if (!fxName) return;
+          if (!confirm("Delete selected preset?")) return;
+          wsSend({type:"deleteFxPreset", guid: win.guid, fxName, presetId: win.presetSelection});
+          win.presetSelection = "";
+          renderPluginWin(win);
         });
       }
 
@@ -6940,6 +7484,7 @@ applyResponsiveMode();
   let dragDropState = null;
   let dragDropEl = null;
   let dragDropTargetEl = null;
+  let fxSlotDrag = null;
 
   function applyOptimisticMove(guid, beforeGuid){
     if (!lastState || !Array.isArray(lastState.tracks)) return;
@@ -7243,15 +7788,43 @@ applyResponsiveMode();
         return;
       }
       if (msg.type === "fxList"){ 
+        const prevFx = (fxCache.get(msg.guid) && fxCache.get(msg.guid).fx) ? fxCache.get(msg.guid).fx : [];
         fxCache.set(msg.guid, {fx: (msg.fx||[]), ts: Date.now()});
         fxReqInFlight.delete(msg.guid);
         const el = stripEls.get(msg.guid);
         if (el) updateFxSlotsUI(el, msg.guid);
 
+        // If we just added an FX from the slots menu, auto-open its UI.
+        try{
+          const pending = fxPendingOpen.get(msg.guid);
+          if (pending){
+            const pendingKey = presetKeyFromName(pending.name || "");
+            const prevIdx = new Set((prevFx||[]).map(f=>f.index));
+            const added = (msg.fx||[]).filter(f=>!prevIdx.has(f.index));
+            let target = null;
+            if (pendingKey){
+              target = added.find(f=>presetKeyFromName(f.name) === pendingKey) || (msg.fx||[]).find(f=>presetKeyFromName(f.name) === pendingKey) || null;
+            }
+            if (!target && added.length) target = added[0];
+            if (target){
+              openPluginWin(msg.guid, target.index);
+              fxPendingOpen.delete(msg.guid);
+            }else if (Date.now() - (pending.ts||0) > 3000){
+              fxPendingOpen.delete(msg.guid);
+            }
+          }
+        }catch(_){ }
+
         if (openModal && openModal.guid === msg.guid && openModal.tab === "fx"){
           openModal.fxList = msg.fx || [];
           renderModal();
         }
+        // Update any open plugin windows for enable state or renamed FX.
+        try{
+          for (const win of pluginWins.values()){
+            if (win && win.guid === msg.guid) renderPluginWin(win);
+          }
+        }catch(_){ }
         return;
       }
       if (msg.type === "fxParams"){
@@ -7268,6 +7841,20 @@ applyResponsiveMode();
           openModal.fxParams = msg.params || [];
           renderModal();
         }
+        return;
+      }
+      if (msg.type === "fxPresets"){
+        const key = presetKeyFromName(msg.fxName || "");
+        fxPresetCache.set(key, {presets: msg.presets || [], ts: Date.now()});
+        try{
+          for (const win of pluginWins.values()){
+            if (!win) continue;
+            const fxName = getFxNameFromCache(win.guid, win.fxIndex);
+            if (presetKeyFromName(fxName) === key){
+              renderPluginWin(win);
+            }
+          }
+        }catch(_){ }
         return;
       }
     };
@@ -7287,6 +7874,10 @@ applyResponsiveMode();
     const str = String(s||"");
     // remove common REAPER prefixes in UI
     return str.replace(/^\s*(JS|AU|VST3?|VST):\s*/i, "").trim();
+  }
+
+  function presetKeyFromName(name){
+    return prettyFxName(String(name||"")).trim().toLowerCase();
   }
 
   // ----- Helpers ----------
@@ -8611,6 +9202,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       mi.addEventListener("click", (ev)=>{
         ev.stopPropagation();
         wsSend({type:"addFx", guid, name:x.add});
+        fxPendingOpen.set(guid, {name: x.name || x.add || "", ts: Date.now()});
         closeFxAddMenu();
         // refresh list shortly
         setTimeout(()=>wsSend({type:"reqFxList", guid}), 60);
@@ -8967,6 +9559,84 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     }
   }
 
+  function clearFxSlotDrag(){
+    if (!fxSlotDrag) return;
+    try{ fxSlotDrag.rowEl && fxSlotDrag.rowEl.classList.remove("dragging"); }catch(_){ }
+    try{
+      if (fxSlotDrag.targetEl){
+        fxSlotDrag.targetEl.classList.remove("dropTarget");
+        fxSlotDrag.targetEl.classList.remove("dropAfter");
+      }
+    }catch(_){ }
+    fxSlotDrag = null;
+  }
+
+  function setFxSlotDropTarget(el, after){
+    if (fxSlotDrag && fxSlotDrag.targetEl && fxSlotDrag.targetEl !== el){
+      fxSlotDrag.targetEl.classList.remove("dropTarget");
+      fxSlotDrag.targetEl.classList.remove("dropAfter");
+    }
+    if (fxSlotDrag) fxSlotDrag.targetEl = el;
+    if (el){
+      el.classList.add("dropTarget");
+      el.classList.toggle("dropAfter", !!after);
+    }
+    if (fxSlotDrag) fxSlotDrag.targetAfter = !!after;
+  }
+
+  function onFxSlotDragMove(ev){
+    if (!fxSlotDrag || ev.pointerId !== fxSlotDrag.pointerId) return;
+    const dx = ev.clientX - fxSlotDrag.startX;
+    const dy = ev.clientY - fxSlotDrag.startY;
+    if (!fxSlotDrag.started){
+      if (Math.hypot(dx, dy) < 6) return;
+      fxSlotDrag.started = true;
+      fxSlotDrag.rowEl.classList.add("dragging");
+      fxSlotDrag.rowEl._skipClick = true;
+    }
+
+    const hit = document.elementFromPoint(ev.clientX, ev.clientY);
+    const row = hit ? hit.closest(".fxSlot") : null;
+    if (!row || !fxSlotDrag.slotsEl || !fxSlotDrag.slotsEl.contains(row)){
+      setFxSlotDropTarget(null, false);
+      return;
+    }
+    if (row === fxSlotDrag.rowEl){
+      setFxSlotDropTarget(null, false);
+      return;
+    }
+    const rect = row.getBoundingClientRect();
+    const after = ev.clientY > (rect.top + rect.height * 0.5);
+    setFxSlotDropTarget(row, after);
+  }
+
+  function onFxSlotDragEnd(ev){
+    if (!fxSlotDrag || ev.pointerId !== fxSlotDrag.pointerId) return;
+    const drag = fxSlotDrag;
+    const target = drag.targetEl;
+    const started = drag.started;
+    if (drag.rowEl) setTimeout(()=>{ drag.rowEl._skipClick = false; }, 0);
+    clearFxSlotDrag();
+    window.removeEventListener("pointermove", onFxSlotDragMove, true);
+    window.removeEventListener("pointerup", onFxSlotDragEnd, true);
+    window.removeEventListener("pointercancel", onFxSlotDragEnd, true);
+
+    if (!started || !target) return;
+    const targetFxIndex = target.dataset.fxIndex ? parseInt(target.dataset.fxIndex, 10) : null;
+    const slotIndex = target.dataset.slotIndex ? parseInt(target.dataset.slotIndex, 10) : null;
+    let toIndex = null;
+    if (Number.isFinite(targetFxIndex)){
+      toIndex = targetFxIndex + (drag.targetAfter ? 1 : 0);
+    }else if (Number.isFinite(slotIndex)){
+      toIndex = slotIndex;
+    }
+    if (toIndex == null || !Number.isFinite(toIndex)) return;
+    if (Number.isFinite(drag.maxIndex)) toIndex = Math.min(drag.maxIndex, toIndex);
+    if (toIndex === drag.fxIndex) return;
+    wsSend({type:"moveFx", guid: drag.guid, from: drag.fxIndex, to: Math.max(0, toIndex)});
+    setTimeout(()=>wsSend({type:"reqFxList", guid: drag.guid}), 80);
+  }
+
   function updateFxSlotsUI(el, guid){
     const r = el._refs;
     if (!r || !r.fxSlots) return;
@@ -9042,6 +9712,9 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
       const fx = list[i]; // may be undefined -> (empty)
       const row = document.createElement("div");
       row.className = "fxSlot" + (fx ? (fx.enabled ? "" : " off") : " empty");
+      row.dataset.slotIndex = String(i);
+      row.dataset.guid = String(guid||"");
+      if (fx) row.dataset.fxIndex = String(fx.index);
 
       let nm = fx ? (fx.name || "") : "";
       if (!nm || isPtrLike(nm)){
@@ -9056,6 +9729,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         row.addEventListener("click",(ev)=>{
           ev.stopPropagation();
           if (row._holdOpen) return; // ignore click after long-press
+          if (row._skipClick){ row._skipClick = false; return; }
           openFxParamsFromSlot(guid, fx.index);
         });
 
@@ -9071,6 +9745,30 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         row.addEventListener("pointerup", cancelHold);
         row.addEventListener("pointerleave", cancelHold);
         row.addEventListener("pointercancel", cancelHold);
+
+        // drag-and-drop reorder (desktop mouse only)
+        row.addEventListener("pointerdown", (ev)=>{
+          if (ev.pointerType !== "mouse" || ev.button !== 0) return;
+          if (row._holdOpen) return;
+          clearTimeout(holdT);
+          holdT = null;
+          fxSlotDrag = {
+            guid,
+            fxIndex: fx.index,
+            rowEl: row,
+            slotsEl: r.fxSlots,
+            pointerId: ev.pointerId,
+            startX: ev.clientX,
+            startY: ev.clientY,
+            started: false,
+            targetEl: null,
+            targetAfter: false,
+            maxIndex: list.length
+          };
+          window.addEventListener("pointermove", onFxSlotDragMove, true);
+          window.addEventListener("pointerup", onFxSlotDragEnd, true);
+          window.addEventListener("pointercancel", onFxSlotDragEnd, true);
+        });
 
       } else {
         row.addEventListener("click",(ev)=>{
@@ -9207,10 +9905,12 @@ const FX_ADD_CATALOG = [
   {name:"RM_1175", add:"JS: RM_1175 (1175 core) Hybrid v3||JS:RM_1175 (1175 core) Hybrid v3||RM_1175"},
   {name:"RM_LA1A", add:"JS: RM_LA1A [Telemetry]||JS:RM_LA1A [Telemetry]||RM_LA1A [Telemetry]"},
   {name:"RM_Deesser", add:"JS: RM_Deesser [Telemetry]||JS:RM_Deesser [Telemetry]||RM_Deesser [Telemetry]"},
+  {name:"RM_Vox", add:"JS: rm_rvox (RVox-ish) - Gate / Comp / Gain||JS:rm_rvox (RVox-ish) - Gate / Comp / Gain||rm_rvox"},
   {name:"RM_Compressor2", add:"JS: RM_Compressor2 [Telemetry]||JS:RM_Compressor2 [Telemetry]||RM_Compressor2 [Telemetry]"},
   {name:"RM_Limiter2", add:"JS: RM_Limiter2 [Telemetry]||JS:RM_Limiter2 [Telemetry]||RM_Limiter2 [Telemetry]"},
   {name:"RM_Kicker50hz", add:"JS: RM_Kicker50hz [Telemetry]||JS:RM_Kicker50hz [Telemetry]||RM_Kicker50hz [Telemetry]"},
   {name:"RM_DelayMachine", add:"JS: RM_DelayMachine||JS:RM_DelayMachine||RM_DelayMachine"},
+  {name:"RM_Saturator", add:"JS: rm_saturator (2x OS + Auto Level v3)||JS:rm_saturator (2x OS + Auto Level v3)||rm_saturator"},
   {name:"RM_EQT1A", add:"JS: RM_EQT1A||JS:RM_EQT1A||RM_EQT1A"},
   {name:"RM_Lexikan2", add:"JS: RM_Lexikan2||JS:RM_Lexikan2||RM_Lexikan2"}
 ];

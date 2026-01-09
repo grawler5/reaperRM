@@ -38,6 +38,14 @@ function getProjectId(projectPath, projectName){
   return sha1(key);
 }
 
+function presetKeyFromName(name){
+  return String(name||"").trim().toLowerCase();
+}
+function makePresetId(){
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}_${Math.random().toString(16).slice(2,8)}`;
+}
+
 let projects = loadProjects();
 
 // current project
@@ -54,7 +62,8 @@ function ensureProjectCfg(pid){
       users: ["main","mon1","mon2"],
       admin: "main",
       assignments: { main: {all:true, guids:[]}, mon1: {all:false, guids:[]}, mon2: {all:false, guids:[]} },
-      ui: { showColorFooter: true, footerIntensity: 0.35 }
+      ui: { showColorFooter: true, footerIntensity: 0.35 },
+      presets: {}
     };
     saveProjects();
   }
@@ -64,6 +73,7 @@ function ensureProjectCfg(pid){
   if (!cfg.admin) cfg.admin = "main";
   if (!cfg.assignments) cfg.assignments = { main:{all:true, guids:[]}, mon1:{all:false, guids:[]}, mon2:{all:false, guids:[]} };
   if (!cfg.ui) cfg.ui = { showColorFooter: true, footerIntensity: 0.35 };
+  if (!cfg.presets) cfg.presets = {};
   if (typeof cfg.ui.showColorFooter !== "boolean") cfg.ui.showColorFooter = true;
   return cfg;
 }
@@ -278,6 +288,56 @@ wss.on("connection", (ws) => {
       if (lastState){
         for (const c of wsClients) sendTo(c, filterStateFor(c, lastState));
       }
+      return;
+    }
+    if (msg.type === "reqFxPresets"){
+      if (!currentProjectId) return;
+      const guid = String(msg.guid||"");
+      if (!guid || !canControl(ws, guid)) return;
+      const cfg = ensureProjectCfg(currentProjectId);
+      const fxName = String(msg.fxName||"");
+      const key = presetKeyFromName(fxName);
+      const presets = (cfg.presets && cfg.presets[key]) ? cfg.presets[key] : [];
+      sendTo(ws, {type:"fxPresets", fxName, presets});
+      return;
+    }
+    if (msg.type === "saveFxPreset"){
+      if (!currentProjectId) return;
+      const guid = String(msg.guid||"");
+      if (!guid || !canControl(ws, guid)) return;
+      const cfg = ensureProjectCfg(currentProjectId);
+      const fxName = String(msg.fxName||"");
+      const key = presetKeyFromName(fxName);
+      const rawParams = Array.isArray(msg.params) ? msg.params : [];
+      const params = rawParams.map(p=>({
+        index: Number(p.index),
+        value: Math.max(0, Math.min(1, Number(p.value)))
+      })).filter(p=>Number.isFinite(p.index) && Number.isFinite(p.value));
+      const name = String(msg.name||"Preset").trim() || "Preset";
+      const preset = {id: makePresetId(), name, params};
+      if (!cfg.presets) cfg.presets = {};
+      const list = Array.isArray(cfg.presets[key]) ? cfg.presets[key] : [];
+      const existing = list.findIndex(p=>String(p.name) === name);
+      if (existing >= 0) list.splice(existing, 1);
+      list.push(preset);
+      cfg.presets[key] = list;
+      saveProjects();
+      sendTo(ws, {type:"fxPresets", fxName, presets: list});
+      return;
+    }
+    if (msg.type === "deleteFxPreset"){
+      if (!currentProjectId) return;
+      const guid = String(msg.guid||"");
+      if (!guid || !canControl(ws, guid)) return;
+      const cfg = ensureProjectCfg(currentProjectId);
+      const fxName = String(msg.fxName||"");
+      const key = presetKeyFromName(fxName);
+      const presetId = String(msg.presetId||"");
+      const list = Array.isArray(cfg.presets && cfg.presets[key]) ? cfg.presets[key] : [];
+      const next = list.filter(p=>String(p.id) !== presetId);
+      cfg.presets[key] = next;
+      saveProjects();
+      sendTo(ws, {type:"fxPresets", fxName, presets: next});
       return;
     }
 

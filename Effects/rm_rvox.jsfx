@@ -11,6 +11,9 @@ desc:rm_rvox (RVox-ish) - Gate / Comp / Gain
 slider1:gate=0<0,100,1>Gate (0=off)
 slider2:comp=0<-36,0,0.1>Comp (dB, 0..-36)
 slider3:gain=0<-24,0,0.1>Gain (dB, 0=max)
+slider4:0<0,1,0.0001>-Z Telemetry: In Peak
+slider5:0<0,24,0.01>-Z Telemetry: GR (dB)
+slider6:0<0,1,0.0001>-Z Telemetry: Out Peak
 
 @init
 ln10 = log(10);
@@ -22,6 +25,10 @@ env_comp = 0;
 
 gate_g = 1;   // smoothed gate gain
 comp_g = 1;   // smoothed comp gain
+
+tele_in = 0;
+tele_out = 0;
+tele_gr = 0;
 
 // fixed times (seconds) - tuned for "vox" feel
 gate_att_t = 0.001;  // 1 ms
@@ -113,6 +120,7 @@ lvl_comp_db = 20*log(max(env_comp, eps))/ln10;
 
 // compressor gain computer with soft knee
 comp_target = 1;
+gr_db = 0;
 
 comp_amt > 0 ? (
   thr  = comp_thr_db;
@@ -155,3 +163,17 @@ spl1 = gR * total;
 // gentle "limiter" safety (brickwall clamp) to emulate limiter-ish max settings
 spl0 > 1 ? spl0 = 1 : spl0 < -1 ? spl0 = -1;
 spl1 > 1 ? spl1 = 1 : spl1 < -1 ? spl1 = -1;
+
+// ---- Telemetry ----
+in_pk = max(abs(inL), abs(inR));
+out_pk = max(abs(spl0), abs(spl1));
+gr_db_meter = max(0, -gr_db);
+gr_db_meter > 24 ? gr_db_meter = 24;
+
+tele_in = max(in_pk, tele_in*0.92);
+tele_out = max(out_pk, tele_out*0.92);
+tele_gr = max(gr_db_meter, tele_gr*0.90);
+
+slider4 = min(1, tele_in);
+slider5 = tele_gr;
+slider6 = min(1, tele_out);
