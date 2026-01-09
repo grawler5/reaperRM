@@ -1,0 +1,157 @@
+desc:rm_rvox (RVox-ish) - Gate / Comp / Gain
+// JSFX "in the spirit of" Waves Renaissance Vox: gate/expander + one-fader compressor + output gain.
+// Not a 1:1 clone. Signal chain: IN -> Gate -> Comp -> Gain.
+//
+// Requested behavior:
+// - Comp fader like RVox: values from 0 to -36 (0 = off, -36 = max).
+// - At -36 it behaves close to a limiter (very high ratio).
+// - Gain fader like RVox: 0 dB is MAX (default). Only attenuation (negative).
+// - Strong auto-makeup (very loud at max comp). Use Gain to pull level down.
+
+slider1:gate=0<0,100,1>Gate (0=off)
+slider2:comp=0<-36,0,0.1>Comp (dB, 0..-36)
+slider3:gain=0<-24,0,0.1>Gain (dB, 0=max)
+
+@init
+ln10 = log(10);
+eps  = pow(10,-20); // EEL2: safer than 1e-20
+
+// envelope followers
+env_gate = 0;
+env_comp = 0;
+
+gate_g = 1;   // smoothed gate gain
+comp_g = 1;   // smoothed comp gain
+
+// fixed times (seconds) - tuned for "vox" feel
+gate_att_t = 0.001;  // 1 ms
+gate_rel_t = 0.120;  // 120 ms
+
+// compressor gain smoothing
+comp_att_t = 0.0025; // 2.5 ms
+comp_rel_t = 0.085;  // 85 ms
+
+// detector times (shared)
+det_att_t  = 0.0015; // 1.5 ms
+det_rel_t  = 0.055;  // 55 ms
+
+@slider
+gate_amt = gate/100;
+
+// comp is 0..-36 (negative or zero)
+comp_amt = -comp/36; // 0..1
+
+// Gate mapping: threshold moves from -60 dB (low) to -10 dB (high)
+gate_thr_db = -60 + gate_amt*50; // -60..-10
+gate_slope  = 2 + gate_amt*10;   // 2..12 (bigger = harder gate)
+
+// Compressor mapping from comp_amt:
+// threshold: -6 .. -42
+comp_thr_db = -6 - comp_amt*36;
+
+// ratio: 1 .. 100 (limiter-ish at max)
+comp_ratio  = 1 + comp_amt*99;
+
+// knee shrinks with more comp: 6 dB .. 1.5 dB
+knee_db = 6 - comp_amt*4.5;
+
+// Very strong auto-makeup: up to +40 dB at max comp
+makeup_db = comp_amt*40;
+
+// output gain (0 dB is max, only attenuation)
+out_db = gain;
+
+// precompute smoothing coeffs (per-sample one-pole)
+sr = srate;
+
+gate_att = 1 - exp(-1/(max(gate_att_t*sr,1)));
+gate_rel = 1 - exp(-1/(max(gate_rel_t*sr,1)));
+
+det_att  = 1 - exp(-1/(max(det_att_t*sr,1)));
+det_rel  = 1 - exp(-1/(max(det_rel_t*sr,1)));
+
+comp_att = 1 - exp(-1/(max(comp_att_t*sr,1)));
+comp_rel = 1 - exp(-1/(max(comp_rel_t*sr,1)));
+
+out_gain = exp(out_db*ln10/20);
+
+@sample
+inL = spl0;
+inR = spl1;
+
+// ---- Gate detector (pre-gate) ----
+xg = max(abs(inL), abs(inR));
+xg > env_gate ? env_gate += (xg - env_gate)*det_att : env_gate += (xg - env_gate)*det_rel;
+
+lvl_gate_db = 20*log(max(env_gate, eps))/ln10;
+
+// target gate gain
+gate_target = 1;
+gate_amt > 0 ? (
+  over = lvl_gate_db - gate_thr_db;
+  over >= 0 ? (
+    gate_target = 1;
+  ) : (
+    // exponential closing below threshold
+    gate_target = exp(over * gate_slope * ln10/20);
+    gate_target < 0.0003 ? gate_target = 0.0003;
+  );
+);
+
+// smooth gate gain
+gate_target < gate_g ? gate_g += (gate_target - gate_g)*gate_att : gate_g += (gate_target - gate_g)*gate_rel;
+
+// apply gate
+gL = inL * gate_g;
+gR = inR * gate_g;
+
+// ---- Compressor detector (post-gate) ----
+xc = max(abs(gL), abs(gR));
+xc > env_comp ? env_comp += (xc - env_comp)*det_att : env_comp += (xc - env_comp)*det_rel;
+
+lvl_comp_db = 20*log(max(env_comp, eps))/ln10;
+
+// compressor gain computer with soft knee
+comp_target = 1;
+
+comp_amt > 0 ? (
+  thr  = comp_thr_db;
+  rat  = max(comp_ratio, 1.0001);
+  knee = max(knee_db, 0.5);
+
+  delta = lvl_comp_db - thr; // dB over threshold
+  gr_db = 0;
+
+  // soft-knee compression curve
+  delta <= -knee/2 ? (
+    gr_db = 0;
+  ) : delta >= knee/2 ? (
+    out_db_c = thr + (lvl_comp_db - thr)/rat;
+    gr_db = out_db_c - lvl_comp_db; // negative
+  ) : (
+    t = (delta + knee/2);
+    gr_db = (1/rat - 1) * (t*t) / (2*knee);
+  );
+
+  // add strong auto makeup
+  comp_gain_db = gr_db + makeup_db;
+
+  // let it get loud (requested), but keep sane upper bound
+  comp_gain_db > 60 ? comp_gain_db = 60;
+  comp_gain_db < -80 ? comp_gain_db = -80;
+
+  comp_target = exp(comp_gain_db*ln10/20);
+);
+
+// smooth compressor gain
+comp_target < comp_g ? comp_g += (comp_target - comp_g)*comp_att : comp_g += (comp_target - comp_g)*comp_rel;
+
+// ---- Output ----
+total = comp_g * out_gain;
+
+spl0 = gL * total;
+spl1 = gR * total;
+
+// gentle "limiter" safety (brickwall clamp) to emulate limiter-ish max settings
+spl0 > 1 ? spl0 = 1 : spl0 < -1 ? spl0 = -1;
+spl1 > 1 ? spl1 = 1 : spl1 < -1 ? spl1 = -1;
