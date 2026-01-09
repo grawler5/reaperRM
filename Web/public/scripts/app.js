@@ -945,6 +945,10 @@ function formatParam(p){
         </div>
         <div class="rmCompGrMeter"><div class="rmCompGrFill"></div></div>
       </div>
+      <div class="rmCompMeterLabels">
+        <div class="rmCompMeterLabel">Пиковый входной уровень</div>
+        <div class="rmCompMeterLabel rmCompGrLabel">Пиковый GR</div>
+      </div>
       <div class="rmCompVal">—</div>
     `;
     left.appendChild(threshCard);
@@ -1084,24 +1088,11 @@ function formatParam(p){
     detectCard.className = "rmCompCard";
     detectCard.innerHTML = `<div class="rmCompCardTitle">DETECTOR INPUT</div>`;
     const detectRow = document.createElement("div");
-    detectRow.className = "rmCompSelectRow";
-    const detectLabel = document.createElement("div");
-    detectLabel.className = "rmCompLabel";
-    detectLabel.textContent = "Source";
-    const detectSelect = document.createElement("select");
-    detectSelect.className = "rmCompSelect";
-    const optMain = document.createElement("option");
-    optMain.value = "main";
-    optMain.textContent = "Main Inputs";
-    const optSc = document.createElement("option");
-    optSc.value = "sc";
-    optSc.textContent = "Sidechain";
-    detectSelect.appendChild(optMain);
-    detectSelect.appendChild(optSc);
-    detectRow.appendChild(detectLabel);
-    detectRow.appendChild(detectSelect);
-    detectCard.appendChild(detectRow);
-
+    detectRow.className = "rmCompDetectRow";
+    const detectToggle = document.createElement("button");
+    detectToggle.type = "button";
+    detectToggle.className = "rmCompMiniBtn rmCompDetectToggle";
+    detectToggle.textContent = "Main";
     const returnsBtn = document.createElement("button");
     returnsBtn.type = "button";
     returnsBtn.className = "rmCompMiniBtn";
@@ -1109,7 +1100,9 @@ function formatParam(p){
     returnsBtn.addEventListener("click", ()=>{
       openTrackMenu(win.guid, "sends");
     });
-    detectCard.appendChild(returnsBtn);
+    detectRow.appendChild(detectToggle);
+    detectRow.appendChild(returnsBtn);
+    detectCard.appendChild(detectRow);
     left.appendChild(detectCard);
 
     const filterCard = document.createElement("div");
@@ -1143,6 +1136,47 @@ function formatParam(p){
     options.appendChild(btnLimit);
     mid.appendChild(options);
 
+    const getParamRawValue = (p, fallbackMin=0, fallbackMax=1)=>{
+      if (!p) return 0;
+      if (p.raw != null && Number.isFinite(p.raw)) return p.raw;
+      if (p.min != null && p.max != null && Number.isFinite(p.min) && Number.isFinite(p.max)){
+        return p.min + (p.value || 0) * (p.max - p.min);
+      }
+      return (p.value || 0);
+    };
+
+    const formatReleaseSync = (p, bpm)=>{
+      if (!p || !Number.isFinite(bpm) || bpm <= 0) return formatParam(p);
+      const ms = getParamRawValue(p, 0, 1000);
+      const msPerBeat = 60000 / bpm;
+      if (!Number.isFinite(msPerBeat) || msPerBeat <= 0) return formatParam(p);
+      const beats = (ms / msPerBeat);
+      const notes = [
+        {label:"1/64t", beats: 1/24},
+        {label:"1/64", beats: 1/16},
+        {label:"1/32t", beats: 1/12},
+        {label:"1/32", beats: 1/8},
+        {label:"1/16t", beats: 1/6},
+        {label:"1/16", beats: 1/4},
+        {label:"1/8t", beats: 1/3},
+        {label:"1/8", beats: 1/2},
+        {label:"1/4t", beats: 2/3},
+        {label:"1/4", beats: 1},
+        {label:"1/2t", beats: 4/3},
+        {label:"1/2", beats: 2},
+      ];
+      let best = notes[0];
+      let bestDiff = Math.abs(beats - best.beats);
+      for (const n of notes){
+        const diff = Math.abs(beats - n.beats);
+        if (diff < bestDiff){
+          best = n;
+          bestDiff = diff;
+        }
+      }
+      return best ? best.label : formatParam(p);
+    };
+
     const update = ()=>{
       const pThresh = getP(ex.thresholdFind);
       if (pThresh) setThreshUI(pThresh.value||0, formatParam(pThresh));
@@ -1171,7 +1205,13 @@ function formatParam(p){
         }
         row.sl.disabled = false;
         if (document.activeElement !== row.sl) row.sl.value = String(p.value||0);
-        row.val.textContent = formatParam(p);
+        if (row === rowRelease){
+          const syncOn = (()=>{ const ps = getP(ex.bpmSyncFind); return ps ? (ps.value||0) >= 0.5 : false; })();
+          const bpm = transportLive.data ? Number(transportLive.data.bpm) : NaN;
+          row.val.textContent = syncOn ? formatReleaseSync(p, bpm) : formatParam(p);
+        } else {
+          row.val.textContent = formatParam(p);
+        }
       };
       [rowAttack, rowRelease, rowRatio, rowKnee, rowLP, rowHP].forEach(updateRow);
 
@@ -1180,11 +1220,13 @@ function formatParam(p){
         const raw = (pDetect.raw != null) ? pDetect.raw : (pDetect.min != null && pDetect.max != null ? pDetect.min + (pDetect.value||0) * (pDetect.max - pDetect.min) : pDetect.value||0);
         const midVal = (pDetect.min != null && pDetect.max != null) ? (pDetect.min + pDetect.max) / 2 : 0.5;
         const isSc = raw > midVal;
-        detectSelect.value = isSc ? "sc" : "main";
-        detectSelect.disabled = false;
+        detectToggle.textContent = isSc ? "SC" : "Main";
+        detectToggle.classList.toggle("on", isSc);
+        detectToggle.disabled = false;
       } else {
-        detectSelect.value = "main";
-        detectSelect.disabled = true;
+        detectToggle.textContent = "Main";
+        detectToggle.classList.remove("on");
+        detectToggle.disabled = true;
       }
 
       const toggleState = (btn, patterns)=>{
@@ -1198,12 +1240,15 @@ function formatParam(p){
       toggleState(btnLimit, ex.limitOutFind);
     };
 
-    detectSelect.addEventListener("change", ()=>{
+    detectToggle.addEventListener("click", ()=>{
       const p = getP(ex.detectFind);
       if (!p) return;
-      const target = (detectSelect.value === "sc")
-        ? ((p.min != null && p.max != null) ? p.max : 1)
-        : ((p.min != null && p.max != null) ? p.min : 0);
+      const raw = (p.raw != null) ? p.raw : (p.min != null && p.max != null ? p.min + (p.value||0) * (p.max - p.min) : p.value||0);
+      const midVal = (p.min != null && p.max != null) ? (p.min + p.max) / 2 : 0.5;
+      const isSc = raw > midVal;
+      const target = isSc
+        ? ((p.min != null && p.max != null) ? p.min : 0)
+        : ((p.min != null && p.max != null) ? p.max : 1);
       setParamRaw(p, target, 0, 1);
     });
 
@@ -6875,6 +6920,21 @@ applyResponsiveMode();
     lastState = Object.assign({}, lastState, {tracks});
   }
 
+  function applyOptimisticMoveToIndex(guid, toIndex){
+    if (!lastState || !Array.isArray(lastState.tracks)) return;
+    if (!guid || !Number.isFinite(toIndex)) return;
+    const tracks = lastState.tracks.slice();
+    const fromIdx = tracks.findIndex(t=>t.guid === guid);
+    if (fromIdx < 0) return;
+    const clamped = Math.max(0, Math.min(tracks.length - 1, toIndex));
+    const [moved] = tracks.splice(fromIdx, 1);
+    let insertIdx = clamped;
+    if (fromIdx < clamped) insertIdx -= 1;
+    insertIdx = Math.max(0, Math.min(tracks.length, insertIdx));
+    tracks.splice(insertIdx, 0, moved);
+    lastState = Object.assign({}, lastState, {tracks});
+  }
+
   function setTouchDropTarget(el){
     if (touchDropTarget && touchDropTarget !== el){
       touchDropTarget.classList.remove("dropTarget");
@@ -6963,13 +7023,27 @@ applyResponsiveMode();
           wsSend({type:"moveTrackToFolder", guid, folderGuid: info.folderGuid});
           setTimeout(()=>wsSend({type:"reqState"}), 10);
         } else {
-          const targetBefore = dragDropState && dragDropState.after
-            ? (getNextTrackGuidAfter(baseGuid, guid) || baseGuid)
-            : baseGuid;
-          wsSend({type:"moveTrack", guid, beforeGuid: targetBefore});
-          applyOptimisticMove(guid, targetBefore);
-          renderOrUpdate(true);
-          setTimeout(()=>wsSend({type:"reqState"}), 10);
+          const after = !!(dragDropState && dragDropState.after);
+          if (after){
+            const nextGuid = getNextTrackGuidAfter(baseGuid, guid);
+            if (nextGuid){
+              wsSend({type:"moveTrack", guid, beforeGuid: nextGuid});
+              applyOptimisticMove(guid, nextGuid);
+              renderOrUpdate(true);
+              setTimeout(()=>wsSend({type:"reqState"}), 10);
+            } else if (Array.isArray(lastState && lastState.tracks) && lastState.tracks.length){
+              const endIndex = lastState.tracks.length - 1;
+              wsSend({type:"moveTrack", guid, toIndex: endIndex});
+              applyOptimisticMoveToIndex(guid, endIndex);
+              renderOrUpdate(true);
+              setTimeout(()=>wsSend({type:"reqState"}), 10);
+            }
+          } else {
+            wsSend({type:"moveTrack", guid, beforeGuid: baseGuid});
+            applyOptimisticMove(guid, baseGuid);
+            renderOrUpdate(true);
+            setTimeout(()=>wsSend({type:"reqState"}), 10);
+          }
         }
       }
     }
@@ -7768,12 +7842,24 @@ applyResponsiveMode();
       if (info && info.folderGuid && info.guid === info.folderGuid && info.guid === dropGuid){
         wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
       } else {
-        const beforeGuid = (dragDropState && dragDropState.after)
-          ? (getNextTrackGuidAfter(dropGuid, draggingTrackGuid) || dropGuid)
-          : dropGuid;
-        wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
-        applyOptimisticMove(draggingTrackGuid, beforeGuid);
-        renderOrUpdate(true);
+        const after = !!(dragDropState && dragDropState.after);
+        if (after){
+          const nextGuid = getNextTrackGuidAfter(dropGuid, draggingTrackGuid);
+          if (nextGuid){
+            wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: nextGuid});
+            applyOptimisticMove(draggingTrackGuid, nextGuid);
+            renderOrUpdate(true);
+          } else if (Array.isArray(lastState && lastState.tracks) && lastState.tracks.length){
+            const endIndex = lastState.tracks.length - 1;
+            wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: endIndex});
+            applyOptimisticMoveToIndex(draggingTrackGuid, endIndex);
+            renderOrUpdate(true);
+          }
+        } else {
+          wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: dropGuid});
+          applyOptimisticMove(draggingTrackGuid, dropGuid);
+          renderOrUpdate(true);
+        }
       }
       draggingTrackGuid = null;
       setTimeout(()=>wsSend({type:"reqState"}), 10);
@@ -7846,12 +7932,24 @@ applyResponsiveMode();
         if (info && info.folderGuid && info.guid === info.folderGuid && info.guid === dropGuid){
           wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
         } else {
-          const beforeGuid = (dragDropState && dragDropState.after)
-            ? (getNextTrackGuidAfter(dropGuid, draggingTrackGuid) || dropGuid)
-            : dropGuid;
-          wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid});
-          applyOptimisticMove(draggingTrackGuid, beforeGuid);
-          renderOrUpdate(true);
+          const after = !!(dragDropState && dragDropState.after);
+          if (after){
+            const nextGuid = getNextTrackGuidAfter(dropGuid, draggingTrackGuid);
+            if (nextGuid){
+              wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: nextGuid});
+              applyOptimisticMove(draggingTrackGuid, nextGuid);
+              renderOrUpdate(true);
+            } else if (Array.isArray(lastState && lastState.tracks) && lastState.tracks.length){
+              const endIndex = lastState.tracks.length - 1;
+              wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: endIndex});
+              applyOptimisticMoveToIndex(draggingTrackGuid, endIndex);
+              renderOrUpdate(true);
+            }
+          } else {
+            wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: dropGuid});
+            applyOptimisticMove(draggingTrackGuid, dropGuid);
+            renderOrUpdate(true);
+          }
         }
         draggingTrackGuid = null;
         setTimeout(()=>wsSend({type:"reqState"}), 10);
