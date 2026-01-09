@@ -2163,16 +2163,17 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 /* ---- RM_Compressor (custom) ---- */
 .rmCompPanel{
   border-radius: 18px;
-  padding: 14px;
+  padding: 16px;
   background: linear-gradient(rgba(18,20,26,.96), rgba(11,12,16,.96));
   border:1px solid rgba(255,255,255,.10);
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
   color: rgba(255,255,255,.92);
   display:grid;
-  grid-template-columns: minmax(190px, 0.9fr) minmax(320px, 2fr) minmax(120px, 0.55fr);
+  grid-template-columns: minmax(180px, 0.85fr) minmax(320px, 2fr) minmax(90px, 0.45fr);
   gap:14px;
   width:100%;
   max-width:100%;
+  min-height:100%;
   height:100%;
   box-sizing:border-box;
   align-items:stretch;
@@ -2180,7 +2181,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .rmCompCol{ display:flex; flex-direction:column; gap:12px; height:100%; }
 .rmCompLeft{ justify-content:space-between; }
 .rmCompMid{ justify-content:space-between; }
-.rmCompRight{ align-items:center; justify-content:space-between; }
+.rmCompRight{ align-items:center; justify-content:flex-end; }
 .rmCompRight .rmCompCard{
   max-width: none;
   width:100%;
@@ -2188,7 +2189,7 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 }
 .rmCompOutput{
   flex: 1 1 auto;
-  width: 100px;
+  width: 80px;
   display:flex;
   flex-direction:column;
 }
@@ -2231,14 +2232,14 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
   justify-content:center;
   flex:1 1 auto;
 }
-.rmCompThreshold .rmCompVTrack{ width:44px; }
+.rmCompThreshold .rmCompVTrack{ width:36px; }
 .rmCompThreshold .rmCompVThumb{ width:58px; }
-.rmCompThreshold .rmCompGrMeter{ width:14px; height:100%; }
+.rmCompThreshold .rmCompGrMeter{ width:20px; height:100%; }
 .rmCompThreshold .rmCompVTrack{ height:100%; }
-.rmCompOutput .rmCompVTrack{ height:100%; }
+.rmCompOutput .rmCompVTrack{ height:100%; width:36px; }
 .rmCompVTrack{
   position:relative;
-  width:56px;
+  width:36px;
   height:240px;
   border-radius:14px;
   background: rgba(0,0,0,.35);

@@ -1153,10 +1153,6 @@ function formatParam(p){
 
     const formatReleaseSync = (p, bpm)=>{
       if (!p || !Number.isFinite(bpm) || bpm <= 0) return formatParam(p);
-      const ms = getParamRawValue(p, 0, 1000);
-      const msPerBeat = 60000 / bpm;
-      if (!Number.isFinite(msPerBeat) || msPerBeat <= 0) return formatParam(p);
-      const beats = (ms / msPerBeat);
       const notes = [
         {label:"1/64t", beats: 1/24},
         {label:"1/64", beats: 1/16},
@@ -1171,16 +1167,31 @@ function formatParam(p){
         {label:"1/2t", beats: 4/3},
         {label:"1/2", beats: 2},
       ];
-      let best = notes[0];
-      let bestDiff = Math.abs(beats - best.beats);
-      for (const n of notes){
-        const diff = Math.abs(beats - n.beats);
-        if (diff < bestDiff){
-          best = n;
-          bestDiff = diff;
+      const fmt = (p.fmt != null && String(p.fmt).trim() !== "") ? String(p.fmt) : "";
+      const unitMatch = fmt.match(/[a-z%]+/i);
+      const unit = unitMatch ? unitMatch[0].toLowerCase() : "";
+      const raw = getParamRawValue(p, 0, 1000);
+      const useMs = unit.includes("ms") || unit.includes("sec") || unit === "s" || raw > 4;
+      if (useMs){
+        const ms = unit === "s" || unit.includes("sec") ? raw * 1000 : raw;
+        const msPerBeat = 60000 / bpm;
+        if (Number.isFinite(msPerBeat) && msPerBeat > 0){
+          const beats = ms / msPerBeat;
+          let best = notes[0];
+          let bestDiff = Math.abs(beats - best.beats);
+          for (const n of notes){
+            const diff = Math.abs(beats - n.beats);
+            if (diff < bestDiff){
+              best = n;
+              bestDiff = diff;
+            }
+          }
+          return best.label;
         }
       }
-      return best ? best.label : formatParam(p);
+      const norm = clamp01(p.value || 0);
+      const idx = Math.round(norm * (notes.length - 1));
+      return (notes[idx] || notes[0]).label;
     };
 
     const meterState = {in:0, out:0, gr:0, peakInRaw:null, peakGrRaw:null};
@@ -7845,12 +7856,13 @@ applyResponsiveMode();
     });
     el.addEventListener("drop", (ev)=>{
       ev.preventDefault();
+      const dropState = dragDropState ? {guid: dragDropState.guid, after: dragDropState.after} : null;
       el.classList.remove("dropTarget");
       el.classList.remove("dropAfter", "dropBefore");
       clearDropHighlight();
-      const dropGuid = (dragDropState && dragDropState.guid) ? dragDropState.guid : t.guid;
+      const dropGuid = (dropState && dropState.guid) ? dropState.guid : t.guid;
       if (draggingSpacerGuid && draggingSpacerGuid !== dropGuid){
-        const beforeGuid = (dragDropState && dragDropState.after)
+        const beforeGuid = (dropState && dropState.after)
           ? (getNextTrackGuidAfter(dropGuid, draggingSpacerGuid) || dropGuid)
           : dropGuid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
@@ -7866,7 +7878,7 @@ applyResponsiveMode();
       if (info && info.folderGuid && info.guid === info.folderGuid && info.guid === dropGuid){
         wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
       } else {
-        const after = !!(dragDropState && dragDropState.after);
+        const after = !!(dropState && dropState.after);
         const targetIndex = getDropTrackTargetIndex(dropGuid, draggingTrackGuid, after);
         if (targetIndex != null){
           wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: targetIndex});
@@ -7924,12 +7936,13 @@ applyResponsiveMode();
     });
     el.addEventListener("drop", (ev)=>{
       ev.preventDefault();
+      const dropState = dragDropState ? {guid: dragDropState.guid, after: dragDropState.after} : null;
       el.classList.remove("dropTarget");
       el.classList.remove("dropAfter", "dropBefore");
       clearDropHighlight();
-      const dropGuid = (dragDropState && dragDropState.guid) ? dragDropState.guid : t.targetGuid;
+      const dropGuid = (dropState && dropState.guid) ? dropState.guid : t.targetGuid;
       if (draggingSpacerGuid && dropGuid && draggingSpacerGuid !== dropGuid){
-        const beforeGuid = (dragDropState && dragDropState.after)
+        const beforeGuid = (dropState && dropState.after)
           ? (getNextTrackGuidAfter(dropGuid, draggingSpacerGuid) || dropGuid)
           : dropGuid;
         wsSend({type:"setSpacer", guid: draggingSpacerGuid, enabled:false});
@@ -7945,7 +7958,7 @@ applyResponsiveMode();
         if (info && info.folderGuid && info.guid === info.folderGuid && info.guid === dropGuid){
           wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
         } else {
-          const after = !!(dragDropState && dragDropState.after);
+          const after = !!(dropState && dropState.after);
           const targetIndex = getDropTrackTargetIndex(dropGuid, draggingTrackGuid, after);
           if (targetIndex != null){
             wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: targetIndex});
