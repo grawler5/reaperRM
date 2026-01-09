@@ -945,9 +945,9 @@ function formatParam(p){
         </div>
         <div class="rmCompGrMeter"><div class="rmCompGrFill"></div></div>
       </div>
-      <div class="rmCompMeterLabels">
-        <div class="rmCompMeterLabel">Пиковый входной уровень</div>
-        <div class="rmCompMeterLabel rmCompGrLabel">Пиковый GR</div>
+      <div class="rmCompMeterReadouts">
+        <div class="rmCompMeterReadout rmCompInPeakVal">—</div>
+        <div class="rmCompMeterReadout rmCompGrPeakVal">—</div>
       </div>
       <div class="rmCompVal">—</div>
     `;
@@ -958,6 +958,8 @@ function formatParam(p){
     const threshVu = threshCard.querySelector(".rmCompVUMeter");
     const grFill = threshCard.querySelector(".rmCompGrFill");
     const threshVal = threshCard.querySelector(".rmCompVal");
+    const inPeakVal = threshCard.querySelector(".rmCompInPeakVal");
+    const grPeakVal = threshCard.querySelector(".rmCompGrPeakVal");
 
     let threshDrag = null;
     let threshLastSent = 0;
@@ -1084,11 +1086,8 @@ function formatParam(p){
     envCard.appendChild(rowKnee.row);
     mid.appendChild(envCard);
 
-    const detectCard = document.createElement("div");
-    detectCard.className = "rmCompCard";
-    detectCard.innerHTML = `<div class="rmCompCardTitle">DETECTOR INPUT</div>`;
     const detectRow = document.createElement("div");
-    detectRow.className = "rmCompDetectRow";
+    detectRow.className = "rmCompDetectRow rmCompDetectRowThreshold";
     const detectToggle = document.createElement("button");
     detectToggle.type = "button";
     detectToggle.className = "rmCompMiniBtn rmCompDetectToggle";
@@ -1102,8 +1101,7 @@ function formatParam(p){
     });
     detectRow.appendChild(detectToggle);
     detectRow.appendChild(returnsBtn);
-    detectCard.appendChild(detectRow);
-    left.appendChild(detectCard);
+    threshCard.appendChild(detectRow);
 
     const filterCard = document.createElement("div");
     filterCard.className = "rmCompCard";
@@ -1144,6 +1142,24 @@ function formatParam(p){
       }
       return (p.value || 0);
     };
+    const formatRawValue = (p, raw)=>{
+      if (!p || !Number.isFinite(raw)) return "—";
+      const fmt = (p.fmt != null && String(p.fmt).trim() !== "") ? String(p.fmt) : "";
+      if (!fmt){
+        return raw.toFixed(2);
+      }
+      const match = fmt.match(/-?\d+(?:\.\d+)?\s*(.*)$/);
+      let decimals = 2;
+      let unit = "";
+      if (match){
+        const num = match[0].trim().split(/\s+/)[0];
+        const dec = num.split(".")[1];
+        decimals = dec ? dec.length : 0;
+        unit = match[1] ? match[1].trim() : "";
+      }
+      const val = raw.toFixed(decimals);
+      return unit ? `${val} ${unit}` : val;
+    };
 
     const formatReleaseSync = (p, bpm)=>{
       if (!p || !Number.isFinite(bpm) || bpm <= 0) return formatParam(p);
@@ -1177,6 +1193,8 @@ function formatParam(p){
       return best ? best.label : formatParam(p);
     };
 
+    const meterState = {in:0, out:0, gr:0, peakInRaw:null, peakGrRaw:null};
+
     const update = ()=>{
       const pThresh = getP(ex.thresholdFind);
       if (pThresh) setThreshUI(pThresh.value||0, formatParam(pThresh));
@@ -1187,13 +1205,29 @@ function formatParam(p){
       else setOutUI(0, "—");
 
       const pInPk = getP(ex.inPeakFind);
-      if (threshVu) threshVu.style.height = (clamp01(pInPk ? pInPk.value : 0) * 100) + "%";
+      const inTarget = clamp01(pInPk ? normFromParam(pInPk, 0, 1) : 0);
+      meterState.in = meterState.in + (inTarget - meterState.in) * 0.2;
+      if (threshVu) threshVu.style.height = (meterState.in * 100) + "%";
 
       const pOutPk = getP(ex.outPeakFind);
-      if (outVu) outVu.style.height = (clamp01(pOutPk ? pOutPk.value : 0) * 100) + "%";
+      const outTarget = clamp01(pOutPk ? normFromParam(pOutPk, 0, 1) : 0);
+      meterState.out = meterState.out + (outTarget - meterState.out) * 0.2;
+      if (outVu) outVu.style.height = (meterState.out * 100) + "%";
 
       const pGr = getP(ex.grFind);
-      if (grFill) grFill.style.height = (normFromParam(pGr, 0, 24) * 100) + "%";
+      const grTarget = clamp01(pGr ? normFromParam(pGr, 0, 24) : 0);
+      meterState.gr = meterState.gr + (grTarget - meterState.gr) * 0.25;
+      if (grFill) grFill.style.height = (meterState.gr * 100) + "%";
+      if (pInPk){
+        const raw = getParamRawValue(pInPk, 0, 1);
+        meterState.peakInRaw = meterState.peakInRaw == null ? raw : Math.max(raw, meterState.peakInRaw * 0.96);
+      }
+      if (pGr){
+        const raw = getParamRawValue(pGr, 0, 24);
+        meterState.peakGrRaw = meterState.peakGrRaw == null ? raw : Math.max(raw, meterState.peakGrRaw * 0.96);
+      }
+      if (inPeakVal) inPeakVal.textContent = pInPk ? formatRawValue(pInPk, meterState.peakInRaw ?? getParamRawValue(pInPk, 0, 1)) : "—";
+      if (grPeakVal) grPeakVal.textContent = pGr ? formatRawValue(pGr, meterState.peakGrRaw ?? getParamRawValue(pGr, 0, 24)) : "—";
 
       const updateRow = (row)=>{
         const p = getP(row.patterns);
@@ -6935,6 +6969,21 @@ applyResponsiveMode();
     lastState = Object.assign({}, lastState, {tracks});
   }
 
+  function getTrackIndexByGuid(guid){
+    if (!lastState || !Array.isArray(lastState.tracks)) return null;
+    const idx = lastState.tracks.findIndex(t=>t.guid === guid);
+    return idx >= 0 ? idx : null;
+  }
+
+  function getDropTrackTargetIndex(dropGuid, draggingGuid, after){
+    const dropIdx = getTrackIndexByGuid(dropGuid);
+    const fromIdx = getTrackIndexByGuid(draggingGuid);
+    if (dropIdx == null || fromIdx == null) return null;
+    let target = dropIdx + (after ? 1 : 0);
+    if (fromIdx < target) target -= 1;
+    return Math.max(0, Math.min((lastState.tracks || []).length - 1, target));
+  }
+
   function setTouchDropTarget(el){
     if (touchDropTarget && touchDropTarget !== el){
       touchDropTarget.classList.remove("dropTarget");
@@ -7024,23 +7073,10 @@ applyResponsiveMode();
           setTimeout(()=>wsSend({type:"reqState"}), 10);
         } else {
           const after = !!(dragDropState && dragDropState.after);
-          if (after){
-            const nextGuid = getNextTrackGuidAfter(baseGuid, guid);
-            if (nextGuid){
-              wsSend({type:"moveTrack", guid, beforeGuid: nextGuid});
-              applyOptimisticMove(guid, nextGuid);
-              renderOrUpdate(true);
-              setTimeout(()=>wsSend({type:"reqState"}), 10);
-            } else if (Array.isArray(lastState && lastState.tracks) && lastState.tracks.length){
-              const endIndex = lastState.tracks.length - 1;
-              wsSend({type:"moveTrack", guid, toIndex: endIndex});
-              applyOptimisticMoveToIndex(guid, endIndex);
-              renderOrUpdate(true);
-              setTimeout(()=>wsSend({type:"reqState"}), 10);
-            }
-          } else {
-            wsSend({type:"moveTrack", guid, beforeGuid: baseGuid});
-            applyOptimisticMove(guid, baseGuid);
+          const targetIndex = getDropTrackTargetIndex(baseGuid, guid, after);
+          if (targetIndex != null){
+            wsSend({type:"moveTrack", guid, toIndex: targetIndex});
+            applyOptimisticMoveToIndex(guid, targetIndex);
             renderOrUpdate(true);
             setTimeout(()=>wsSend({type:"reqState"}), 10);
           }
@@ -7843,21 +7879,10 @@ applyResponsiveMode();
         wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
       } else {
         const after = !!(dragDropState && dragDropState.after);
-        if (after){
-          const nextGuid = getNextTrackGuidAfter(dropGuid, draggingTrackGuid);
-          if (nextGuid){
-            wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: nextGuid});
-            applyOptimisticMove(draggingTrackGuid, nextGuid);
-            renderOrUpdate(true);
-          } else if (Array.isArray(lastState && lastState.tracks) && lastState.tracks.length){
-            const endIndex = lastState.tracks.length - 1;
-            wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: endIndex});
-            applyOptimisticMoveToIndex(draggingTrackGuid, endIndex);
-            renderOrUpdate(true);
-          }
-        } else {
-          wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: dropGuid});
-          applyOptimisticMove(draggingTrackGuid, dropGuid);
+        const targetIndex = getDropTrackTargetIndex(dropGuid, draggingTrackGuid, after);
+        if (targetIndex != null){
+          wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: targetIndex});
+          applyOptimisticMoveToIndex(draggingTrackGuid, targetIndex);
           renderOrUpdate(true);
         }
       }
@@ -7933,21 +7958,10 @@ applyResponsiveMode();
           wsSend({type:"moveTrackToFolder", guid: draggingTrackGuid, folderGuid: info.folderGuid});
         } else {
           const after = !!(dragDropState && dragDropState.after);
-          if (after){
-            const nextGuid = getNextTrackGuidAfter(dropGuid, draggingTrackGuid);
-            if (nextGuid){
-              wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: nextGuid});
-              applyOptimisticMove(draggingTrackGuid, nextGuid);
-              renderOrUpdate(true);
-            } else if (Array.isArray(lastState && lastState.tracks) && lastState.tracks.length){
-              const endIndex = lastState.tracks.length - 1;
-              wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: endIndex});
-              applyOptimisticMoveToIndex(draggingTrackGuid, endIndex);
-              renderOrUpdate(true);
-            }
-          } else {
-            wsSend({type:"moveTrack", guid: draggingTrackGuid, beforeGuid: dropGuid});
-            applyOptimisticMove(draggingTrackGuid, dropGuid);
+          const targetIndex = getDropTrackTargetIndex(dropGuid, draggingTrackGuid, after);
+          if (targetIndex != null){
+            wsSend({type:"moveTrack", guid: draggingTrackGuid, toIndex: targetIndex});
+            applyOptimisticMoveToIndex(draggingTrackGuid, targetIndex);
             renderOrUpdate(true);
           }
         }
