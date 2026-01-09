@@ -1089,7 +1089,7 @@ def handle_cmd(cmd, sock):
                     except Exception: dest_idx = None
                 if dest_idx is None:
                     return
-                if dest_idx > src_idx:
+                if dest_idx > src_idx and before_guid:
                     dest_idx -= 1
                 try:
                     RPR_SetOnlyTrackSelected(tr)

@@ -1047,7 +1047,7 @@ function formatParam(p){
     outThumb.addEventListener("pointerup", endOut);
     outThumb.addEventListener("pointercancel", endOut);
 
-    const mkHSlider = (label, patterns)=>{
+    const mkHSlider = (label, patterns, formatter)=>{
       const row = document.createElement("div");
       row.className = "rmCompHRow";
       row.innerHTML = `
@@ -1062,7 +1062,9 @@ function formatParam(p){
         const p = getP(patterns);
         if (!p) return;
         const v = parseFloat(sl.value);
-        if (val) val.textContent = formatParam(p);
+        if (val){
+          val.textContent = formatter ? formatter(p) : formatParam(p);
+        }
         p.value = v;
         const now = performance.now();
         if (now - lastSent > 25){
@@ -1076,8 +1078,13 @@ function formatParam(p){
     const envCard = document.createElement("div");
     envCard.className = "rmCompCard";
     envCard.innerHTML = `<div class="rmCompCardTitle">ENVELOPE</div>`;
+    const formatReleaseValue = (p)=>{
+      const syncOn = (()=>{ const ps = getP(ex.bpmSyncFind); return ps ? (ps.value||0) >= 0.5 : false; })();
+      const bpm = transportLive.data ? Number(transportLive.data.bpm) : NaN;
+      return syncOn ? formatReleaseSync(p, bpm) : formatParam(p);
+    };
     const rowAttack = mkHSlider("Attack", ex.attackFind);
-    const rowRelease = mkHSlider("Release", ex.releaseFind);
+    const rowRelease = mkHSlider("Release", ex.releaseFind, formatReleaseValue);
     const rowRatio = mkHSlider("Ratio", ex.ratioFind);
     const rowKnee = mkHSlider("Knee", ex.kneeFind);
     envCard.appendChild(rowAttack.row);
@@ -1240,13 +1247,7 @@ function formatParam(p){
         }
         row.sl.disabled = false;
         if (document.activeElement !== row.sl) row.sl.value = String(p.value||0);
-        if (row === rowRelease){
-          const syncOn = (()=>{ const ps = getP(ex.bpmSyncFind); return ps ? (ps.value||0) >= 0.5 : false; })();
-          const bpm = transportLive.data ? Number(transportLive.data.bpm) : NaN;
-          row.val.textContent = syncOn ? formatReleaseSync(p, bpm) : formatParam(p);
-        } else {
-          row.val.textContent = formatParam(p);
-        }
+        row.val.textContent = (row === rowRelease) ? formatReleaseValue(p) : formatParam(p);
       };
       [rowAttack, rowRelease, rowRatio, rowKnee, rowLP, rowHP].forEach(updateRow);
 
