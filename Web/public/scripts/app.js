@@ -6958,21 +6958,29 @@ for (const c of (sec.controls||[])){
       }
       const cached = fxPresetCache.get(fxKey);
       const presets = cached ? cached.presets : [];
-      presetSelect.innerHTML = "";
-      const optDefault = document.createElement("option");
-      optDefault.value = "";
-      optDefault.textContent = "Default";
-      presetSelect.appendChild(optDefault);
-      presets.forEach(p=>{
-        const opt = document.createElement("option");
-        opt.value = String(p.id);
-        opt.textContent = p.name || "Preset";
-        presetSelect.appendChild(opt);
-      });
+      const listKey = `${fxKey}|${presets.map(p=>`${p.id}:${p.name}`).join("|")}`;
+      if (win._presetOptionsKey !== listKey){
+        win._presetOptionsKey = listKey;
+        presetSelect.innerHTML = "";
+        const optDefault = document.createElement("option");
+        optDefault.value = "";
+        optDefault.textContent = "Default";
+        presetSelect.appendChild(optDefault);
+        presets.forEach(p=>{
+          const opt = document.createElement("option");
+          opt.value = String(p.id);
+          opt.textContent = p.name || "Preset";
+          presetSelect.appendChild(opt);
+        });
+      }
       if (win.presetSelection && !presets.find(p=>String(p.id) === String(win.presetSelection))){
         win.presetSelection = "";
       }
-      presetSelect.value = win.presetSelection || "";
+      if (presetSelect.value !== (win.presetSelection || "")){
+        win._presetSetting = true;
+        presetSelect.value = win.presetSelection || "";
+        win._presetSetting = false;
+      }
       if (deletePresetBtn) deletePresetBtn.disabled = !presetSelect.value;
     }
 
@@ -7166,6 +7174,7 @@ for (const c of (sec.controls||[])){
 
       if (presetSelect){
         presetSelect.addEventListener("change", ()=>{
+          if (win._presetSetting) return;
           win.presetSelection = presetSelect.value || "";
           if (!win.presetSelection) return;
           const fxName = getFxNameFromCache(win.guid, win.fxIndex);
