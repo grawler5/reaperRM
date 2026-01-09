@@ -3501,12 +3501,12 @@ function buildRMVoxPanelControl(win, ctrl){
 
   const header = document.createElement("div");
   header.className = "rmVoxHeader";
-  header.innerHTML = `<div class="rmVoxTitle">RM VOX</div><div class="rmVoxSub">Gate / Comp / Gain</div>`;
+  header.innerHTML = `<div class="rmVoxLogo">RVox</div><div class="rmVoxSub">Gate • Comp • Gain</div>`;
   panel.appendChild(header);
 
-  const faderRow = document.createElement("div");
-  faderRow.className = "rmVoxFaders";
-  panel.appendChild(faderRow);
+  const grid = document.createElement("div");
+  grid.className = "rmVoxGrid";
+  panel.appendChild(grid);
 
   const ps = ()=> (Array.isArray(win.params) ? win.params : []);
   const find = (patterns)=> findParamByPatterns(ps(), patterns||[]);
@@ -3526,40 +3526,70 @@ function buildRMVoxPanelControl(win, ctrl){
       const mx = Number.isFinite(p.max) ? p.max : maxVal;
       if (Number.isFinite(mx) && mx > 0) return clamp01(p.raw / mx);
     }
-    if (Number.isFinite(p.value)) return clamp01(p.value);
+    if (Number.isFinite(p.value)){
+      if (Number.isFinite(p.max) && p.max > 1) return clamp01(p.value / p.max);
+      return clamp01(p.value);
+    }
     return 0;
   };
+  const fmtPeakDb = (v)=>{
+    const val = Math.max(0, v || 0);
+    if (val <= 1e-6) return "-inf";
+    const db = 20 * Math.log10(val);
+    return db.toFixed(1);
+  };
 
-  function mkFader(label, getParam, getMeter, meterMax){
+  function mkMeterFader(opts){
     const wrap = document.createElement("div");
-    wrap.className = "rmVoxFaderWrap";
-    const lbl = document.createElement("div");
-    lbl.className = "rmVoxFaderLabel";
-    lbl.textContent = label;
+    wrap.className = `rmVoxCol ${opts.className||""}`.trim();
+    const title = document.createElement("div");
+    title.className = "rmVoxColTitle";
+    title.textContent = opts.title || "";
+    wrap.appendChild(title);
+
+    const meterWrap = document.createElement("div");
+    meterWrap.className = "rmVoxMeterWrap";
+    if (opts.scaleLabels && opts.scaleLabels.length){
+      const scale = document.createElement("div");
+      scale.className = "rmVoxScale";
+      opts.scaleLabels.forEach(l=>{
+        const span = document.createElement("span");
+        span.textContent = l;
+        scale.appendChild(span);
+      });
+      meterWrap.appendChild(scale);
+    }
+
     const track = document.createElement("div");
-    track.className = "rmVoxFaderTrack";
+    track.className = `rmVoxTrack ${opts.trackClass||""}`.trim();
     const meter = document.createElement("div");
-    meter.className = "rmVoxFaderVu";
+    meter.className = "rmVoxMeter";
     const meterFill = document.createElement("div");
-    meterFill.className = "rmVoxFaderVuFill";
+    meterFill.className = "rmVoxMeterFill";
     meter.appendChild(meterFill);
+
     const fill = document.createElement("div");
     fill.className = "rmVoxFaderFill";
     const thumb = document.createElement("div");
-    thumb.className = "rmVoxFaderThumb";
+    thumb.className = "rmVoxThumb";
     track.appendChild(meter);
     track.appendChild(fill);
     track.appendChild(thumb);
+    meterWrap.appendChild(track);
+    wrap.appendChild(meterWrap);
+
     const val = document.createElement("div");
-    val.className = "rmVoxFaderVal";
+    val.className = "rmVoxValue";
     val.textContent = "—";
-    wrap.appendChild(lbl);
-    wrap.appendChild(track);
+    const sub = document.createElement("div");
+    sub.className = "rmVoxValueSub";
+    sub.textContent = "—";
     wrap.appendChild(val);
+    wrap.appendChild(sub);
 
     let drag = null;
     const setFromClientY = (ev)=>{
-      const p = getParam();
+      const p = opts.getParam();
       if (!p) return;
       const r = track.getBoundingClientRect();
       const y = Math.max(r.top, Math.min(r.bottom, ev.clientY));
@@ -3573,7 +3603,7 @@ function buildRMVoxPanelControl(win, ctrl){
     };
 
     const startDrag = (ev)=>{
-      const p = getParam();
+      const p = opts.getParam();
       if (!p) return;
       if (ev.button !== 0) return;
       bringPluginToFront(win);
@@ -3596,7 +3626,7 @@ function buildRMVoxPanelControl(win, ctrl){
     });
     const endDrag = (ev)=>{
       if (!drag || ev.pointerId !== drag.id) return;
-      const p = getParam();
+      const p = opts.getParam();
       if (p) endParamDrag(win, p.index);
       drag = null;
       try{ track.releasePointerCapture(ev.pointerId); }catch(_){ }
@@ -3605,7 +3635,7 @@ function buildRMVoxPanelControl(win, ctrl){
     track.addEventListener("pointercancel", endDrag);
 
     const update = ()=>{
-      const p = getParam();
+      const p = opts.getParam();
       if (p){
         const v = clamp01(p.value||0);
         fill.style.height = (v*100) + "%";
@@ -3617,27 +3647,65 @@ function buildRMVoxPanelControl(win, ctrl){
         val.textContent = "—";
       }
 
-      const m = getMeter ? getMeter() : null;
-      const mv = meterNorm(m, meterMax || 1);
+      const m = opts.getMeter ? opts.getMeter() : null;
+      const mv = meterNorm(m, opts.meterMax || 1);
       meterFill.style.height = (mv*100) + "%";
+      if (m){
+        if (opts.meterMax && opts.meterMax > 1){
+          const raw = Number.isFinite(m.raw) ? m.raw : (Number.isFinite(m.value) ? (m.value * opts.meterMax) : 0);
+          sub.textContent = `${opts.meterLabel || ""} ${Math.max(0, raw).toFixed(1)}`.trim();
+        }else{
+          const raw = Number.isFinite(m.raw) ? m.raw : (Number.isFinite(m.value) ? m.value : 0);
+          sub.textContent = `${opts.meterLabel || ""} ${fmtPeakDb(raw)}`.trim();
+        }
+      }else{
+        sub.textContent = "—";
+      }
     };
 
     update();
     return {el: wrap, update};
   }
 
-  const fGate = mkFader("GATE", pGate, pIn, 1);
-  const fComp = mkFader("COMP", pComp, pGR, 24);
-  const fGain = mkFader("OUTPUT", pGain, pOut, 1);
+  const gateCol = mkMeterFader({
+    title: "Gate",
+    className: "rmVoxColGate",
+    trackClass: "rmVoxTrackNarrow",
+    scaleLabels: ["12","24","36","48","60","72"],
+    getParam: pGate,
+    getMeter: pIn,
+    meterLabel: "Energy",
+    meterMax: 1
+  });
+  const compCol = mkMeterFader({
+    title: "Comp",
+    className: "rmVoxColComp",
+    trackClass: "rmVoxTrackWide",
+    scaleLabels: ["6","12","18","24","30","36"],
+    getParam: pComp,
+    getMeter: pGR,
+    meterLabel: "GR",
+    meterMax: 24
+  });
+  const gainCol = mkMeterFader({
+    title: "Gain",
+    className: "rmVoxColGain",
+    trackClass: "rmVoxTrackNarrow",
+    scaleLabels: [],
+    getParam: pGain,
+    getMeter: pOut,
+    meterLabel: "Output",
+    meterMax: 1
+  });
 
-  faderRow.appendChild(fGate.el);
-  faderRow.appendChild(fComp.el);
-  faderRow.appendChild(fGain.el);
+  grid.appendChild(gateCol.el);
+  grid.appendChild(compCol.el);
+  grid.appendChild(gainCol.el);
 
   const update = ()=>{
-    fGate.update();
-    fComp.update();
-    fGain.update();
+    gateCol.update();
+    compCol.update();
+    gainCol.update();
   };
   ctrl.update = ()=>update();
   update();
@@ -3654,12 +3722,31 @@ function buildRMSaturatorPanelControl(win, ctrl){
 
   const header = document.createElement("div");
   header.className = "rmSatHeader";
-  header.innerHTML = `<div class="rmSatTitle">RM SATURATOR</div><div class="rmSatSub">2x OS • Auto Level</div>`;
+  header.innerHTML = `<div class="rmSatTitle">RM SATURATOR</div><div class="rmSatSub">Analog drive</div>`;
   panel.appendChild(header);
 
-  const grid = document.createElement("div");
-  grid.className = "rmSatGrid";
-  panel.appendChild(grid);
+  const styleRow = document.createElement("div");
+  styleRow.className = "rmSatStyleRow";
+  panel.appendChild(styleRow);
+
+  const main = document.createElement("div");
+  main.className = "rmSatMain";
+  panel.appendChild(main);
+
+  const left = document.createElement("div");
+  left.className = "rmSatBlock";
+  const right = document.createElement("div");
+  right.className = "rmSatBlock";
+  main.appendChild(left);
+  main.appendChild(right);
+
+  const slopeRow = document.createElement("div");
+  slopeRow.className = "rmSatSlopeRow";
+  panel.appendChild(slopeRow);
+
+  const extra = document.createElement("div");
+  extra.className = "rmSatExtra";
+  panel.appendChild(extra);
 
   const ps = ()=> (Array.isArray(win.params) ? win.params : []);
   const find = (patterns)=> findParamByPatterns(ps(), patterns||[]);
@@ -3689,7 +3776,7 @@ function buildRMSaturatorPanelControl(win, ctrl){
   const formatDb = (p)=>{
     const raw = getRaw(p, -60, 60);
     const rounded = Math.round(raw*10)/10;
-    return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)} dB`;
+    return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}`;
   };
   const formatHz = (p, fallbackMin, fallbackMax)=>{
     const raw = getRaw(p, fallbackMin, fallbackMax);
@@ -3701,49 +3788,12 @@ function buildRMSaturatorPanelControl(win, ctrl){
     return `${Math.round(raw)}%`;
   };
 
-  const colDrive = document.createElement("div");
-  colDrive.className = "rmSatCol";
-  const colFilt = document.createElement("div");
-  colFilt.className = "rmSatCol";
-  const colOut = document.createElement("div");
-  colOut.className = "rmSatCol";
-  grid.appendChild(colDrive);
-  grid.appendChild(colFilt);
-  grid.appendChild(colOut);
-
-  const mkSection = (title)=>{
-    const sec = document.createElement("div");
-    sec.className = "rmSatSection";
-    const t = document.createElement("div");
-    t.className = "rmSatSectionTitle";
-    t.textContent = title;
-    sec.appendChild(t);
-    return sec;
-  };
-
-  const driveSec = mkSection("Drive");
-  const driveDial = buildRmDialControl(win, "DRIVE", pDrive, { valueFormatter: formatDb });
-  const biasDial = buildRmDialControl(win, "BIAS", pBias, { valueFormatter: (p)=> getRaw(p, -0.5, 0.5).toFixed(3) });
-  const toneDial = buildRmDialControl(win, "TONE", pTone, { valueFormatter: formatDb });
-  driveSec.appendChild(driveDial.el);
-  driveSec.appendChild(biasDial.el);
-  driveSec.appendChild(toneDial.el);
-
-  const punishBtn = document.createElement("button");
-  punishBtn.type = "button";
-  punishBtn.className = "rmSatToggle";
-  punishBtn.textContent = "PUNISH";
-  driveSec.appendChild(punishBtn);
-
-  const styleSec = mkSection("Style");
-  const styleRow = document.createElement("div");
-  styleRow.className = "rmSatButtonRow";
   const styleLabels = ["Tape","Tube","Diode","Trans","Rect"];
   const styleButtons = styleLabels.map((label, idx)=>{
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "rmSatBtn";
-    b.textContent = label;
+    b.className = "rmSatStyleBtn";
+    b.textContent = label.toUpperCase();
     b.addEventListener("click", ()=>{
       const p = pStyle();
       if (!p) return;
@@ -3757,66 +3807,88 @@ function buildRMSaturatorPanelControl(win, ctrl){
     styleRow.appendChild(b);
     return b;
   });
-  styleSec.appendChild(styleRow);
 
-  colDrive.appendChild(driveSec);
-  colDrive.appendChild(styleSec);
+  const driveDial = buildRmDialControl(win, "DRIVE", pDrive, { valueFormatter: formatDb });
+  const biasDial = buildRmDialControl(win, "BIAS", pBias, { valueFormatter: (p)=> getRaw(p, -0.5, 0.5).toFixed(2) });
+  const toneDial = buildRmDialControl(win, "TONE", pTone, { valueFormatter: formatDb });
+  const outDial = buildRmDialControl(win, "OUTPUT", pOut, { valueFormatter: formatDb });
+  const loDial = buildRmDialControl(win, "LOCUT", pLocut, { valueFormatter: (p)=> formatHz(p, 20, 300) });
+  const hiDial = buildRmDialControl(win, "HICUT", pHicut, { valueFormatter: (p)=> formatHz(p, 4000, 20000) });
+  const mixDial = buildRmDialControl(win, "MIX", pMix, { valueFormatter: (p)=> formatPct(p, 0, 100) });
 
-  const filterSec = mkSection("Filters");
-  const loDial = buildRmDialControl(win, "LO CUT", pLocut, { valueFormatter: (p)=> formatHz(p, 20, 300) });
-  const hiDial = buildRmDialControl(win, "HI CUT", pHicut, { valueFormatter: (p)=> formatHz(p, 4000, 20000) });
-  filterSec.appendChild(loDial.el);
-  filterSec.appendChild(hiDial.el);
+  const mkDialWrap = (dial)=> {
+    const wrap = document.createElement("div");
+    wrap.className = "rmSatDialWrap";
+    wrap.appendChild(dial.el);
+    return wrap;
+  };
+
+  left.appendChild(mkDialWrap(driveDial));
+  left.appendChild(mkDialWrap(loDial));
+  left.appendChild(mkDialWrap(toneDial));
+  right.appendChild(mkDialWrap(outDial));
+  right.appendChild(mkDialWrap(hiDial));
+  right.appendChild(mkDialWrap(mixDial));
+  right.appendChild(mkDialWrap(biasDial));
+
+  const punishWrap = document.createElement("div");
+  punishWrap.className = "rmSatSwitchWrap";
+  punishWrap.innerHTML = `<div class="rmSatSwitchLabel">PUNISH</div>`;
+  const punishBtn = document.createElement("button");
+  punishBtn.type = "button";
+  punishBtn.className = "rmSatSwitch";
+  punishBtn.textContent = "OFF";
+  punishWrap.appendChild(punishBtn);
+  left.appendChild(punishWrap);
 
   const slopeValues = [6,12,18,24,48,96];
-  const mkSlopeGroup = (label, getParam)=>{
+  const mkSlopeSelect = (label, getParam)=>{
     const wrap = document.createElement("div");
-    wrap.className = "rmSatSlopeGroup";
+    wrap.className = "rmSatSlopeSelect";
     const t = document.createElement("div");
     t.className = "rmSatSlopeLabel";
     t.textContent = label;
-    wrap.appendChild(t);
-    const row = document.createElement("div");
-    row.className = "rmSatButtonRow rmSatSlopeRow";
-    const btns = slopeValues.map((val, idx)=>{
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "rmSatBtn";
-      b.textContent = String(val);
-      b.addEventListener("click", ()=>{
-        const p = getParam();
-        if (!p) return;
-        bringPluginToFront(win);
-        suppressPoll(win, 600);
-        const v = idx / (slopeValues.length - 1);
-        setParamNormalized(win, p.index, v);
-        p.value = v;
-        update();
-      });
-      row.appendChild(b);
-      return b;
+    const sel = document.createElement("select");
+    slopeValues.forEach((val, idx)=>{
+      const opt = document.createElement("option");
+      opt.value = String(idx);
+      opt.textContent = `${val} dB/oct`;
+      sel.appendChild(opt);
     });
-    wrap.appendChild(row);
-    return {wrap, btns};
+    sel.addEventListener("change", ()=>{
+      const p = getParam();
+      if (!p) return;
+      bringPluginToFront(win);
+      suppressPoll(win, 600);
+      const idx = parseInt(sel.value, 10);
+      const v = idx / (slopeValues.length - 1);
+      setParamNormalized(win, p.index, v);
+      p.value = v;
+      update();
+    });
+    wrap.appendChild(t);
+    wrap.appendChild(sel);
+    return {wrap, sel};
   };
 
-  const hpSlopeGroup = mkSlopeGroup("HP SLOPE (dB/oct)", pHpSlope);
-  const lpSlopeGroup = mkSlopeGroup("LP SLOPE (dB/oct)", pLpSlope);
-  filterSec.appendChild(hpSlopeGroup.wrap);
-  filterSec.appendChild(lpSlopeGroup.wrap);
-  colFilt.appendChild(filterSec);
+  const hpSlope = mkSlopeSelect("HP SLOPE", pHpSlope);
+  const lpSlope = mkSlopeSelect("LP SLOPE", pLpSlope);
+  slopeRow.appendChild(hpSlope.wrap);
+  slopeRow.appendChild(lpSlope.wrap);
 
-  const outSec = mkSection("Output");
-  const outDial = buildRmDialControl(win, "OUTPUT", pOut, { valueFormatter: formatDb });
-  const mixDial = buildRmDialControl(win, "MIX", pMix, { valueFormatter: (p)=> formatPct(p, 0, 100) });
+  const autoWrap = document.createElement("div");
+  autoWrap.className = "rmSatAutoWrap";
   const autoBtn = document.createElement("button");
   autoBtn.type = "button";
-  autoBtn.className = "rmSatToggle";
-  autoBtn.textContent = "AUTO LEVEL";
-  outSec.appendChild(outDial.el);
-  outSec.appendChild(mixDial.el);
-  outSec.appendChild(autoBtn);
-  colOut.appendChild(outSec);
+  autoBtn.className = "rmSatAutoBtn";
+  autoBtn.textContent = "AUTO";
+  autoWrap.appendChild(autoBtn);
+
+  const osWrap = document.createElement("div");
+  osWrap.className = "rmSatOsWrap";
+  osWrap.innerHTML = `<div class="rmSatOsLabel">OS 2x</div><div class="rmSatOsLamp on"></div>`;
+  extra.appendChild(autoWrap);
+  extra.appendChild(osWrap);
 
   const update = ()=>{
     driveDial.update();
@@ -3829,7 +3901,9 @@ function buildRMSaturatorPanelControl(win, ctrl){
 
     const pPun = pPunish();
     punishBtn.disabled = !pPun;
-    punishBtn.classList.toggle("on", pPun ? clamp01(pPun.value) >= 0.5 : false);
+    const punishOn = pPun ? clamp01(pPun.value) >= 0.5 : false;
+    punishBtn.classList.toggle("on", punishOn);
+    punishBtn.textContent = punishOn ? "ON" : "OFF";
 
     const pSt = pStyle();
     const styleRaw = getRaw(pSt, 0, styleLabels.length - 1);
@@ -3837,11 +3911,11 @@ function buildRMSaturatorPanelControl(win, ctrl){
 
     const pHp = pHpSlope();
     const hpRaw = getRaw(pHp, 0, slopeValues.length - 1);
-    hpSlopeGroup.btns.forEach((b, idx)=> b.classList.toggle("on", Math.round(hpRaw) === idx));
+    hpSlope.sel.value = String(Math.round(hpRaw));
 
     const pLp = pLpSlope();
     const lpRaw = getRaw(pLp, 0, slopeValues.length - 1);
-    lpSlopeGroup.btns.forEach((b, idx)=> b.classList.toggle("on", Math.round(lpRaw) === idx));
+    lpSlope.sel.value = String(Math.round(lpRaw));
 
     const pAu = pAuto();
     autoBtn.disabled = !pAu;
@@ -9589,7 +9663,9 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     const dx = ev.clientX - fxSlotDrag.startX;
     const dy = ev.clientY - fxSlotDrag.startY;
     if (!fxSlotDrag.started){
+      if (fxSlotDrag.holdTriggered) return;
       if (Math.hypot(dx, dy) < 6) return;
+      if (fxSlotDrag.holdClear) fxSlotDrag.holdClear();
       fxSlotDrag.started = true;
       fxSlotDrag.rowEl.classList.add("dragging");
       fxSlotDrag.rowEl._skipClick = true;
@@ -9615,6 +9691,7 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
     const drag = fxSlotDrag;
     const target = drag.targetEl;
     const started = drag.started;
+    try{ if (drag.rowEl) drag.rowEl.releasePointerCapture(ev.pointerId); }catch(_){ }
     if (drag.rowEl) setTimeout(()=>{ drag.rowEl._skipClick = false; }, 0);
     clearFxSlotDrag();
     window.removeEventListener("pointermove", onFxSlotDragMove, true);
@@ -9735,12 +9812,17 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
 
         // hold -> show actions overlay
         let holdT = null;
+        const clearHold = ()=>{ if (holdT){ clearTimeout(holdT); holdT=null; } };
         const startHold = (ev)=>{
           ev.stopPropagation();
-          clearTimeout(holdT);
-          holdT = setTimeout(()=>{ row._holdOpen = true; showSlotActions(row, guid, fx); }, 420);
+          clearHold();
+          holdT = setTimeout(()=>{
+            row._holdOpen = true;
+            if (fxSlotDrag && fxSlotDrag.rowEl === row) fxSlotDrag.holdTriggered = true;
+            showSlotActions(row, guid, fx);
+          }, 420);
         };
-        const cancelHold = ()=>{ clearTimeout(holdT); holdT=null; };
+        const cancelHold = ()=>{ clearHold(); };
         row.addEventListener("pointerdown", startHold);
         row.addEventListener("pointerup", cancelHold);
         row.addEventListener("pointerleave", cancelHold);
@@ -9750,8 +9832,6 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
         row.addEventListener("pointerdown", (ev)=>{
           if (ev.pointerType !== "mouse" || ev.button !== 0) return;
           if (row._holdOpen) return;
-          clearTimeout(holdT);
-          holdT = null;
           fxSlotDrag = {
             guid,
             fxIndex: fx.index,
@@ -9761,10 +9841,13 @@ r.sendsBtn.classList.toggle("sendsAllMute", sendCount>0 && allMuted);
             startX: ev.clientX,
             startY: ev.clientY,
             started: false,
+            holdTriggered: false,
+            holdClear: clearHold,
             targetEl: null,
             targetAfter: false,
             maxIndex: list.length
           };
+          try{ row.setPointerCapture(ev.pointerId); }catch(_){ }
           window.addEventListener("pointermove", onFxSlotDragMove, true);
           window.addEventListener("pointerup", onFxSlotDragEnd, true);
           window.addEventListener("pointercancel", onFxSlotDragEnd, true);

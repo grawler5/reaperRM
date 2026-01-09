@@ -1825,123 +1825,187 @@ body.phoneLandscape .panBox{ margin-top:2px !important; }
 .rmVoxPanel{
   width:100%;
   height:100%;
-  max-width:520px;
-  max-height:320px;
-  padding:14px 16px;
-  border-radius:16px;
-  background: linear-gradient(180deg, rgba(16,16,20,0.96), rgba(10,10,12,0.96));
-  border:1px solid rgba(255,255,255,0.08);
+  max-width:620px;
+  max-height:360px;
+  padding:18px 20px;
+  border-radius:20px;
+  background: linear-gradient(180deg, #f1eee8, #d8d4cc);
+  border:1px solid rgba(0,0,0,0.12);
   display:flex;
   flex-direction:column;
-  gap:12px;
+  gap:14px;
   user-select:none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 18px 40px rgba(0,0,0,0.25);
 }
 .rmVoxHeader{ display:flex; justify-content:space-between; align-items:baseline; }
-.rmVoxTitle{ font-weight:900; letter-spacing:0.14em; opacity:0.95; }
-.rmVoxSub{ font-size:12px; opacity:0.55; }
-.rmVoxFaders{ flex:1; display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:16px; align-items:stretch; }
-.rmVoxFaderWrap{ display:flex; flex-direction:column; align-items:center; gap:8px; }
-.rmVoxFaderLabel{ font-size:12px; letter-spacing:0.14em; opacity:0.88; }
-.rmVoxFaderVal{ font-size:12px; opacity:0.85; font-variant-numeric: tabular-nums; }
-.rmVoxFaderTrack{
-  position:relative;
-  width:92px;
+.rmVoxLogo{ font-size:26px; font-weight:700; font-style:italic; color:#333; }
+.rmVoxSub{ font-size:12px; opacity:0.6; }
+.rmVoxGrid{
   flex:1;
-  border-radius:14px;
-  background: rgba(0,0,0,0.24);
-  border:1px solid rgba(255,255,255,0.10);
+  display:grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap:16px;
+  align-items:stretch;
+}
+.rmVoxCol{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+.rmVoxColTitle{ font-size:13px; font-weight:600; color:#555; }
+.rmVoxMeterWrap{ display:flex; gap:10px; align-items:stretch; }
+.rmVoxScale{
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  font-size:10px;
+  color:#7a7a7a;
+  height:180px;
+}
+.rmVoxColComp .rmVoxScale{ height:200px; }
+.rmVoxTrack{
+  position:relative;
+  height:180px;
+  width:78px;
+  border-radius:18px;
+  background: #243646;
+  border:1px solid rgba(0,0,0,.35);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
   overflow:visible;
 }
-.rmVoxFaderVu{ position:absolute; inset:0; opacity:0.55; }
-.rmVoxFaderVuFill{
-  position:absolute;
-  left:0; right:0; bottom:0;
-  height:0%;
-  background: linear-gradient(0deg,
-    rgba(0,255,120,0.85) 0%,
-    rgba(255,220,0,0.85) 60%,
-    rgba(255,60,60,0.90) 100%);
-}
+.rmVoxTrackWide{ height:200px; width:110px; border-radius:22px; }
+.rmVoxTrackNarrow{ width:64px; }
+.rmVoxMeter{ position:absolute; inset:0; opacity:0.8; border-radius:inherit; overflow:hidden; }
+.rmVoxMeterFill{ position:absolute; left:0; right:0; bottom:0; height:0%; background: linear-gradient(0deg, #ffb23c 0%, #ff7a2d 60%, #ff573a 100%); }
+.rmVoxColComp .rmVoxMeterFill{ background: linear-gradient(0deg, #3aa7ff 0%, #4ad1ff 60%, #9df5ff 100%); }
+.rmVoxColGain .rmVoxMeterFill{ background: linear-gradient(0deg, #3a8bff 0%, #4ad1ff 60%, #9df5ff 100%); }
 .rmVoxFaderFill{
   position:absolute;
   left:0; right:0; bottom:0;
   height:0%;
-  border-radius:14px;
-  background: rgba(80,160,255,0.28);
+  border-radius:inherit;
+  background: rgba(255,255,255,0.12);
 }
-.rmVoxFaderThumb{
+.rmVoxThumb{
   position:absolute;
   left:50%;
-  width:74px;
-  height:16px;
+  width:56px;
+  height:14px;
   border-radius:999px;
   transform:translate(-50%,-50%);
-  background: rgba(255,255,255,0.20);
-  border:1px solid rgba(255,255,255,0.22);
-  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  background: rgba(255,255,255,0.65);
+  border:1px solid rgba(0,0,0,0.18);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.25);
 }
+.rmVoxColComp .rmVoxThumb{ width:72px; }
+.rmVoxValue{ font-size:12px; font-weight:600; color:#333; }
+.rmVoxValueSub{ font-size:11px; color:#666; }
 
 /* RM Saturator */
 .rmSatHost{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
 .rmSatPanel{
   width:100%;
   height:100%;
-  max-width:820px;
-  max-height:460px;
-  padding:16px 18px;
-  border-radius:16px;
-  background: linear-gradient(180deg, rgba(16,16,20,0.96), rgba(10,10,12,0.96));
-  border:1px solid rgba(255,255,255,0.08);
+  max-width:900px;
+  max-height:520px;
+  padding:18px 20px;
+  border-radius:18px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 40%),
+    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.05), transparent 45%),
+    linear-gradient(180deg, #3e2f25, #2b1f18);
+  border:1px solid rgba(0,0,0,0.6);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 18px 40px rgba(0,0,0,0.35);
   display:flex;
   flex-direction:column;
   gap:14px;
+  color:#f2e6da;
   user-select:none;
 }
 .rmSatHeader{ display:flex; justify-content:space-between; align-items:baseline; }
-.rmSatTitle{ font-weight:900; letter-spacing:0.14em; opacity:0.95; }
-.rmSatSub{ font-size:12px; opacity:0.55; }
-.rmSatGrid{ flex:1 1 auto; display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:14px; }
-.rmSatCol{ display:flex; flex-direction:column; gap:12px; }
-.rmSatSection{
-  border-radius:14px;
-  border:1px solid rgba(255,255,255,0.08);
-  background: rgba(0,0,0,0.16);
-  padding:12px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.rmSatSectionTitle{ font-weight:900; letter-spacing:0.12em; font-size:12px; opacity:0.9; }
-.rmSatButtonRow{ display:flex; flex-wrap:wrap; gap:8px; }
-.rmSatSlopeRow{ gap:6px; }
-.rmSatSlopeLabel{ font-size:11px; opacity:0.75; letter-spacing:0.12em; }
-.rmSatBtn{
-  height:28px;
-  padding:0 12px;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,0.12);
-  background:rgba(255,255,255,0.06);
-  color:#fff;
+.rmSatTitle{ font-weight:900; letter-spacing:0.2em; font-size:14px; }
+.rmSatSub{ font-size:11px; opacity:0.7; }
+.rmSatStyleRow{ display:grid; grid-template-columns: repeat(5, 1fr); gap:8px; }
+.rmSatStyleBtn{
+  height:32px;
+  border-radius:8px;
+  border:1px solid rgba(0,0,0,0.6);
+  background:linear-gradient(#6a4a36,#4a3226);
+  color:#f4dcc0;
   font-weight:800;
-  letter-spacing:0.10em;
+  letter-spacing:0.12em;
   font-size:11px;
   cursor:pointer;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.15);
 }
-.rmSatBtn.on{ background:rgba(255,255,255,0.16); border-color:rgba(255,255,255,0.22); }
-.rmSatToggle{
-  height:32px;
-  border-radius:12px;
-  border:1px solid rgba(0,0,0,.70);
-  background:linear-gradient(#3b3f45,#2d3036);
-  color:#eaeaea;
+.rmSatStyleBtn.on{
+  color:#ffb05a;
+  box-shadow: 0 0 12px rgba(255,160,60,0.6), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.rmSatMain{ display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+.rmSatBlock{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+.rmSatDialWrap{ display:flex; align-items:center; justify-content:center; }
+.rmSatPanel .rmDialLabel{ font-size:11px; letter-spacing:0.12em; color:#f4dcc0; }
+.rmSatPanel .rmDialValue{ font-size:11px; opacity:0.8; }
+.rmSatPanel .rmDialFace{
+  width:86px;
+  height:86px;
+  background: radial-gradient(circle at 35% 30%, #eee, #666 60%, #333 100%);
+  border:2px solid #1a120d;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,0.15), 0 8px 18px rgba(0,0,0,0.35);
+}
+.rmSatPanel .rmDialNeedle{ background:#1a120d; }
+.rmSatSwitchWrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+.rmSatSwitchWrap{ grid-column: span 2; justify-self:center; }
+.rmSatSwitchLabel{ font-size:11px; letter-spacing:0.12em; }
+.rmSatSwitch{
+  width:60px;
+  height:28px;
+  border-radius:6px;
+  border:1px solid rgba(0,0,0,0.6);
+  background:linear-gradient(#6a4a36,#3a251c);
+  color:#f4dcc0;
+  font-weight:800;
   cursor:pointer;
-  font-size:12px;
-  letter-spacing:0.10em;
 }
-.rmSatToggle.on{
-  background:linear-gradient(#265ad8,#1c3f9a);
-  border-color:rgba(80,140,255,.9);
-  color:#fff;
+.rmSatSwitch.on{
+  color:#ffe1a8;
+  box-shadow: 0 0 10px rgba(255,160,60,0.6);
+}
+.rmSatSlopeRow{ display:flex; gap:14px; justify-content:flex-start; }
+.rmSatSlopeSelect{ display:flex; flex-direction:column; gap:6px; }
+.rmSatSlopeLabel{ font-size:11px; letter-spacing:0.12em; opacity:0.8; }
+.rmSatSlopeSelect select{
+  height:28px;
+  border-radius:6px;
+  border:1px solid rgba(0,0,0,0.6);
+  background:linear-gradient(#5b3f2e,#3b281f);
+  color:#f4dcc0;
+  padding:0 8px;
+}
+.rmSatExtra{ display:flex; gap:20px; align-items:center; justify-content:flex-end; }
+.rmSatAutoBtn{
+  height:28px;
+  padding:0 14px;
+  border-radius:6px;
+  border:1px solid rgba(0,0,0,0.6);
+  background:linear-gradient(#6a4a36,#3a251c);
+  color:#f4dcc0;
+  font-weight:800;
+  cursor:pointer;
+}
+.rmSatAutoBtn.on{
+  color:#ffe1a8;
+  box-shadow: 0 0 10px rgba(255,160,60,0.6);
+}
+.rmSatOsWrap{ display:flex; align-items:center; gap:8px; }
+.rmSatOsLabel{ font-size:11px; letter-spacing:0.12em; }
+.rmSatOsLamp{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:#4c2f1f;
+  box-shadow: inset 0 0 3px rgba(0,0,0,0.6);
+}
+.rmSatOsLamp.on{
+  background:#ff9e3a;
+  box-shadow: 0 0 8px rgba(255,160,60,0.7);
 }
 
 
