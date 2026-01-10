@@ -297,6 +297,7 @@ wss.on("connection", (ws) => {
       const cfg = ensureProjectCfg(currentProjectId);
       const fxName = String(msg.fxName||"");
       const key = presetKeyFromName(fxName);
+      if (!key) return;
       const presets = (cfg.presets && cfg.presets[key]) ? cfg.presets[key] : [];
       sendTo(ws, {type:"fxPresets", fxName, presets});
       return;
@@ -308,6 +309,7 @@ wss.on("connection", (ws) => {
       const cfg = ensureProjectCfg(currentProjectId);
       const fxName = String(msg.fxName||"");
       const key = presetKeyFromName(fxName);
+      if (!key) return;
       const rawParams = Array.isArray(msg.params) ? msg.params : [];
       const params = rawParams.map(p=>({
         index: Number(p.index),
@@ -332,6 +334,7 @@ wss.on("connection", (ws) => {
       const cfg = ensureProjectCfg(currentProjectId);
       const fxName = String(msg.fxName||"");
       const key = presetKeyFromName(fxName);
+      if (!key) return;
       const presetId = String(msg.presetId||"");
       const list = Array.isArray(cfg.presets && cfg.presets[key]) ? cfg.presets[key] : [];
       const next = list.filter(p=>String(p.id) !== presetId);

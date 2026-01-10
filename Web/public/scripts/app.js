@@ -6956,7 +6956,7 @@ for (const c of (sec.controls||[])){
         win.presetSelection = "";
         wsSend({type:"reqFxPresets", guid: win.guid, fxName});
       }
-      const cached = fxPresetCache.get(fxKey);
+      const cached = fxKey ? fxPresetCache.get(fxKey) : null;
       const presets = cached ? cached.presets : [];
       const listKey = `${fxKey}|${presets.map(p=>`${p.id}:${p.name}`).join("|")}`;
       if (win._presetOptionsKey !== listKey){
@@ -6981,7 +6981,8 @@ for (const c of (sec.controls||[])){
         presetSelect.value = win.presetSelection || "";
         win._presetSetting = false;
       }
-      if (deletePresetBtn) deletePresetBtn.disabled = !presetSelect.value;
+      presetSelect.disabled = !fxKey;
+      if (deletePresetBtn) deletePresetBtn.disabled = !fxKey || !presetSelect.value;
     }
 
     const listEl = win.el.querySelector(".pluginParamList");
@@ -7179,6 +7180,7 @@ for (const c of (sec.controls||[])){
           if (!win.presetSelection) return;
           const fxName = getFxNameFromCache(win.guid, win.fxIndex);
           const keyName = presetKeyFromName(fxName);
+          if (!keyName) return;
           const cached = fxPresetCache.get(keyName);
           const presets = cached ? cached.presets : [];
           const preset = presets.find(p=>String(p.id) === String(win.presetSelection));
@@ -7928,6 +7930,7 @@ applyResponsiveMode();
       }
       if (msg.type === "fxPresets"){
         const key = presetKeyFromName(msg.fxName || "");
+        if (!key) return;
         fxPresetCache.set(key, {presets: msg.presets || [], ts: Date.now()});
         try{
           for (const win of pluginWins.values()){
