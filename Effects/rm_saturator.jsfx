@@ -11,21 +11,21 @@ desc:rm_saturator (2x OS + Auto Level v3)
   - This changes the effective corner slightly compared to a single section.
 */
 
-slider1:drive_db=18<0,60,0.1>Drive (dB)
-slider2:punish=0<0,1,1{Off,On}>Punish (+20 dB)
-slider3:style=0<0,4,1{Tape,Tube,Diode,Trans,Rect}>Style
-slider4:bias=0<-0.50,0.50,0.001>Bias (asym)
-slider5:tone_db=0<-12,12,0.1>Tone (tilt dB)
+slider1:drive_db=18<0,60,0.1>- Drive (dB)
+slider2:punish=0<0,1,1{Off,On}>- Punish (+20 dB)
+slider3:style=0<0,4,1{Tape,Tube,Diode,Trans,Rect}>- Style
+slider4:bias=0<-0.50,0.50,0.001>- Bias (asym)
+slider5:tone_db=0<-12,12,0.1>- Tone (tilt dB)
 
-slider6:locut=20<20,300,1>LoCut (Hz)
-slider7:hp_slope=0<0,5,1{6,12,18,24,48,96}>HP Slope (dB/oct)
+slider6:locut=20<20,300,1>- LoCut (Hz)
+slider7:hp_slope=0<0,5,1{6,12,18,24,48,96}>- HP Slope (dB/oct)
 
-slider8:hicut=20000<4000,20000,10>HiCut (Hz)
-slider9:lp_slope=0<0,5,1{6,12,18,24,48,96}>LP Slope (dB/oct)
+slider8:hicut=20000<4000,20000,10>- HiCut (Hz)
+slider9:lp_slope=0<0,5,1{6,12,18,24,48,96}>- LP Slope (dB/oct)
 
-slider10:auto=1<0,1,1{Off,On}>Auto level (RMS)
-slider11:out_db=0<-50,24,0.1>Output (dB)
-slider12:mix=100<0,100,0.1>Mix (%)
+slider10:auto=1<0,1,1{Off,On}>- Auto level (RMS)
+slider11:out_db=0<-50,24,0.1>- Output (dB)
+slider12:mix=100<0,100,0.1>- Mix (%)
 
 @init
 pi = 3.141592653589793;
@@ -343,7 +343,7 @@ wetR *= out_lin;
 spl0 = dryL*dry + wetL*wet;
 spl1 = dryR*dry + wetR*wet;
 
-@gfx 760 420
+@gfx 960 540
 gfx_clear = 0.07;
 gfx_a = 1;
 
@@ -452,15 +452,15 @@ function drawSlope(x y w h slider_idx label)
 
 // Header
 gfx_r=0.9; gfx_g=0.9; gfx_b=0.9;
-gfx_x = 24; gfx_y = 16;
+gfx_x = 36; gfx_y = 20;
 gfx_drawstr("RM SATURATOR");
 gfx_r=0.6; gfx_g=0.6; gfx_b=0.6;
-gfx_x = 24; gfx_y = 36;
+gfx_x = 36; gfx_y = 44;
 gfx_drawstr("Analog drive");
 
 // Style buttons
-styles_w = 120; styles_h = 28; styles_gap = 10;
-sx = 24; sy = 62;
+styles_w = 140; styles_h = 32; styles_gap = 14;
+sx = 36; sy = 80;
 style_idx = slider3|0;
 function drawStyleBtn(idx label)
 (
@@ -484,25 +484,25 @@ drawStyleBtn(3, "TRANS");
 drawStyleBtn(4, "RECT");
 
 // Knobs
-row1_y = 140;
-row2_y = 250;
-knob_r = 36;
+row1_y = 190;
+row2_y = 330;
+knob_r = 48;
 
-drawKnob(90, row1_y, knob_r, 1, 0, 60, "DRIVE", " dB");
-drawKnob(210, row1_y, knob_r, 5, -12, 12, "TONE", " dB");
-drawKnob(330, row1_y, knob_r, 11, -50, 24, "OUTPUT", " dB");
-drawKnob(450, row1_y, knob_r, 12, 0, 100, "MIX", " %");
+drawKnob(120, row1_y, knob_r, 1, 0, 60, "DRIVE", " dB");
+drawKnob(260, row1_y, knob_r, 5, -12, 12, "TONE", " dB");
+drawKnob(400, row1_y, knob_r, 11, -50, 24, "OUTPUT", " dB");
+drawKnob(540, row1_y, knob_r, 12, 0, 100, "MIX", " %");
 
-drawKnob(120, row2_y, knob_r, 4, -0.5, 0.5, "BIAS", "");
-drawKnob(260, row2_y, knob_r, 6, 20, 300, "LOCUT", " Hz");
-drawKnob(400, row2_y, knob_r, 8, 4000, 20000, "HICUT", " Hz");
+drawKnob(160, row2_y, knob_r, 4, -0.5, 0.5, "BIAS", "");
+drawKnob(320, row2_y, knob_r, 6, 20, 300, "LOCUT", " Hz");
+drawKnob(480, row2_y, knob_r, 8, 4000, 20000, "HICUT", " Hz");
 
 // Toggles
-drawToggle(540, 220, 170, 34, 2, "PUNISH");
-drawToggle(540, 262, 170, 34, 10, "AUTO");
+drawToggle(680, 250, 210, 38, 2, "PUNISH");
+drawToggle(680, 300, 210, 38, 10, "AUTO");
 
-// Slopes
-drawSlope(540, 310, 170, 34, 7, "HP SLOPE");
-drawSlope(540, 352, 170, 34, 9, "LP SLOPE");
+// Slopes under controls
+drawSlope(260, 410, 200, 36, 7, "HP SLOPE");
+drawSlope(420, 410, 200, 36, 9, "LP SLOPE");
 
 ui_last_cap = mouse_cap;

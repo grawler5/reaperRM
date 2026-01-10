@@ -8,12 +8,12 @@ desc:rm_rvox (RVox-ish) - Gate / Comp / Gain
 // - Gain fader like RVox: 0 dB is MAX (default). Only attenuation (negative).
 // - Strong auto-makeup (very loud at max comp). Use Gain to pull level down.
 
-slider1:gate=0<0,100,1>Gate (0=off)
-slider2:comp=0<-36,0,0.1>Comp (dB, 0..-36)
-slider3:gain=0<-24,0,0.1>Gain (dB, 0=max)
-slider4:0<0,1,0.0001>-Z Telemetry: In Peak
-slider5:0<0,24,0.01>-Z Telemetry: GR (dB)
-slider6:0<0,1,0.0001>-Z Telemetry: Out Peak
+slider1:gate=0<0,100,1>- Gate (0=off)
+slider2:comp=0<-36,0,0.1>- Comp (dB, 0..-36)
+slider3:gain=0<-24,0,0.1>- Gain (dB, 0=max)
+slider4:0<0,1,0.0001>- Telemetry: In Peak
+slider5:0<0,24,0.01>- Telemetry: GR (dB)
+slider6:0<0,1,0.0001>- Telemetry: Out Peak
 
 @init
 ln10 = log(10);
@@ -187,7 +187,7 @@ slider4 = min(1, tele_in);
 slider5 = tele_gr;
 slider6 = min(1, tele_out);
 
-@gfx 520 320
+@gfx 760 420
 gfx_clear = 0.08;
 gfx_a = 1;
 
@@ -203,16 +203,25 @@ mouse_down ? (
 
 function clamp(v lo hi) ( v < lo ? lo : v > hi ? hi : v; );
 function inRect(x y w h) (mouse_x >= x && mouse_x <= x+w && mouse_y >= y && mouse_y <= y+h);
+function getSlider(idx)(
+  idx == 1 ? gate :
+  idx == 2 ? comp :
+  idx == 3 ? gain :
+  0;
+);
+
 function setSlider(idx val lo hi)(
   val = clamp(val, lo, hi);
-  slider(idx) = val;
+  idx == 1 ? gate = val :
+  idx == 2 ? comp = val :
+  idx == 3 ? gain = val : 0;
   slider_automate(idx);
 );
 
 function drawFader(x y w h slider_idx lo hi meter_val meter_max)
   local(val norm mnorm knob_y)
 (
-  val = slider(slider_idx);
+  val = getSlider(slider_idx);
   norm = clamp((val - lo) / (hi - lo), 0, 1);
   mnorm = meter_max > 0 ? clamp(meter_val / meter_max, 0, 1) : 0;
 
@@ -246,19 +255,19 @@ function drawFader(x y w h slider_idx lo hi meter_val meter_max)
 );
 
 // Layout
-pad = 24;
-col_w = 140;
-col_h = 200;
-top = 72;
-gap = 16;
+pad = 36;
+col_w = 190;
+col_h = 250;
+top = 96;
+gap = 24;
 x1 = pad;
 x2 = x1 + col_w + gap;
 x3 = x2 + col_w + gap;
 
 // Header
 gfx_r=0.85; gfx_g=0.85; gfx_b=0.85;
-gfx_x = pad; gfx_y = 16;
-gfx_drawstr("RVox  •  Gate / Comp / Gain");
+gfx_x = pad; gfx_y = 22;
+gfx_drawstr("RM Vox  •  Gate / Comp / Gain");
 
 // Gate
 drawFader(x1, top, col_w, col_h, 1, 0, 100, slider4, 1);
