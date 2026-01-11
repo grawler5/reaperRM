@@ -11,24 +11,33 @@ desc:rm_saturator (2x OS + Auto Level v3)
   - This changes the effective corner slightly compared to a single section.
 */
 
-slider1:drive_db=18<0,60,0.1>Drive (dB)
-slider2:punish=0<0,1,1{Off,On}>Punish (+20 dB)
-slider3:style=0<0,4,1{Tape,Tube,Diode,Trans,Rect}>Style
-slider4:bias=0<-0.50,0.50,0.001>Bias (asym)
-slider5:tone_db=0<-12,12,0.1>Tone (tilt dB)
+slider1:drive_db=18<0,60,0.1>- Drive (dB)
+slider2:punish=0<0,1,1{Off,On}>- Punish (+20 dB)
+slider3:style=0<0,4,1{Tape,Tube,Diode,Trans,Rect}>- Style
+slider4:bias=0<-0.50,0.50,0.001>- Bias (asym)
+slider5:tone_db=0<-12,12,0.1>- Tone (tilt dB)
 
-slider6:locut=20<20,300,1>LoCut (Hz)
-slider7:hp_slope=0<0,15,1{6,12,18,24,30,36,42,48,54,60,66,72,78,84,90,96}>HP Slope (dB/oct)
+slider6:locut=20<20,300,1>- LoCut (Hz)
+slider7:hp_slope=0<0,5,1{6,12,18,24,48,96}>- HP Slope (dB/oct)
 
-slider8:hicut=20000<4000,20000,10>HiCut (Hz)
-slider9:lp_slope=0<0,15,1{6,12,18,24,30,36,42,48,54,60,66,72,78,84,90,96}>LP Slope (dB/oct)
+slider8:hicut=20000<4000,20000,10>- HiCut (Hz)
+slider9:lp_slope=0<0,5,1{6,12,18,24,48,96}>- LP Slope (dB/oct)
 
-slider10:auto=1<0,1,1{Off,On}>Auto level (RMS)
-slider11:out_db=0<-50,24,0.1>Output (dB)
-slider12:mix=100<0,100,0.1>Mix (%)
+slider10:auto=1<0,1,1{Off,On}>- Auto level (RMS)
+slider11:out_db=0<-50,24,0.1>- Output (dB)
+slider12:mix=100<0,100,0.1>- Mix (%)
 
 @init
 pi = 3.141592653589793;
+gfx_ext_retina = 1;
+
+ui_drag = 0;
+ui_drag_slider = 0;
+ui_drag_start_y = 0;
+ui_drag_start_val = 0;
+ui_drag_min = 0;
+ui_drag_max = 1;
+ui_last_cap = 0;
 
 maxst = 16; // 6..96 dB/oct => 1..16 stages
 
@@ -232,8 +241,8 @@ sr  = srate;
 sr2 = sr*2;
 
 // stages from slope menus
-hp_stages = hp_slope + 1; // 0..15 -> 1..16
-lp_stages = lp_slope + 1;
+hp_stages = hp_slope <= 3 ? (hp_slope + 1) : (hp_slope == 4 ? 8 : 16);
+lp_stages = lp_slope <= 3 ? (lp_slope + 1) : (lp_slope == 4 ? 8 : 16);
 
 // Total drive
 drive_total_db = drive_db + punish*20;
@@ -333,3 +342,167 @@ wetR *= out_lin;
 // Mix
 spl0 = dryL*dry + wetL*wet;
 spl1 = dryR*dry + wetR*wet;
+
+@gfx 960 540
+gfx_clear = 0.07;
+gfx_a = 1;
+
+mouse_down = mouse_cap & 1;
+mouse_click = mouse_down && !(ui_last_cap & 1);
+
+mouse_down ? (
+  0;
+) : (
+  ui_drag = 0;
+  ui_drag_slider = 0;
+);
+
+function clamp(v lo hi) ( v < lo ? lo : v > hi ? hi : v; );
+function inRect(x y w h) (mouse_x >= x && mouse_x <= x+w && mouse_y >= y && mouse_y <= y+h);
+function setSlider(idx val lo hi)(
+  val = clamp(val, lo, hi);
+  slider(idx) = val;
+  slider_automate(idx);
+);
+
+function drawKnob(x y r slider_idx lo hi label unit)
+  local(val norm ang vx vy)
+(
+  val = slider(slider_idx);
+  norm = clamp((val - lo) / (hi - lo), 0, 1);
+
+  // knob face
+  gfx_r=0.15; gfx_g=0.15; gfx_b=0.16;
+  gfx_circle(x, y, r, 1, 1);
+  gfx_r=0.6; gfx_g=0.6; gfx_b=0.62;
+  gfx_circle(x, y, r, 0, 1);
+
+  // needle
+  ang = -2.35619449 + (4.71238898 * norm);
+  vx = x + cos(ang) * (r-6);
+  vy = y + sin(ang) * (r-6);
+  gfx_r=0.9; gfx_g=0.9; gfx_b=0.9;
+  gfx_line(x, y, vx, vy);
+
+  // label
+  gfx_x = x - r; gfx_y = y + r + 8;
+  gfx_drawstr(label);
+  gfx_x = x - r; gfx_y = y + r + 22;
+  sprintf(#tmp, "%.1f%s", val, unit);
+  gfx_drawstr(#tmp);
+
+  // drag
+  mouse_down && !ui_drag && inRect(x-r, y-r, r*2, r*2) ? (
+    ui_drag = 1;
+    ui_drag_slider = slider_idx;
+    ui_drag_start_y = mouse_y;
+    ui_drag_start_val = val;
+    ui_drag_min = lo;
+    ui_drag_max = hi;
+  );
+
+  ui_drag && ui_drag_slider == slider_idx ? (
+    delta = (ui_drag_start_y - mouse_y) * (hi - lo) / 180;
+    setSlider(slider_idx, ui_drag_start_val + delta, lo, hi);
+  );
+);
+
+function drawToggle(x y w h slider_idx label)
+  local(on)
+(
+  on = slider(slider_idx) >= 0.5;
+  gfx_r=0.15; gfx_g=0.15; gfx_b=0.15;
+  gfx_rect(x, y, w, h, 1);
+  on ? (gfx_r=0.2; gfx_g=0.7; gfx_b=0.35) : (gfx_r=0.4; gfx_g=0.4; gfx_b=0.4);
+  gfx_rect(x+2, y+2, w-4, h-4, 1);
+  gfx_r=0; gfx_g=0; gfx_b=0;
+  gfx_x = x + 8; gfx_y = y + 6;
+  gfx_drawstr(label);
+  on ? (gfx_x = x + w - 40; gfx_drawstr("ON")) : (gfx_x = x + w - 40; gfx_drawstr("OFF"));
+  mouse_click && inRect(x, y, w, h) ? (
+    setSlider(slider_idx, on ? 0 : 1, 0, 1);
+  );
+);
+
+function slope_db(v) (
+  v == 0 ? 6 :
+  v == 1 ? 12 :
+  v == 2 ? 18 :
+  v == 3 ? 24 :
+  v == 4 ? 48 : 96;
+);
+
+function drawSlope(x y w h slider_idx label)
+  local(val next db)
+(
+  val = slider(slider_idx);
+  db = slope_db(val|0);
+  gfx_r=0.15; gfx_g=0.15; gfx_b=0.15;
+  gfx_rect(x, y, w, h, 1);
+  gfx_r=0.75; gfx_g=0.75; gfx_b=0.75;
+  gfx_x = x + 8; gfx_y = y + 6;
+  sprintf(#tmp, "%s %d dB", label, db);
+  gfx_drawstr(#tmp);
+  mouse_click && inRect(x, y, w, h) ? (
+    next = val + 1;
+    next > 5 ? next = 0;
+    setSlider(slider_idx, next, 0, 5);
+  );
+);
+
+// Header
+gfx_r=0.9; gfx_g=0.9; gfx_b=0.9;
+gfx_x = 36; gfx_y = 20;
+gfx_drawstr("RM SATURATOR");
+gfx_r=0.6; gfx_g=0.6; gfx_b=0.6;
+gfx_x = 36; gfx_y = 44;
+gfx_drawstr("Analog drive");
+
+// Style buttons
+styles_w = 140; styles_h = 32; styles_gap = 14;
+sx = 36; sy = 80;
+style_idx = slider3|0;
+function drawStyleBtn(idx label)
+(
+  x = sx + idx*(styles_w + styles_gap);
+  y = sy;
+  gfx_r=0.16; gfx_g=0.16; gfx_b=0.16;
+  gfx_rect(x, y, styles_w, styles_h, 1);
+  idx == style_idx ? (gfx_r=0.25; gfx_g=0.6; gfx_b=0.85) : (gfx_r=0.4; gfx_g=0.4; gfx_b=0.4);
+  gfx_rect(x+2, y+2, styles_w-4, styles_h-4, 1);
+  gfx_r=0; gfx_g=0; gfx_b=0;
+  gfx_x = x + 8; gfx_y = y + 7;
+  gfx_drawstr(label);
+  mouse_click && inRect(x, y, styles_w, styles_h) ? (
+    setSlider(3, idx, 0, 4);
+  );
+);
+drawStyleBtn(0, "TAPE");
+drawStyleBtn(1, "TUBE");
+drawStyleBtn(2, "DIODE");
+drawStyleBtn(3, "TRANS");
+drawStyleBtn(4, "RECT");
+
+// Knobs
+row1_y = 190;
+row2_y = 330;
+knob_r = 48;
+
+drawKnob(120, row1_y, knob_r, 1, 0, 60, "DRIVE", " dB");
+drawKnob(260, row1_y, knob_r, 5, -12, 12, "TONE", " dB");
+drawKnob(400, row1_y, knob_r, 11, -50, 24, "OUTPUT", " dB");
+drawKnob(540, row1_y, knob_r, 12, 0, 100, "MIX", " %");
+
+drawKnob(160, row2_y, knob_r, 4, -0.5, 0.5, "BIAS", "");
+drawKnob(320, row2_y, knob_r, 6, 20, 300, "LOCUT", " Hz");
+drawKnob(480, row2_y, knob_r, 8, 4000, 20000, "HICUT", " Hz");
+
+// Toggles
+drawToggle(680, 250, 210, 38, 2, "PUNISH");
+drawToggle(680, 300, 210, 38, 10, "AUTO");
+
+// Slopes under controls
+drawSlope(260, 410, 200, 36, 7, "HP SLOPE");
+drawSlope(420, 410, 200, 36, 9, "LP SLOPE");
+
+ui_last_cap = mouse_cap;
