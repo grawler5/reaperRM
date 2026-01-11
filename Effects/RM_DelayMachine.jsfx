@@ -32,8 +32,7 @@ out_pin:left output
 out_pin:right output
 
 @init
-  gfx_ext_retina = 1;
-  gfx_loadimg(0, "../Web/public/tukan/delay/TKCCBack.png");
+  ui_loaded = 0;
   // delay lines
   max_samps = min(3000 * srate / 1000, 500000);
   freemem = 0;
@@ -205,6 +204,11 @@ out_pin:right output
   );
 
 @gfx 650 260
+  ui_loaded == 0 ? (
+    gfx_ext_retina = 1;
+    gfx_loadimg(0, "../Web/public/tukan/delay/TKCCBack.png");
+    ui_loaded = 1;
+  );
   gfx_a = 1;
   gfx_x = 0; gfx_y = 0;
   gfx_blit(0, 1, 0);

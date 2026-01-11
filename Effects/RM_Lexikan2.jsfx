@@ -73,8 +73,7 @@ import smoother.jsfx-inc
 FPREEQB1 = PREEQB2 = PREEQFB3 = 0;
 /////////////////////////////////// ENDE PRE EQ ////////////////////////////
 freemem = 0;
-gfx_ext_retina = 1;
-gfx_loadimg(0, "../Web/public/tukan/lexi2/Lexi2_DAW.png");
+ui_loaded = 0;
 
 b1Env1 = -exp(-30 / srate );
 a0Env1 = 1.0 + b1Env1;
@@ -1338,10 +1337,14 @@ aaa= __memtop();
 //bpos>=33*max_delay_samples+1+buffsize*2 ? bpos=33*max_delay_samples+1;
 
 @gfx 945 186
+ui_loaded == 0 ? (
+  gfx_ext_retina = 1;
+  gfx_loadimg(0, "../Web/public/tukan/lexi2/Lexi2_DAW.png");
+  ui_loaded = 1;
+);
 gfx_a = 1;
 gfx_x = 0; gfx_y = 0;
 gfx_blit(0, 1, 0);
-
 
 
 
