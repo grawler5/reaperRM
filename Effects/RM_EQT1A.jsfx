@@ -1,4 +1,5 @@
 desc:RM_EQT1A
+import rm_gui_basic.jsfx-inc
 // Version 1.1.1
 // RECALIBRATED!!
 
@@ -534,34 +535,25 @@ spl1 *= outvol;
 
 spl0 =sin(max(min(spl0,1),-1)*foo)/bar;
 spl1 =sin(max(min(spl1,1),-1)*foo)/bar;
+@gfx 620 360
+#rmGuiTitle = "RM_EQT1A"
+#rmGuiSubtitle = "Low / High / Output"
 
+gfx_clear = 0.06;
+rm_gui_header();
 
+#rmGuiLabel = "Low Boost";
+lb_norm = slider2 / 18;
+sprintf(#rmGuiValue, "%.1f dB", slider2);
+rm_gui_bar(20, 80, gfx_w-40, 24, lb_norm);
 
+#rmGuiLabel = "High Gain";
+hg_norm = slider10 / 18;
+sprintf(#rmGuiValue, "%.1f dB", slider10);
+rm_gui_bar(20, 114, gfx_w-40, 24, hg_norm);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#rmGuiLabel = "Output";
+out_norm = (slider12 + 12) / 24;
+sprintf(#rmGuiValue, "%+.1f dB", slider12);
+rm_gui_bar(20, 148, gfx_w-40, 24, out_norm);
 

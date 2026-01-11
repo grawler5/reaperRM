@@ -1,4 +1,5 @@
 desc:RM_Lexikan2
+import rm_gui_basic.jsfx-inc
 // Version 1.1.3
 //This plugin contains code by Geraint Luff. THANK YOU!
 
@@ -1363,54 +1364,24 @@ fxm1 < abs(FXR) ? FXm1 = abs(FXR);//:(fxm1*=0.999);
 aaa= __memtop();
 //bpos+=2;
 //bpos>=33*max_delay_samples+1+buffsize*2 ? bpos=33*max_delay_samples+1;
+@gfx 720 420
+#rmGuiTitle = "RM_Lexikan2"
+#rmGuiSubtitle = "Density / Feedback / Mix"
 
+gfx_clear = 0.06;
+rm_gui_header();
 
+#rmGuiLabel = "Density";
+den_norm = (slider1 - 1) / (4000-1);
+sprintf(#rmGuiValue, "%.0f ms", slider1);
+rm_gui_bar(20, 90, gfx_w-40, 26, den_norm);
 
+#rmGuiLabel = "Feedback";
+fb_norm = slider2 / 99;
+sprintf(#rmGuiValue, "%.0f%%", slider2);
+rm_gui_bar(20, 126, gfx_w-40, 26, fb_norm);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#rmGuiLabel = "Mix";
+sprintf(#rmGuiValue, "%.0f%%", slider20 * 100);
+rm_gui_bar(20, 162, gfx_w-40, 26, slider20);
 

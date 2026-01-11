@@ -2,6 +2,7 @@
 // Web UI uses its own skin; this JSFX focuses on audio + meters.
 
 desc:RM_PreAmp [Telemetry]
+import rm_gui_basic.jsfx-inc
 //tags: saturation preamp
 
 // Match original Tukān PreAmp: INPUT is 0..30 dB, default 0 dB.
@@ -248,3 +249,25 @@ slider_automate(slider13);
 slider_automate(slider14);
 slider_automate(slider15);
 slider_automate(slider16);
+@gfx 620 360
+#rmGuiTitle = "RM_PreAmp"
+#rmGuiSubtitle = "Input / Drive / Output"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+in_norm = min(max(slider1 / 30, 0), 1);
+#rmGuiLabel = "Input";
+sprintf(#rmGuiValue, "%.1f dB", slider1);
+rm_gui_bar(20, 80, gfx_w-40, 24, in_norm);
+
+#rmGuiLabel = "Tube";
+kn_norm = min(max((slider2-1) / 99, 0), 1);
+sprintf(#rmGuiValue, "%d%%", slider2);
+rm_gui_bar(20, 114, gfx_w-40, 24, kn_norm);
+
+out_norm = min(max((slider9 + 12) / 24, 0), 1);
+#rmGuiLabel = "Output";
+sprintf(#rmGuiValue, "%+.1f dB", slider9);
+rm_gui_bar(20, 148, gfx_w-40, 24, out_norm);
+
