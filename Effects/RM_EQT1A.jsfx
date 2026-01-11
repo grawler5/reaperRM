@@ -21,7 +21,7 @@ out_pin:L out
 out_pin:R out
 
 @init
-
+ui_loaded = 0;
 tempA = slider2*10/15;
 src_wetA = tgt_wetA = slider2 <= 0 ? 0.0 : 10^(tempA/20);
 
@@ -29,10 +29,6 @@ tempB = (-7.5-slider3*0.5);
 src_wetB = tgt_wetB = slider3 >= 0 ? 0.0 : 10^(tempB/20);
 
 dry = 1;
-
-
-
-
 
 
 
@@ -535,13 +531,15 @@ spl1 *= outvol;
 spl0 =sin(max(min(spl0,1),-1)*foo)/bar;
 spl1 =sin(max(min(spl1,1),-1)*foo)/bar;
 
-
-
-
-
-
-
-
+@gfx 600 250
+ui_loaded == 0 ? (
+  gfx_ext_retina = 1;
+  gfx_loadimg(0, "../Web/public/tukan/eqt/EQTback.png");
+  ui_loaded = 1;
+);
+gfx_a = 1;
+gfx_x = 0; gfx_y = 0;
+gfx_blit(0, 1, 0);
 
 
 

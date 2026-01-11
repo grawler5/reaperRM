@@ -49,6 +49,7 @@ out_pin:right output
 
 @init
   ext_tail_size = -1;
+  ui_loaded = 0;
   log2db = 8.6858896380650365530225783783321; // 20 / ln(10)
   db2log = 0.11512925464970228420089957273422; // ln(10) / 20
 
@@ -178,3 +179,13 @@ out_pin:right output
     slider5 = gr_db_out;
     slider_automate(slider5);
   );
+
+@gfx 906 213
+  ui_loaded == 0 ? (
+    gfx_ext_retina = 1;
+    gfx_loadimg(0, "../Web/public/tukan/76/76Back.png");
+    ui_loaded = 1;
+  );
+  gfx_a = 1;
+  gfx_x = 0; gfx_y = 0;
+  gfx_blit(0, 1, 0);
