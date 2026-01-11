@@ -1,4 +1,5 @@
 desc:RM_Limiter2 [Telemetry]
+import rm_gui_basic.jsfx-inc
 // RM_Limiter2
 // - DAW UI: shows Threshold/Output/Release/Maximizer
 // - Web UI: L2-style (Threshold & Output faders + meters)
@@ -104,3 +105,25 @@ spl1 = yR;
 // output peak
 lvlOut = max(abs(yL), abs(yR));
 pkOut = max(pkOut, min(1, lvlOut));
+@gfx 620 360
+#rmGuiTitle = "RM_Limiter2"
+#rmGuiSubtitle = "Threshold / Output / Release"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+#rmGuiLabel = "Threshold";
+th_norm = (slider1 + 30) / 30;
+sprintf(#rmGuiValue, "%.1f dB", slider1);
+rm_gui_bar(20, 80, gfx_w-40, 24, th_norm);
+
+#rmGuiLabel = "Output";
+out_norm = (slider2 + 30) / 30;
+sprintf(#rmGuiValue, "%.1f dB", slider2);
+rm_gui_bar(20, 114, gfx_w-40, 24, out_norm);
+
+#rmGuiLabel = "Release";
+rel_norm = (slider3 - 1) / (1000-1);
+sprintf(#rmGuiValue, "%.0f ms", slider3);
+rm_gui_bar(20, 148, gfx_w-40, 24, rel_norm);
+

@@ -1,4 +1,5 @@
 desc:RM_Deesser [Telemetry]
+import rm_gui_basic.jsfx-inc
 //author: Tukan
 //version 1.1
 
@@ -845,3 +846,25 @@ gr_db = abs(ratio2db(max(tele_eps, gr_meter2)));
 gr_db > 24 ? gr_db = 24;
 slider14 = gr_db;
 slider_automate(slider14);
+@gfx 620 360
+#rmGuiTitle = "RM_Deesser"
+#rmGuiSubtitle = "Threshold / Frequency / Range"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+#rmGuiLabel = "Threshold";
+th_norm = (slider1 + 50) / 50;
+sprintf(#rmGuiValue, "%.1f dB", slider1);
+rm_gui_bar(20, 80, gfx_w-40, 24, th_norm);
+
+#rmGuiLabel = "Freq";
+fr_norm = (slider4 - 2500) / (20000-2500);
+sprintf(#rmGuiValue, "%.0f Hz", slider4);
+rm_gui_bar(20, 114, gfx_w-40, 24, fr_norm);
+
+#rmGuiLabel = "Range";
+rg_norm = (slider5 + 50) / 50;
+sprintf(#rmGuiValue, "%.1f dB", slider5);
+rm_gui_bar(20, 148, gfx_w-40, 24, rg_norm);
+

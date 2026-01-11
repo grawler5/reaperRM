@@ -1,4 +1,5 @@
 desc:RM_LA1A [Telemetry]
+import rm_gui_basic.jsfx-inc
 // Version 1.4
 
 // Copyright 2006, Thomas Scott Stillwell
@@ -1121,3 +1122,20 @@ gr_db = abs(ratio2db(max(tele_eps, gr_meter2)));
 gr_db > 24 ? gr_db = 24;
 slider14 = gr_db;
 slider_automate(slider14);
+@gfx 720 360
+#rmGuiTitle = "RM_LA1A"
+#rmGuiSubtitle = "Gain / Peak Reduction"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+#rmGuiLabel = "Gain";
+g_norm = (slider3 + 10) / 30;
+sprintf(#rmGuiValue, "%+.1f dB", slider3);
+rm_gui_bar(20, 80, gfx_w-40, 24, g_norm);
+
+#rmGuiLabel = "Peak Red";
+pr_norm = slider9 / 60;
+sprintf(#rmGuiValue, "%.1f dB", slider9);
+rm_gui_bar(20, 114, gfx_w-40, 24, pr_norm);
+

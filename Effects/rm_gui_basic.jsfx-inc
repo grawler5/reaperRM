@@ -1,0 +1,55 @@
+// Basic JSFX GUI helpers for RM plugins.
+
+function rm_gui_setfont(size, bold)(
+  gfx_setfont(1, "Arial", size, bold ? 1 : 0);
+);
+
+function rm_gui_header()(
+  gfx_r=0.14; gfx_g=0.15; gfx_b=0.17;
+  gfx_rect(0,0,gfx_w,50,1);
+  gfx_r=0.85; gfx_g=0.86; gfx_b=0.88;
+  rm_gui_setfont(18, 1);
+  gfx_x=16; gfx_y=14; gfx_drawstr(#rmGuiTitle);
+  strlen(#rmGuiSubtitle) > 0 ? (
+    rm_gui_setfont(11, 0);
+    gfx_r=0.6; gfx_g=0.62; gfx_b=0.65;
+    gfx_x=16; gfx_y=32; gfx_drawstr(#rmGuiSubtitle);
+  );
+);
+
+function rm_gui_bar(x, y, w, h, norm)(
+  norm = min(max(norm, 0), 1);
+  gfx_r=0.10; gfx_g=0.11; gfx_b=0.12;
+  gfx_rect(x, y, w, h, 1);
+  gfx_r=0.20; gfx_g=0.58; gfx_b=0.85;
+  gfx_rect(x, y, w * norm, h, 1);
+  gfx_r=0.03; gfx_g=0.03; gfx_b=0.03;
+  rm_gui_setfont(12, 1);
+  gfx_x = x + 8; gfx_y = y + 6;
+  gfx_drawstr(#rmGuiLabel);
+  gfx_r=0.9; gfx_g=0.9; gfx_b=0.9;
+  rm_gui_setfont(12, 0);
+  gfx_x = x + w - 72; gfx_y = y + 6;
+  gfx_drawstr(#rmGuiValue);
+);
+
+function rm_gui_knob(x, y, r, norm)(
+  norm = min(max(norm, 0), 1);
+  ang = -135 + (norm * 270);
+  gfx_r=0.18; gfx_g=0.19; gfx_b=0.21;
+  gfx_circle(x, y, r, 1, 1);
+  gfx_r=0.4; gfx_g=0.42; gfx_b=0.45;
+  gfx_circle(x, y, r-3, 0, 1);
+  gfx_r=0.9; gfx_g=0.9; gfx_b=0.9;
+  nx = x + cos(ang*$pi/180) * (r-6);
+  ny = y + sin(ang*$pi/180) * (r-6);
+  gfx_line(x, y, nx, ny);
+  gfx_r=0.7; gfx_g=0.72; gfx_b=0.74;
+  rm_gui_setfont(11, 1);
+  gfx_x = x - r; gfx_y = y + r + 6;
+  gfx_drawstr(#rmGuiLabel);
+  rm_gui_setfont(11, 0);
+  gfx_r=0.85; gfx_g=0.86; gfx_b=0.88;
+  gfx_x = x - r; gfx_y = y + r + 20;
+  gfx_drawstr(#rmGuiValue);
+);

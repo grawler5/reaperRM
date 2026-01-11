@@ -3,6 +3,7 @@
 // Web UI provides Pro-Q style editor.
 
 desc:RM_EQ4 (ProQ) + Spectrum v3 [Telemetry]
+import rm_gui_basic.jsfx-inc
 //tags: equalizer parametric spectrum
 
 slider1:0<0,1,1{Off,On}>LoCut
@@ -583,3 +584,25 @@ spec_on && fft_acc >= (FFTSZ*0.5) ? (
   slider_automate(slider53);
   slider_automate(slider54);
 );
+@gfx 620 360
+#rmGuiTitle = "RM_EQ4"
+#rmGuiSubtitle = "Lo/Hi Cut + Output"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+lc_norm = min(max((slider2-20) / (20000-20), 0), 1);
+#rmGuiLabel = "LoCut";
+sprintf(#rmGuiValue, "%s %.0fHz", slider1 >= 0.5 ? "ON" : "OFF", slider2);
+rm_gui_bar(20, 80, gfx_w-40, 24, lc_norm);
+
+hc_norm = min(max((slider4-20) / (20000-20), 0), 1);
+#rmGuiLabel = "HiCut";
+sprintf(#rmGuiValue, "%s %.0fHz", slider3 >= 0.5 ? "ON" : "OFF", slider4);
+rm_gui_bar(20, 114, gfx_w-40, 24, hc_norm);
+
+out_norm = min(max((slider21 + 18) / 36, 0), 1);
+#rmGuiLabel = "Output";
+sprintf(#rmGuiValue, "%+.1f dB", slider21);
+rm_gui_bar(20, 148, gfx_w-40, 24, out_norm);
+

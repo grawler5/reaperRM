@@ -1,5 +1,6 @@
 // License: GPL - http://www.gnu.org/licenses/gpl.html
 desc:RM_DelayMachine
+import rm_gui_basic.jsfx-inc
 
 slider1:100<0,3000,1>Delay (ms)
 slider2:-5<-40,0,1>Feedback (dB)
@@ -201,3 +202,24 @@ out_pin:right output
   bypass ? (spl0 = dryInL; spl1 = dryInR;) : (
     delta ? (spl0 = outL - dryInL; spl1 = outR - dryInR;) : (spl0 = outL; spl1 = outR;)
   );
+@gfx 720 420
+#rmGuiTitle = "RM_DelayMachine"
+#rmGuiSubtitle = "Delay / Feedback / Mix"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+#rmGuiLabel = "Delay";
+dly_norm = slider1 / 3000;
+sprintf(#rmGuiValue, "%.0f ms", slider1);
+rm_gui_bar(20, 90, gfx_w-40, 26, dly_norm);
+
+#rmGuiLabel = "Feedback";
+fb_norm = (slider2 + 40) / 40;
+sprintf(#rmGuiValue, "%.0f dB", slider2);
+rm_gui_bar(20, 126, gfx_w-40, 26, fb_norm);
+
+#rmGuiLabel = "Mix";
+sprintf(#rmGuiValue, "%.0f%%", slider4 * 100);
+rm_gui_bar(20, 162, gfx_w-40, 26, slider4);
+

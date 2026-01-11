@@ -5,6 +5,7 @@
 //   slider4: Out Peak (0..1)
 
 desc:RM_Kicker50hz [Telemetry]
+import rm_gui_basic.jsfx-inc
 //tags: processing equalizer
 //author: LOSER (restored) + RM telemetry wrapper
 
@@ -73,3 +74,25 @@ pos += adj;
 // output peak (post-processing)
 lvlOut = max(abs(spl0), abs(spl1));
 pkOut = max(pkOut, min(1, lvlOut));
+@gfx 620 360
+#rmGuiTitle = "RM_Kicker50hz"
+#rmGuiSubtitle = "Frequency / Wet / Dry"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+#rmGuiLabel = "Freq";
+f_norm = (slider1 - 10) / (200-10);
+sprintf(#rmGuiValue, "%.0f Hz", slider1);
+rm_gui_bar(20, 80, gfx_w-40, 24, f_norm);
+
+#rmGuiLabel = "Wet";
+w_norm = (slider2 + 120) / 132;
+sprintf(#rmGuiValue, "%.0f dB", slider2);
+rm_gui_bar(20, 114, gfx_w-40, 24, w_norm);
+
+#rmGuiLabel = "Dry";
+d_norm = (slider3 + 120) / 132;
+sprintf(#rmGuiValue, "%.0f dB", slider3);
+rm_gui_bar(20, 148, gfx_w-40, 24, d_norm);
+

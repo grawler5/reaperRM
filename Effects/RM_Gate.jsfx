@@ -3,6 +3,7 @@
 // Telemetry: gate closure (0..1) and attenuation (dB)
 
 desc:RM_Gate [Telemetry]
+import rm_gui_basic.jsfx-inc
 //tags: dynamics gate
 
 slider1:-35<-80,0,0.1>Threshold (dB)
@@ -94,3 +95,30 @@ slider_automate(slider5);
 slider_automate(slider6);
 slider_automate(slider7);
 slider_automate(slider8);
+@gfx 480 300
+#rmGuiTitle = "RM_Gate"
+#rmGuiSubtitle = "Threshold / Attack / Release"
+
+gfx_clear = 0.07;
+rm_gui_header();
+
+th_norm = (slider1 + 80) / 80;
+#rmGuiLabel = "Threshold";
+sprintf(#rmGuiValue, "%.1f dB", slider1);
+rm_gui_bar(20, 78, gfx_w-40, 24, th_norm);
+
+atk_norm = min(max((slider2-0.1) / (50-0.1), 0), 1);
+#rmGuiLabel = "Attack";
+sprintf(#rmGuiValue, "%.1f ms", slider2);
+rm_gui_bar(20, 112, gfx_w-40, 24, atk_norm);
+
+rel_norm = min(max((slider3-5) / (1000-5), 0), 1);
+#rmGuiLabel = "Release";
+sprintf(#rmGuiValue, "%.0f ms", slider3);
+rm_gui_bar(20, 146, gfx_w-40, 24, rel_norm);
+
+rng_norm = min(max(slider4 / 80, 0), 1);
+#rmGuiLabel = "Range";
+sprintf(#rmGuiValue, "%.1f dB", slider4);
+rm_gui_bar(20, 180, gfx_w-40, 24, rng_norm);
+

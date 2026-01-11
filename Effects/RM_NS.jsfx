@@ -1,4 +1,5 @@
 desc:RM_NS (RM-NS)
+import rm_gui_basic.jsfx-inc
 slider1:50<0,100,1>Reduction
 
 @init
@@ -24,3 +25,15 @@ target = (level_db < thresh_db) ? min_gain : 1;
 gain = (target > gain) ? (target + (gain - target) * atk_coef) : (target + (gain - target) * rel_coef);
 spl0 = inL * gain;
 spl1 = inR * gain;
+@gfx 360 240
+#rmGuiTitle = "RM_NS"
+#rmGuiSubtitle = "Reduction"
+
+gfx_clear = 0.08;
+rm_gui_header();
+
+red_norm = min(max(slider1 / 100, 0), 1);
+#rmGuiLabel = "Reduction";
+sprintf(#rmGuiValue, "%d%%", slider1);
+rm_gui_bar(20, 80, gfx_w-40, 28, red_norm);
+

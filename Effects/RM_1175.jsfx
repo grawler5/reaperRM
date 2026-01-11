@@ -23,6 +23,7 @@
 //THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 desc:RM_1175 (1175 core) Hybrid v4
+import rm_gui_basic.jsfx-inc
 //tags: dynamics compressor
 //author: Stillwell (orig) / hybrid mapping
 
@@ -178,3 +179,25 @@ out_pin:right output
     slider5 = gr_db_out;
     slider_automate(slider5);
   );
+@gfx 620 360
+#rmGuiTitle = "RM_1175"
+#rmGuiSubtitle = "Ratio / Out / Attack"
+
+gfx_clear = 0.06;
+rm_gui_header();
+
+#rmGuiLabel = "Ratio";
+rt_norm = slider1 / 4;
+sprintf(#rmGuiValue, "%d", slider1);
+rm_gui_bar(20, 80, gfx_w-40, 24, rt_norm);
+
+#rmGuiLabel = "Out";
+out_norm = (slider2 + 24) / 48;
+sprintf(#rmGuiValue, "%+.1f dB", slider2);
+rm_gui_bar(20, 114, gfx_w-40, 24, out_norm);
+
+#rmGuiLabel = "Attack";
+at_norm = (slider3 - 20) / (2000-20);
+sprintf(#rmGuiValue, "%.0f us", slider3);
+rm_gui_bar(20, 148, gfx_w-40, 24, at_norm);
+
